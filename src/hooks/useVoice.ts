@@ -1,4 +1,3 @@
-// src/hooks/useVoice.ts
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -54,7 +53,7 @@ export function useVoice(): UseVoiceReturn {
     };
     
     audioRef.current.onerror = (e) => {
-      console.error('❌ Erreur élément audio:', e);
+      console.warn('⚠️ Élément audio: Impossible de lire la source. Fallback possible.');
       setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
       processingRef.current = false;
       processNextInQueue();
@@ -86,7 +85,7 @@ export function useVoice(): UseVoiceReturn {
     }
     
     processingRef.current = false;
-  }, []); // Dépendances vides car on utilise les refs
+  }, []);
 
   // Fallback vers Web Speech API (Browser)
   const playWithWebSpeech = useCallback((text: string, speed: number, volume: number): Promise<void> => {
@@ -97,7 +96,7 @@ export function useVoice(): UseVoiceReturn {
         return;
       }
 
-      // Arrêter toute lecture en cours
+      // Arrêter toute lecture en cours pour éviter les superpositions
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -115,22 +114,32 @@ export function useVoice(): UseVoiceReturn {
         resolve();
       };
 
-      utterance.onerror = (e) => {
-        console.error("❌ Erreur Web Speech API:", e);
+      utterance.onerror = (e: any) => {
+        // On affiche l'erreur spécifique du navigateur (ex: 'not-allowed', 'canceled')
+        const errorCode = e.error || 'unknown';
+        if (errorCode === 'not-allowed') {
+          console.warn("🔇 Lecture vocale bloquée par le navigateur (interaction utilisateur requise).");
+        } else if (errorCode !== 'interrupted') {
+          console.error(`❌ Erreur Web Speech API: ${errorCode}`);
+        }
+        
         setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
         processNextInQueue();
         resolve();
       };
 
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error("❌ Échec critique speechSynthesis.speak:", err);
+        resolve();
+      }
     });
   }, [processNextInQueue]);
 
   // Jouer un texte
   const playText = useCallback(async (text: string) => {
     try {
-      console.log(`🔊 Lecture: "${text.substring(0, 50)}..."`);
-      
       const response = await fetch('/api/voice/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,8 +153,7 @@ export function useVoice(): UseVoiceReturn {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn(`⚠️ Erreur serveur (${response.status}): ${errorData.error || 'Inconnu'}. Fallback Web Speech.`);
+        // En cas d'erreur 500 ou autre, on bascule direct sur le navigateur
         await playWithWebSpeech(text, state.speed, state.volume);
         return;
       }
@@ -171,7 +179,6 @@ export function useVoice(): UseVoiceReturn {
         await playWithWebSpeech(text, state.speed, state.volume);
       }
     } catch (error) {
-      console.error('❌ Erreur synthèse, passage au secours vocal:', error);
       await playWithWebSpeech(text, state.speed, state.volume);
     }
   }, [state.provider, state.voice, state.speed, state.volume, playWithWebSpeech]);
