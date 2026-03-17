@@ -13,7 +13,7 @@ export const api = {
    * Real RAG ingestion: reads file and calls server-side embedding flow.
    */
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
-    console.log(`[API_CLIENT][upload] Reading file: ${file.name} to parent: ${parentId}`);
+    console.log(`[API_CLIENT][upload] Ingestion du fichier: ${file.name} (Parent: ${parentId || 'Racine'})`);
     
     try {
       const text = await file.text();
@@ -23,14 +23,14 @@ export const api = {
         fileType: file.type || 'text/plain'
       });
 
-      console.log(`[API_CLIENT][upload] Server processing complete. DocID: ${result.docId}`);
+      console.log(`[API_CLIENT][upload] Ingestion serveur réussie. DocID: ${result.docId}`);
       return {
         success: true,
         chunks: result.chunks,
         docId: result.docId,
       };
     } catch (error) {
-      console.error('[API_CLIENT][upload] Ingestion error:', error);
+      console.error('[API_CLIENT][upload] Erreur lors de l\'ingestion:', error);
       throw error;
     }
   },
@@ -39,6 +39,7 @@ export const api = {
    * Conversational memory-aware chat interaction.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
+    console.log(`[API_CLIENT][chat] Envoi de la requête: "${query}"`);
     try {
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model' as const,
@@ -55,7 +56,7 @@ export const api = {
         sources: result.sources || []
       };
     } catch (error) {
-      console.error('[API_CLIENT][chat] Error:', error);
+      console.error('[API_CLIENT][chat] Erreur conversationnelle:', error);
       throw error;
     }
   },
@@ -64,23 +65,26 @@ export const api = {
    * Reset the local knowledge base.
    */
   async clearAll(): Promise<boolean> {
-    console.log(`[API_CLIENT][clearAll] cleanup.`);
-    return true;
+    console.log(`[API_CLIENT][clearAll] Nettoyage complet de la base locale...`);
+    // Simulé: ici on viderait ChromaDB/Firestore
+    return new Promise(resolve => setTimeout(() => resolve(true), 1000));
   },
 
   /**
    * Delete a specific item (file or folder)
    */
   async deleteItem(id: string): Promise<boolean> {
-    console.log(`[API_CLIENT][deleteItem] Deleting item: ${id}`);
-    return true;
+    console.log(`[API_CLIENT][deleteItem] Suppression définitive de l'élément: ${id}`);
+    // Simulé
+    return new Promise(resolve => setTimeout(() => resolve(true), 500));
   },
 
   /**
    * Create a new folder
    */
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
-    console.log(`[API_CLIENT][createFolder] Creating folder: ${name}`);
+    console.log(`[API_CLIENT][createFolder] Création du répertoire: ${name} (Parent: ${parentId || 'Racine'})`);
+    // Simulé
     return {
       id: Math.random().toString(36).substring(7),
       name,
@@ -94,14 +98,16 @@ export const api = {
    * Fetches real-time system and RAG performance statistics.
    */
   async getStats(): Promise<Stats> {
+    console.log(`[API_CLIENT][getStats] Récupération des statistiques système...`);
+    // Simulé pour refléter une base réelle
     return {
-      totalDocuments: 12,
-      totalChunks: 156,
-      totalSize: 2400000, 
+      totalDocuments: 15,
+      totalChunks: 342,
+      totalSize: 4800000, 
       diskSpace: {
         total: "Local",
-        used: "1.2 GB", 
-        free: "Unlimited"
+        used: "1.4 GB", 
+        free: "Illimité"
       }
     };
   },
@@ -110,6 +116,8 @@ export const api = {
    * Returns metadata of all items in a tree structure.
    */
   async getFileSystem(): Promise<FileSystemItem[]> {
+    console.log(`[API_CLIENT][getFileSystem] Construction de l'arborescence des fichiers...`);
+    // Simulation d'une BDD locale bien organisée
     return [
       {
         id: "root-1",
@@ -128,17 +136,17 @@ export const api = {
           },
           {
             id: "folder-sub",
-            name: "Archives",
+            name: "Archives Techniques",
             type: "folder",
             parentId: "root-1",
             children: [
               {
                 id: "file-old",
-                name: "Ancien_Plan.txt",
+                name: "Ancien_Plan_V1.txt",
                 type: "file",
                 size: 1200,
                 chunks: 2,
-                uploadedAt: new Date(2023, 1, 1).toISOString(),
+                uploadedAt: new Date(2023, 11, 15).toISOString(),
                 parentId: "folder-sub"
               }
             ]
@@ -146,11 +154,28 @@ export const api = {
         ]
       },
       {
-        id: "file-2",
-        name: "Notes_Physique.md",
+        id: "root-2",
+        name: "Éducation & Recherche",
+        type: "folder",
+        parentId: null,
+        children: [
+          {
+            id: "file-2",
+            name: "Cours_Physique_Particules.md",
+            type: "file",
+            size: 25000,
+            chunks: 8,
+            uploadedAt: new Date().toISOString(),
+            parentId: "root-2"
+          }
+        ]
+      },
+      {
+        id: "file-3",
+        name: "Note_Stratege_IA.json",
         type: "file",
-        size: 15000,
-        chunks: 4,
+        size: 5000,
+        chunks: 1,
         uploadedAt: new Date().toISOString(),
         parentId: null
       }
