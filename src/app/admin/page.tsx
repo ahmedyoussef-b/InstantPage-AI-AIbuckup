@@ -9,6 +9,10 @@ import { ArrowLeft, Database, FileText, HardDrive, LayoutDashboard } from 'lucid
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+/**
+ * Admin Dashboard for managing the RAG knowledge base.
+ * Displays ingestion stats and a list of indexed documents.
+ */
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -95,7 +99,7 @@ export default function AdminPage() {
           <Card className="bg-[#2f2f2f] border-white/5 text-white">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                <Database className="w-4 h-4" /> Stockage Utilisé
+                <Database className="w-4 h-4" /> RAM Utilisée
               </CardTitle>
             </CardHeader>
             <CardContent>

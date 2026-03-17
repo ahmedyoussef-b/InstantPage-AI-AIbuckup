@@ -1,14 +1,19 @@
 
-"use client"
+'use client';
+
 import Chat from '@/components/chat/Chat';
 import Upload from '@/components/upload/Upload';
 import { Bot, LayoutDashboard, Settings, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
+/**
+ * Main entry point for the Agentic Personal Assistant.
+ * Provides a ChatGPT-style sidebar and a centered chat/upload interface.
+ */
 export default function HomePage() {
   return (
     <main className="h-screen flex bg-[#171717] overflow-hidden">
-      {/* Sidebar - ChatGPT Style */}
+      {/* Sidebar - Navigation and Branding */}
       <aside className="w-64 flex-col hidden md:flex border-r border-white/5 bg-[#171717]">
         <div className="p-4 flex flex-col h-full">
           <Link href="/" className="flex items-center gap-2 px-3 py-2 mb-8 hover:bg-white/5 rounded-xl transition-all">
@@ -50,7 +55,7 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Chat Interface Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
         <header className="h-14 border-b border-white/5 flex items-center px-6 justify-between md:hidden bg-[#171717]">
           <h1 className="font-semibold text-white text-sm">Agentic AI</h1>
@@ -63,8 +68,9 @@ export default function HomePage() {
           <Chat />
         </div>
         
+        {/* Document Ingestion Component */}
         <Upload />
       </div>
     </main>
-  )
+  );
 }

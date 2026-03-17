@@ -1,31 +1,19 @@
 'use client';
 
 import { Document, Stats } from '@/types';
+import { chat as serverChat } from '@/ai/flows/chat-flow';
 
 /**
- * Client-side API simulation for the Agentic Personal Assistant.
- * Implements the RAG ingestion logic: Extraction, Chunking (1000 chars), and Metadata storage.
+ * Client-side API for the Agentic Personal Assistant.
+ * Connects to server-side Genkit flows for real AI intelligence.
  */
 export const api = {
   /**
    * Simulates the RAG ingestion process.
-   * 1. File Reading
-   * 2. Text Extraction (Simulated)
-   * 3. Chunking (1000 characters per chunk)
-   * 4. Embedding & Vector Storage (Simulated)
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
-    // Simulate reading and processing delay
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // In a real RAG system:
-    // const text = await extractText(file);
-    // const chunks = chunkText(text, 1000); 
-    
-    // Simulation: Assume average character count based on file size (approx 1 byte per char)
-    const estimatedChars = file.size;
-    const chunks = Math.max(1, Math.ceil(estimatedChars / 1000));
-    
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const chunks = Math.max(1, Math.ceil(file.size / 1000));
     return {
       success: true,
       chunks,
@@ -34,47 +22,53 @@ export const api = {
   },
 
   /**
-   * Simulates RAG-based chat interaction.
-   * Context is retrieved from ChromaDB (simulated) and passed to Genkit.
+   * Real RAG-based chat interaction via Genkit.
+   * Maintains history for conversational memory.
    */
-  async chat(query: string): Promise<{ answer: string; sources: string[] }> {
-    await new Promise(resolve => setTimeout(resolve, 1800));
+  async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
+    try {
+      // Map UI messages to Genkit history format
+      const genkitHistory = history.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        content: [{ text: msg.text }]
+      }));
 
-    const responses = [
-      "D'après l'analyse de vos documents (ChromaDB), la stratégie recommandée est centrée sur l'acquisition d'utilisateurs.",
-      "Le système RAG a identifié une croissance de 15% dans vos derniers rapports financiers indexés.",
-      "La documentation technique (MD/PDF) précise que la maintenance doit être planifiée toutes les 500 heures.",
-      "Analyse contextuelle terminée : vos documents traitent principalement de l'optimisation des ressources locales."
-    ];
+      const result = await serverChat({ 
+        text: query, 
+        history: genkitHistory 
+      });
 
-    return {
-      answer: responses[Math.floor(Math.random() * responses.length)],
-      sources: ["Strategie_Q1.md", "Rapport_Annuel_2023.pdf"]
-    };
+      return {
+        answer: result.answer,
+        sources: result.sources || []
+      };
+    } catch (error) {
+      console.error('Chat error:', error);
+      throw error;
+    }
   },
 
   async getStats(): Promise<Stats> {
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
-      totalDocuments: 12,
-      totalChunks: 452, // Updated to reflect 1000-char chunks
-      totalSize: 4500000,
+      totalDocuments: 3,
+      totalChunks: 180,
+      totalSize: 1260000,
       diskSpace: {
-        total: "Local Storage",
-        used: "15 MB",
+        total: "Local",
+        used: "1.2 MB",
         free: "Illimité"
       }
     };
   },
 
   async getDocuments(): Promise<Document[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
     return [
       {
         id: "1",
         name: "Rapport Annuel 2023.pdf",
         size: 1200000,
-        chunks: 120, // 1.2MB / 1000 chars
+        chunks: 120,
         uploadedAt: new Date(Date.now() - 86400000 * 2).toISOString()
       },
       {
@@ -86,7 +80,7 @@ export const api = {
       },
       {
         id: "3",
-        name: "Configuration.json",
+        name: "Notes_Reunion.txt",
         size: 15000,
         chunks: 15,
         uploadedAt: new Date().toISOString()
