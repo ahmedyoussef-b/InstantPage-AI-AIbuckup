@@ -2,15 +2,23 @@
 
 import { useState, useRef } from 'react';
 import { api } from '@/lib/api/client';
-import { Upload as UploadIcon, File, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload as UploadIcon, FileText, CheckCircle2, AlertCircle, Loader2, FileCode, Table, FileJson } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return <FileText className="w-4 h-4 text-red-400" />;
+    if (ext === 'md') return <FileCode className="w-4 h-4 text-blue-400" />;
+    if (ext === 'csv') return <Table className="w-4 h-4 text-green-400" />;
+    if (ext === 'json') return <FileJson className="w-4 h-4 text-yellow-400" />;
+    return <FileText className="w-4 h-4 text-gray-400" />;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -28,14 +36,14 @@ export default function Upload() {
       const result = await api.upload(file);
       setStatus({ 
         type: 'success', 
-        message: `Upload réussi ! ${result.chunks} chunks créés.` 
+        message: `Ingestion terminée : ${result.chunks} segments (1000 chars) créés et indexés dans la base locale.` 
       });
       setFile(null);
       if (inputRef.current) inputRef.current.value = '';
     } catch (error) {
       setStatus({ 
         type: 'error', 
-        message: 'Erreur lors de l\'upload du document.' 
+        message: "Erreur lors de l'extraction ou de l'indexation du document." 
       });
     } finally {
       setUploading(false);
@@ -61,9 +69,9 @@ export default function Upload() {
                 className="flex items-center justify-between w-full h-12 px-4 bg-[#2f2f2f] border border-white/10 rounded-xl cursor-pointer hover:bg-[#3a3a3a] transition-colors overflow-hidden"
               >
                 <div className="flex items-center gap-2 text-sm text-gray-300">
-                  <File className="w-4 h-4 text-gray-500" />
+                  {file ? getFileIcon(file.name) : <UploadIcon className="w-4 h-4 text-gray-500" />}
                   <span className="truncate max-w-[200px] sm:max-w-md">
-                    {file ? file.name : 'Choisir un fichier (PDF, TXT...)'}
+                    {file ? file.name : 'Ingérer PDF, TXT, MD, JSON, CSV...'}
                   </span>
                 </div>
                 <div className="text-xs font-medium text-blue-400">Parcourir</div>
@@ -78,12 +86,12 @@ export default function Upload() {
               {uploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Traitement...
+                  Ingestion...
                 </>
               ) : (
                 <>
                   <UploadIcon className="mr-2 h-4 w-4" />
-                  Upload
+                  Indexer
                 </>
               )}
             </Button>

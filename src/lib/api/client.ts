@@ -4,18 +4,27 @@ import { Document, Stats } from '@/types';
 
 /**
  * Client-side API simulation for the Agentic Personal Assistant.
- * In a production app, these would call Next.js Server Actions or API routes.
+ * Implements the RAG ingestion logic: Extraction, Chunking (1000 chars), and Metadata storage.
  */
 export const api = {
   /**
-   * Simulates uploading and chunking a document.
+   * Simulates the RAG ingestion process.
+   * 1. File Reading
+   * 2. Text Extraction (Simulated)
+   * 3. Chunking (1000 characters per chunk)
+   * 4. Embedding & Vector Storage (Simulated)
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Simulate reading and processing delay
+    await new Promise(resolve => setTimeout(resolve, 2500));
     
-    // Simulate chunk calculation (e.g., 1 chunk per 5KB)
-    const chunks = Math.max(1, Math.ceil(file.size / 5000));
+    // In a real RAG system:
+    // const text = await extractText(file);
+    // const chunks = chunkText(text, 1000); 
+    
+    // Simulation: Assume average character count based on file size (approx 1 byte per char)
+    const estimatedChars = file.size;
+    const chunks = Math.max(1, Math.ceil(estimatedChars / 1000));
     
     return {
       success: true,
@@ -25,45 +34,39 @@ export const api = {
   },
 
   /**
-   * Simulates a chat interaction with the knowledge base.
+   * Simulates RAG-based chat interaction.
+   * Context is retrieved from ChromaDB (simulated) and passed to Genkit.
    */
   async chat(query: string): Promise<{ answer: string; sources: string[] }> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1800));
 
     const responses = [
-      "Basé sur vos documents, il semble que la stratégie recommandée soit de se concentrer sur l'acquisition d'utilisateurs au premier trimestre.",
-      "Le rapport financier indique une croissance de 15% par rapport à l'année précédente.",
-      "Selon le manuel, la procédure de maintenance doit être effectuée toutes les 500 heures d'utilisation.",
-      "Vos documents ne mentionnent pas explicitement ce sujet, mais ils traitent de thèmes connexes comme l'optimisation des ressources."
+      "D'après l'analyse de vos documents (ChromaDB), la stratégie recommandée est centrée sur l'acquisition d'utilisateurs.",
+      "Le système RAG a identifié une croissance de 15% dans vos derniers rapports financiers indexés.",
+      "La documentation technique (MD/PDF) précise que la maintenance doit être planifiée toutes les 500 heures.",
+      "Analyse contextuelle terminée : vos documents traitent principalement de l'optimisation des ressources locales."
     ];
 
     return {
       answer: responses[Math.floor(Math.random() * responses.length)],
-      sources: ["document_reference_1.pdf", "notes_v2.txt"]
+      sources: ["Strategie_Q1.md", "Rapport_Annuel_2023.pdf"]
     };
   },
 
-  /**
-   * Retrieves overall statistics for the knowledge base.
-   */
   async getStats(): Promise<Stats> {
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
       totalDocuments: 12,
-      totalChunks: 154,
-      totalSize: 4500000, // 4.5 MB
+      totalChunks: 452, // Updated to reflect 1000-char chunks
+      totalSize: 4500000,
       diskSpace: {
-        total: "100 GB",
+        total: "Local Storage",
         used: "15 MB",
-        free: "99.98 GB"
+        free: "Illimité"
       }
     };
   },
 
-  /**
-   * Retrieves a list of uploaded documents.
-   */
   async getDocuments(): Promise<Document[]> {
     await new Promise(resolve => setTimeout(resolve, 500));
     return [
@@ -71,21 +74,21 @@ export const api = {
         id: "1",
         name: "Rapport Annuel 2023.pdf",
         size: 1200000,
-        chunks: 45,
+        chunks: 120, // 1.2MB / 1000 chars
         uploadedAt: new Date(Date.now() - 86400000 * 2).toISOString()
       },
       {
         id: "2",
-        name: "Notes de Réunion.txt",
-        size: 15000,
-        chunks: 3,
-        uploadedAt: new Date(Date.now() - 3600000).toISOString()
+        name: "Strategie_Q1.md",
+        size: 45000,
+        chunks: 45,
+        uploadedAt: new Date().toISOString()
       },
       {
         id: "3",
-        name: "Strategie_Q1.md",
-        size: 45000,
-        chunks: 8,
+        name: "Configuration.json",
+        size: 15000,
+        chunks: 15,
         uploadedAt: new Date().toISOString()
       }
     ];
