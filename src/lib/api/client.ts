@@ -10,23 +10,23 @@ import { chat as serverChat } from '@/ai/flows/chat-flow';
 export const api = {
   /**
    * Simulates the RAG ingestion process: 
-   * 1. Extraction 
-   * 2. Chunking (Fixed 1000 characters per segment as required)
-   * 3. Local Embedding (Ollama)
-   * 4. Local Vector Storage (ChromaDB)
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
+    console.log(`[API_CLIENT][upload] Starting upload for: ${file.name} (${file.size} bytes)`);
+    
     // Artificial delay to simulate local processing (Extraction + Embedding)
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Technical Spec: 1000 characters per segment
-    // We simulate character extraction based on file size
     const chunks = Math.max(1, Math.ceil(file.size / 1000));
+    const docId = Math.random().toString(36).substring(7);
+
+    console.log(`[API_CLIENT][upload] Processed ${file.name}: ${chunks} chunks generated. DocID: ${docId}`);
     
     return {
       success: true,
       chunks,
-      docId: Math.random().toString(36).substring(7),
+      docId,
     };
   },
 
@@ -34,6 +34,8 @@ export const api = {
    * Conversational memory-aware chat interaction.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
+    console.log(`[API_CLIENT][chat] Sending query to backend: "${query}"`);
+    
     try {
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model' as const,
@@ -45,21 +47,25 @@ export const api = {
         history: genkitHistory 
       });
 
+      console.log(`[API_CLIENT][chat] Received response from backend. Sources: ${result.sources?.join(', ') || 'None'}`);
+
       return {
         answer: result.answer,
         sources: result.sources || []
       };
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('[API_CLIENT][chat] Error during chat flow:', error);
       throw error;
     }
   },
 
   /**
-   * Reset the local knowledge base (Clear ChromaDB).
+   * Reset the local knowledge base.
    */
   async clearAll(): Promise<boolean> {
+    console.log(`[API_CLIENT][clearAll] Requesting full database cleanup.`);
     await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`[API_CLIENT][clearAll] Database cleared successfully.`);
     return true;
   },
 
@@ -67,8 +73,9 @@ export const api = {
    * Fetches real-time system and RAG performance statistics.
    */
   async getStats(): Promise<Stats> {
+    console.log(`[API_CLIENT][getStats] Fetching system statistics...`);
     await new Promise(resolve => setTimeout(resolve, 500));
-    return {
+    const stats = {
       totalDocuments: 3,
       totalChunks: 43,
       totalSize: 1782200, 
@@ -78,13 +85,16 @@ export const api = {
         free: "Unlimited"
       }
     };
+    console.log(`[API_CLIENT][getStats] Stats retrieved: ${stats.totalDocuments} docs, ${stats.totalChunks} chunks.`);
+    return stats;
   },
 
   /**
    * Returns metadata of all documents indexed in the local base.
    */
   async getDocuments(): Promise<Document[]> {
-    return [
+    console.log(`[API_CLIENT][getDocuments] Fetching indexed documents list...`);
+    const docs = [
       {
         id: "1",
         name: "Cours Physique - 3ème.pdf",
@@ -107,5 +117,7 @@ export const api = {
         uploadedAt: new Date().toISOString()
       }
     ];
+    console.log(`[API_CLIENT][getDocuments] Found ${docs.length} documents.`);
+    return docs;
   }
 };

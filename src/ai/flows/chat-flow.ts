@@ -44,14 +44,16 @@ const retrieveDocuments = ai.defineTool(
     }),
   },
   async (input) => {
-    // Simulated RAG Retrieval logic
-    // In a production environment, this would query ChromaDB or Firestore Vector Search.
-    console.log(`[RAG] Searching for: ${input.query}`);
+    console.log(`[BACKEND][TOOL:retrieveDocuments] Searching for: "${input.query}"`);
     
-    return {
+    // Simulated RAG Retrieval logic
+    const result = {
       context: "D'après les documents indexés (Rapport_Annuel_2023.pdf et Strategie_Q1.md), l'entreprise prévoit une transition vers des architectures agentiques d'ici la fin de l'année. La sécurité des données locales est citée comme la priorité numéro 1.",
       sources: ["Rapport_Annuel_2023.pdf", "Strategie_Q1.md"],
     };
+
+    console.log(`[BACKEND][TOOL:retrieveDocuments] Found ${result.sources.length} relevant sources.`);
+    return result;
   }
 );
 
@@ -59,6 +61,9 @@ const retrieveDocuments = ai.defineTool(
  * Main chat flow that acts as an Agent.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
+  console.log(`[BACKEND][FLOW:chat] Received user query: "${input.text}"`);
+  console.log(`[BACKEND][FLOW:chat] History length: ${input.history?.length || 0} messages.`);
+
   const response = await ai.generate({
     system: `Tu es un assistant personnel intelligent et agentique. 
     TES RÈGLES :
@@ -72,11 +77,10 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     tools: [retrieveDocuments],
   });
 
-  // In this implementation, we extract the answer from the model's text response.
-  // We can also check if the tool was called to enrich the source metadata.
+  console.log(`[BACKEND][FLOW:chat] AI response generated. Length: ${response.text.length} chars.`);
+
   return {
     answer: response.text,
-    // For simplicity in this MVP, sources are mentioned in the text or we can mock them based on tool usage
     sources: response.text.includes('Rapport_Annuel_2023.pdf') ? ["Rapport_Annuel_2023.pdf", "Strategie_Q1.md"] : [],
   };
 }

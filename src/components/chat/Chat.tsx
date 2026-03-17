@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -32,6 +31,8 @@ export default function Chat() {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
 
+    console.log(`[UI_CHAT] User initiated send: "${trimmed}"`);
+
     setLoading(true);
     setInput('');
     const userMsg: Message = { role: 'user', text: trimmed };
@@ -40,6 +41,7 @@ export default function Chat() {
 
     try {
       const data = await api.chat(trimmed, messages);
+      console.log(`[UI_CHAT] AI response received. Sources found: ${data.sources.length}`);
       
       setMessages(prev => [...prev, { 
         role: 'ai', 
@@ -47,6 +49,7 @@ export default function Chat() {
         sources: data.sources 
       }]);
     } catch (error) {
+      console.error(`[UI_CHAT] Error sending message:`, error);
       setMessages(prev => [...prev, { 
         role: 'ai', 
         text: 'Désolé, une erreur est survenue lors de la communication avec l\'assistant.' 

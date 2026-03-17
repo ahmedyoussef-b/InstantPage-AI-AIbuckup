@@ -23,6 +23,7 @@ export default function Upload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
+      console.log(`[UI_UPLOAD] File selected: ${selected.name} (${selected.size} bytes)`);
       setFile(selected);
       setStatus(null);
     }
@@ -30,10 +31,15 @@ export default function Upload() {
 
   const handleUpload = async () => {
     if (!file) return;
+    
+    console.log(`[UI_UPLOAD] User clicked upload for: ${file.name}`);
     setUploading(true);
     setStatus(null);
+    
     try {
       const result = await api.upload(file);
+      console.log(`[UI_UPLOAD] Ingestion success. Chunks: ${result.chunks}`);
+      
       setStatus({ 
         type: 'success', 
         message: `Upload réussi!`,
@@ -42,6 +48,7 @@ export default function Upload() {
       setFile(null);
       if (inputRef.current) inputRef.current.value = '';
     } catch (error) {
+      console.error(`[UI_UPLOAD] Ingestion failed:`, error);
       setStatus({ 
         type: 'error', 
         message: "Erreur lors de l'extraction ou de l'indexation du document." 
@@ -101,7 +108,7 @@ export default function Upload() {
             }`}>
               {status.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
               <span>
-                {status.message} {status.chunks && <span className="font-bold">{status.chunks} chunks créés.</span>}
+                {status.message} {status.chunks && <span className="font-bold">{status.chunks} segments créés.</span>}
               </span>
             </div>
           )}

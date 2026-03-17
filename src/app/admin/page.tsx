@@ -30,11 +30,13 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   useEffect(() => { 
+    console.log('[UI_ADMIN] Component mounted. Loading initial data...');
     loadData(); 
   }, []);
 
   const loadData = async () => {
     setLoading(true);
+    console.log('[UI_ADMIN] loadData: Fetching stats and documents...');
     try {
       const [statsData, docsData] = await Promise.all([
         api.getStats(), 
@@ -42,7 +44,9 @@ export default function AdminPage() {
       ]);
       setStats(statsData);
       setDocuments(docsData);
+      console.log('[UI_ADMIN] loadData success. Docs count:', docsData.length);
     } catch (err) {
+      console.error('[UI_ADMIN] loadData error:', err);
       toast({
         variant: "destructive",
         title: "Erreur",
@@ -55,14 +59,17 @@ export default function AdminPage() {
 
   const handleClearAll = async () => {
     if (confirm("Êtes-vous sûr de vouloir supprimer TOUTE la base de connaissances locale ?")) {
+      console.log('[UI_ADMIN] User confirmed clear database.');
       try {
         await api.clearAll();
+        console.log('[UI_ADMIN] Database clear complete.');
         toast({
           title: "Base nettoyée",
           description: "Tous les documents et segments ont été supprimés de ChromaDB."
         });
         loadData();
       } catch (e) {
+        console.error('[UI_ADMIN] clear database error:', e);
         toast({
           variant: "destructive",
           title: "Erreur",
@@ -223,6 +230,7 @@ export default function AdminPage() {
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8 hover:bg-white/10"
+                            onClick={() => console.log(`[UI_ADMIN] Inspecting chunks for document: ${doc.name}`)}
                             title="Inspecter les segments"
                           >
                             <Eye className="w-3.5 h-3.5" />
