@@ -3,9 +3,11 @@
 import { FileSystemItem, Stats, ChunkMetadata } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
+import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
- * État local simulé persistant pour la session
+ * État local simulé persistant pour la session.
+ * On utilise une variable globale au module pour qu'elle survive aux re-renders.
  */
 let mockFileSystem: FileSystemItem[] = [
   {
@@ -39,6 +41,26 @@ const getAllFileContents = (items: FileSystemItem[]): string => {
   return context;
 };
 
+// Helper pour trouver tous les fichiers dans un dossier (pour la purge récursive)
+const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystemItem[] => {
+  let files: FileSystemItem[] = [];
+  
+  const search = (currentItems: FileSystemItem[], found: boolean) => {
+    currentItems.forEach(item => {
+      const isTarget = item.id === targetId || found;
+      if (isTarget && item.type === 'file') {
+        files.push(item);
+      }
+      if (item.children) {
+        search(item.children, isTarget);
+      }
+    });
+  };
+  
+  search(items, false);
+  return files;
+};
+
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     try {
@@ -55,7 +77,7 @@ export const api = {
         type: 'file',
         size: file.size,
         chunks: result.chunks,
-        content: text, // On stocke le texte pour le passage au LLM
+        content: text,
         uploadedAt: new Date().toISOString(),
         parentId: parentId
       };
@@ -74,6 +96,7 @@ export const api = {
       mockFileSystem = addItem(mockFileSystem);
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error) {
+      console.error("[API_CLIENT] Upload failed:", error);
       throw error;
     }
   },
@@ -96,11 +119,13 @@ export const api = {
       });
       return { answer: result.answer, sources: result.sources || [] };
     } catch (error) {
+      console.error("[API_CLIENT] Chat failed:", error);
       throw error;
     }
   },
 
   async clearAll(): Promise<boolean> {
+    console.log("[API_CLIENT] Clearing all files, keeping folders...");
     const keepFolders = (items: FileSystemItem[]): FileSystemItem[] => {
       return items
         .filter(item => item.type === 'folder')
@@ -111,15 +136,25 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
+    console.log(`[API_CLIENT] Deleting item: ${name} (ID: ${id})`);
     let totalPurged = 0;
     
+    // 1. Purge des segments de tous les fichiers concernés (récursivement)
+    const filesToPurge = findFilesToPurge(mockFileSystem, id);
+    for (const file of filesToPurge) {
+      try {
+        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name });
+        totalPurged += purgeResult.purgedChunks;
+      } catch (e) {
+        console.warn(`[API_CLIENT] Failed to purge segments for ${file.name}, skipping server purge...`, e);
+        totalPurged += (file.chunks || 0);
+      }
+    }
+    
+    // 2. Retrait de l'arborescence locale
     const removeItem = (items: FileSystemItem[]): FileSystemItem[] => {
       return items.filter(item => {
-        if (item.id === id) {
-          // Si c'est un dossier, on pourrait compter les segments de ses enfants ici
-          totalPurged += item.chunks || 0;
-          return false;
-        }
+        if (item.id === id) return false;
         if (item.children) {
           item.children = removeItem(item.children);
         }
@@ -128,7 +163,7 @@ export const api = {
     };
     
     mockFileSystem = removeItem(mockFileSystem);
-    return { success: true, purgedChunks: totalPurged || 5 };
+    return { success: true, purgedChunks: totalPurged };
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
@@ -179,7 +214,6 @@ export const api = {
   },
 
   async getDocChunks(docId: string): Promise<ChunkMetadata[]> {
-    // On essaie de retrouver le fichier pour afficher son contenu réel par segments
     const findFile = (items: FileSystemItem[]): FileSystemItem | null => {
       for (const item of items) {
         if (item.id === docId) return item;
@@ -194,7 +228,6 @@ export const api = {
     const file = findFile(mockFileSystem);
     if (!file || !file.content) return [];
 
-    // On simule le découpage pour l'inspecteur
     const segments = file.content.match(/.{1,1000}/g) || [];
     return segments.map((text, i) => ({
       id: `chunk-${docId}-${i}`,
