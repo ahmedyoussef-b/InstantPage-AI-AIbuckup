@@ -74,8 +74,17 @@ class TTSService {
     } = options;
 
     try {
+      // Sélectionner le provider
+      const ttsProvider = this.providers[provider] || this.providers[this.defaultProvider];
+      if (!ttsProvider) {
+        throw new Error(`Provider TTS non trouvé: ${provider}`);
+      }
+
+      // Format attendu selon le provider
+      const format = provider === 'piper' ? 'wav' : 'mp3';
+
       // Vérifier le cache
-      const cacheKey = this.generateCacheKey(text, { provider, voice, language, speed });
+      const cacheKey = this.generateCacheKey(text, { provider, voice, language, speed }) + '.' + format;
       
       if (cache) {
         const cachedAudio = await this.cache.get(cacheKey);
@@ -83,23 +92,15 @@ class TTSService {
           console.log('✅ Audio récupéré du cache');
           return {
             audio: cachedAudio.toString('base64'),
-            format: 'mp3',
+            format: format as 'mp3' | 'wav',
             duration: this.estimateDuration(text),
             fromCache: true
           };
         }
       }
 
-      // Sélectionner le provider
-      const ttsProvider = this.providers[provider] || this.providers[this.defaultProvider];
-      
-      if (!ttsProvider) {
-        throw new Error(`Provider TTS non trouvé: ${provider}`);
-      }
-
       // Obtenir le modèle de voix
       const voiceModel = this.getVoiceModel(language, provider, voice);
-      
       console.log(`🔄 Provider: ${provider}, Voix: ${voiceModel}`);
       
       // Synthétiser
@@ -118,17 +119,17 @@ class TTSService {
       
       return {
         audio: audioBuffer.toString('base64'),
-        format: 'mp3',
+        format: format as 'mp3' | 'wav',
         duration: this.estimateDuration(text),
         fromCache: false
       };
 
-    } catch (error) {
-      console.error('❌ Erreur synthèse:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur synthèse:', error.message);
       
-      // Fallback automatique
+      // Fallback automatique vers Edge si Piper échoue (souvent dû aux binaires manquants)
       if (provider !== this.fallbackProvider) {
-        console.log(`🔄 Fallback vers ${this.fallbackProvider}`);
+        console.log(`🔄 Tentative de fallback vers ${this.fallbackProvider}...`);
         return this.synthesize({ ...options, provider: this.fallbackProvider });
       }
       
@@ -136,38 +137,25 @@ class TTSService {
     }
   }
 
-  /**
-   * Obtenir le modèle de voix
-   */
   private getVoiceModel(language: string, provider: string, voiceType: string): string {
     return this.voices[language]?.[provider]?.[voiceType] || 
            this.voices[language]?.[provider]?.default ||
-           this.voices['fr-FR'][provider]?.default;
+           this.voices['fr-FR']?.[provider]?.default ||
+           'default';
   }
 
-  /**
-   * Générer clé de cache
-   */
   private generateCacheKey(text: string, options: any): string {
     const data = `${text}-${JSON.stringify(options)}`;
-    return crypto.createHash('md5').update(data).digest('hex') + '.mp3';
+    return crypto.createHash('md5').update(data).digest('hex');
   }
 
-  /**
-   * Estimer la durée audio (approximatif)
-   */
   private estimateDuration(text: string): number {
-    // ~150 mots par minute, ~5 caractères par mot
     const wordCount = text.split(/\s+/).length;
     return Math.ceil(wordCount / 150 * 60);
   }
 
-  /**
-   * Lister les voix disponibles
-   */
   async listVoices(): Promise<VoiceInfo[]> {
     const voices: VoiceInfo[] = [];
-    
     for (const [lang, langData] of Object.entries(this.voices)) {
       for (const [provider, providerVoices] of Object.entries(langData as any)) {
         for (const [voiceId, modelName] of Object.entries(providerVoices)) {
@@ -183,16 +171,11 @@ class TTSService {
         }
       }
     }
-    
     return voices;
   }
 
-  /**
-   * Vérifier la santé des providers
-   */
   async checkHealth(): Promise<Record<string, boolean>> {
     const status: Record<string, boolean> = {};
-    
     for (const [name, provider] of Object.entries(this.providers)) {
       try {
         status[name] = await provider.checkHealth();
@@ -200,7 +183,6 @@ class TTSService {
         status[name] = false;
       }
     }
-    
     return status;
   }
 }

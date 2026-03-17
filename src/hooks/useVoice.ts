@@ -51,6 +51,13 @@ export function useVoice(): UseVoiceReturn {
       setState(prev => ({ ...prev, isPaused: false }));
     };
     
+    audioRef.current.onerror = (e) => {
+      console.error('Erreur élément audio:', e);
+      setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
+      processingRef.current = false;
+      processNextInQueue();
+    };
+    
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -90,12 +97,22 @@ export function useVoice(): UseVoiceReturn {
         })
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur synthèse serveur');
+      }
+
       const data: VoiceResponse = await response.json();
       
       if (audioRef.current) {
-        const audioSrc = `data:audio/${data.format};base64,${data.audio}`;
+        // Important: utiliser le format renvoyé par le serveur
+        const mimeType = data.format === 'wav' ? 'audio/wav' : 'audio/mpeg';
+        const audioSrc = `data:${mimeType};base64,${data.audio}`;
+        
         audioRef.current.src = audioSrc;
         audioRef.current.volume = state.volume;
+        audioRef.current.playbackRate = 1.0; // Piper gère déjà la vitesse côté serveur
+        
         await audioRef.current.play();
         
         setState(prev => ({
@@ -105,51 +122,42 @@ export function useVoice(): UseVoiceReturn {
         }));
       }
     } catch (error) {
-      console.error('Erreur lecture:', error);
+      console.error('Erreur lecture voice hook:', error);
       processingRef.current = false;
-      processNextInQueue();
+      // Optionnel: notifier l'utilisateur de l'échec de lecture
     }
   }, [state.provider, state.voice, state.speed, state.volume, processNextInQueue]);
 
   // Fonction principale pour jouer
   const play = useCallback(async (text: string, options?: Partial<VoiceOptions>) => {
-    // Mettre à jour les options si fournies
     if (options) {
-      setState(prev => ({
-        ...prev,
-        ...options
-      }));
+      setState(prev => ({ ...prev, ...options }));
     }
     
-    // Ajouter à la file d'attente
     queueRef.current.push(text);
     setState(prev => ({ ...prev, queue: [...queueRef.current] }));
     
-    // Démarrer le traitement si pas déjà en cours
     if (!processingRef.current && !state.isPlaying) {
       processNextInQueue();
     }
   }, [state.isPlaying, processNextInQueue]);
 
-  // Pause
   const pause = useCallback(() => {
     if (audioRef.current && state.isPlaying) {
       audioRef.current.pause();
     }
   }, [state.isPlaying]);
 
-  // Reprendre
   const resume = useCallback(() => {
     if (audioRef.current && state.isPaused) {
-      audioRef.current.play();
+      audioRef.current.play().catch(console.error);
     }
   }, [state.isPaused]);
 
-  // Arrêter
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      audioRef.current.src = '';
     }
     
     queueRef.current = [];
@@ -163,13 +171,11 @@ export function useVoice(): UseVoiceReturn {
     processingRef.current = false;
   }, []);
 
-  // Vider la file d'attente
   const clearQueue = useCallback(() => {
     queueRef.current = [];
     setState(prev => ({ ...prev, queue: [] }));
   }, []);
 
-  // Changer volume
   const setVolume = useCallback((volume: number) => {
     if (audioRef.current) {
       audioRef.current.volume = Math.max(0, Math.min(1, volume));
@@ -177,7 +183,6 @@ export function useVoice(): UseVoiceReturn {
     setState(prev => ({ ...prev, volume }));
   }, []);
 
-  // Changer vitesse
   const setSpeed = useCallback((speed: number) => {
     setState(prev => ({ ...prev, speed }));
   }, []);
