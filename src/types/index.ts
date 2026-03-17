@@ -3,12 +3,15 @@ export interface Message {
   text: string;
 }
 
-export interface Document {
+export interface FileSystemItem {
   id: string;
   name: string;
-  size: number;
-  chunks: number;
-  uploadedAt: string;
+  type: 'file' | 'folder';
+  size?: number;
+  chunks?: number;
+  uploadedAt?: string;
+  parentId: string | null;
+  children?: FileSystemItem[];
 }
 
 export interface Stats {

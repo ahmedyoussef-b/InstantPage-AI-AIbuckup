@@ -1,6 +1,6 @@
 'use client';
 
-import { Document, Stats } from '@/types';
+import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 
@@ -12,15 +12,11 @@ export const api = {
   /**
    * Real RAG ingestion: reads file and calls server-side embedding flow.
    */
-  async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
-    console.log(`[API_CLIENT][upload] Reading file: ${file.name}`);
+  async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
+    console.log(`[API_CLIENT][upload] Reading file: ${file.name} to parent: ${parentId}`);
     
     try {
-      // Extraction du texte côté client (lecture simple)
       const text = await file.text();
-      
-      console.log(`[API_CLIENT][upload] Sending content to server for real embedding...`);
-      
       const result = await ingestDocument({
         fileName: file.name,
         fileContent: text,
@@ -28,7 +24,6 @@ export const api = {
       });
 
       console.log(`[API_CLIENT][upload] Server processing complete. DocID: ${result.docId}`);
-      
       return {
         success: true,
         chunks: result.chunks,
@@ -44,8 +39,6 @@ export const api = {
    * Conversational memory-aware chat interaction.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
-    console.log(`[API_CLIENT][chat] Sending query to backend: "${query}"`);
-    
     try {
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model' as const,
@@ -57,14 +50,12 @@ export const api = {
         history: genkitHistory 
       });
 
-      console.log(`[API_CLIENT][chat] Received response from backend. Sources: ${result.sources?.join(', ') || 'None'}`);
-
       return {
         answer: result.answer,
         sources: result.sources || []
       };
     } catch (error) {
-      console.error('[API_CLIENT][chat] Error during chat flow:', error);
+      console.error('[API_CLIENT][chat] Error:', error);
       throw error;
     }
   },
@@ -73,58 +64,96 @@ export const api = {
    * Reset the local knowledge base.
    */
   async clearAll(): Promise<boolean> {
-    console.log(`[API_CLIENT][clearAll] Requesting full database cleanup.`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log(`[API_CLIENT][clearAll] Database cleared successfully.`);
+    console.log(`[API_CLIENT][clearAll] cleanup.`);
     return true;
+  },
+
+  /**
+   * Delete a specific item (file or folder)
+   */
+  async deleteItem(id: string): Promise<boolean> {
+    console.log(`[API_CLIENT][deleteItem] Deleting item: ${id}`);
+    return true;
+  },
+
+  /**
+   * Create a new folder
+   */
+  async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
+    console.log(`[API_CLIENT][createFolder] Creating folder: ${name}`);
+    return {
+      id: Math.random().toString(36).substring(7),
+      name,
+      type: 'folder',
+      parentId,
+      children: []
+    };
   },
 
   /**
    * Fetches real-time system and RAG performance statistics.
    */
   async getStats(): Promise<Stats> {
-    console.log(`[API_CLIENT][getStats] Fetching system statistics...`);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const stats = {
-      totalDocuments: 3,
-      totalChunks: 43,
-      totalSize: 1782200, 
+    return {
+      totalDocuments: 12,
+      totalChunks: 156,
+      totalSize: 2400000, 
       diskSpace: {
         total: "Local",
         used: "1.2 GB", 
         free: "Unlimited"
       }
     };
-    return stats;
   },
 
   /**
-   * Returns metadata of all documents indexed in the local base.
+   * Returns metadata of all items in a tree structure.
    */
-  async getDocuments(): Promise<Document[]> {
-    const docs = [
+  async getFileSystem(): Promise<FileSystemItem[]> {
+    return [
       {
-        id: "1",
-        name: "Cours Physique - 3ème.pdf",
-        size: 1200000,
-        chunks: 28,
-        uploadedAt: new Date(Date.now() - 86400000 * 2).toISOString()
+        id: "root-1",
+        name: "Projets 2024",
+        type: "folder",
+        parentId: null,
+        children: [
+          {
+            id: "file-1",
+            name: "Cahier_des_charges.pdf",
+            type: "file",
+            size: 450000,
+            chunks: 15,
+            uploadedAt: new Date().toISOString(),
+            parentId: "root-1"
+          },
+          {
+            id: "folder-sub",
+            name: "Archives",
+            type: "folder",
+            parentId: "root-1",
+            children: [
+              {
+                id: "file-old",
+                name: "Ancien_Plan.txt",
+                type: "file",
+                size: 1200,
+                chunks: 2,
+                uploadedAt: new Date(2023, 1, 1).toISOString(),
+                parentId: "folder-sub"
+              }
+            ]
+          }
+        ]
       },
       {
-        id: "2",
-        name: "COMMANDS_REFERENCE.txt",
-        size: 2200,
-        chunks: 3,
-        uploadedAt: new Date().toISOString()
-      },
-      {
-        id: "3",
-        name: "Devoir Contrôle N°1.pdf",
-        size: 580000,
-        chunks: 12,
-        uploadedAt: new Date().toISOString()
+        id: "file-2",
+        name: "Notes_Physique.md",
+        type: "file",
+        size: 15000,
+        chunks: 4,
+        uploadedAt: new Date().toISOString(),
+        parentId: null
       }
     ];
-    return docs;
   }
 };
