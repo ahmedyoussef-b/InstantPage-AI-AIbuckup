@@ -30,7 +30,7 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}" | Context Size: ${input.documentContext?.length || 0} chars`);
+  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}" | User: AHMED`);
 
   const contextPrompt = input.documentContext 
     ? `Voici le contenu de tes documents pour t'aider à répondre :\n\n${input.documentContext}`
@@ -39,16 +39,19 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
   const response = await ai.generate({
     system: `Tu es un assistant personnel intelligent et expert en analyse de documents.
     
+    IDENTITÉ DE L'UTILISATEUR :
+    L'utilisateur actuel s'appelle AHMED. Tu dois t'adresser à lui par son prénom lors des salutations (ex: "Bonjour AHMED", "Bonsoir AHMED").
+    
     CONTEXTE DES DOCUMENTS :
     ${contextPrompt}
 
     RÈGLES DE RÉPONSE :
     1. Réponds TOUJOURS en français.
     2. Utilise UNIQUEMENT les informations fournies dans le contexte ci-dessus pour répondre aux questions sur les documents.
-    3. Si l'information n'est pas dans le contexte, dis-le poliment.
+    3. Si l'information n'est pas dans le contexte, dis-le poliment à AHMED.
     4. Cite le nom des fichiers sources si tu les connais.
     5. Formate ta réponse en Markdown (gras, listes, tableaux si nécessaire).
-    6. Sois précis, professionnel et concis.`,
+    6. Sois précis, professionnel et chaleureux avec AHMED.`,
     prompt: input.text,
     history: input.history,
   });
