@@ -8,7 +8,7 @@ import { deleteDocument } from '@/ai/flows/delete-document-flow';
 /**
  * Persistance locale pour éviter le reset au redémarrage.
  */
-const STORAGE_KEY = 'agentic_assistant_db';
+const STORAGE_KEY = 'agentic_assistant_db_v2';
 
 const getInitialFileSystem = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -88,24 +88,15 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     try {
       // --- DÉTECTION DES DOUBLONS ---
-      const findFolder = (list: FileSystemItem[]): FileSystemItem | null => {
+      const findInList = (list: FileSystemItem[]): boolean => {
         for (const item of list) {
-          if (item.id === parentId) return item;
-          if (item.children) {
-            const found = findFolder(item.children);
-            if (found) return found;
-          }
+          if (item.type === 'file' && item.name === file.name && item.parentId === parentId) return true;
+          if (item.children && findInList(item.children)) return true;
         }
-        return null;
+        return false;
       };
 
-      const targetList = parentId 
-        ? findFolder(mockFileSystem)?.children || []
-        : mockFileSystem.filter(i => i.parentId === null);
-
-      const isDuplicate = targetList.some(item => item.type === 'file' && item.name === file.name);
-
-      if (isDuplicate) {
+      if (findInList(mockFileSystem)) {
         throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
       }
       // -------------------------------
@@ -172,7 +163,6 @@ export const api = {
   },
 
   async clearAll(): Promise<boolean> {
-    console.log("[API_CLIENT] Clearing all files, keeping folders...");
     const keepFoldersOnly = (items: FileSystemItem[]): FileSystemItem[] => {
       return items
         .filter(item => item.type === 'folder')
@@ -184,16 +174,12 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    console.log(`[API_CLIENT] Suppression de l'élément: ${name} (ID: ${id})`);
     let totalPurged = 0;
-    
-    // 1. Identification récursive des fichiers à purger
     const filesToPurge = findFilesToPurge(mockFileSystem, id);
     
     for (const file of filesToPurge) {
       try {
-        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(err => {
-          console.warn(`[API_CLIENT] Purge serveur échouée pour ${file.name}, suppression locale uniquement.`);
+        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(() => {
           return { purgedChunks: file.chunks || 0 };
         });
         totalPurged += purgeResult.purgedChunks;
@@ -202,7 +188,6 @@ export const api = {
       }
     }
     
-    // 2. Retrait de l'arborescence locale
     const removeItemFromTree = (items: FileSystemItem[]): FileSystemItem[] => {
       return items.filter(item => {
         if (item.id === id) return false;
@@ -260,12 +245,11 @@ export const api = {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "Persistant (Browser)", used: `${(stats.size / 1024 / 1024).toFixed(2)} MB`, free: "Local" }
+      diskSpace: { total: "Persistant (LocalStorage)", used: `${(stats.size / 1024 / 1024).toFixed(2)} MB`, free: "N/A" }
     };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
-    // Toujours re-vérifier si une mise à jour externe a eu lieu (optionnel mais plus sûr)
     return [...mockFileSystem];
   },
 
