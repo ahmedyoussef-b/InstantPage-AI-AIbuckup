@@ -1,22 +1,20 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api/client';
-import { Send, Bot, User, Database, Sparkles, FileText, Brain, ShieldCheck, ListChecks, HelpCircle } from 'lucide-react';
+import { Send, Sparkles, FileText, Brain, ShieldCheck, ListChecks, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import VoiceMessage from '@/components/chat/VoiceMessage';
+import VoiceControls from '@/components/chat/VoiceControls';
 
 interface Message {
   role: 'user' | 'ai';
   text: string;
   sources?: string[];
+  id: string;
 }
 
 export default function Chat() {
@@ -38,24 +36,29 @@ export default function Chat() {
 
     setLoading(true);
     if (!textOverride) setInput('');
-    const userMsg: Message = { role: 'user', text: trimmed };
-    const currentMessages = [...messages, userMsg];
-    setMessages(currentMessages);
+    
+    const userMsgId = Math.random().toString(36).substring(7);
+    const userMsg: Message = { role: 'user', text: trimmed, id: userMsgId };
+    setMessages(prev => [...prev, userMsg]);
 
     try {
       const data = await api.chat(trimmed, messages);
       console.log(`[UI_CHAT] AI response received. Sources found: ${data.sources?.length || 0}`);
       
+      const aiMsgId = Math.random().toString(36).substring(7);
       setMessages(prev => [...prev, { 
         role: 'ai', 
         text: data.answer,
-        sources: data.sources 
+        sources: data.sources,
+        id: aiMsgId
       }]);
     } catch (error) {
       console.error(`[UI_CHAT] Error sending message:`, error);
+      const errId = Math.random().toString(36).substring(7);
       setMessages(prev => [...prev, { 
         role: 'ai', 
-        text: 'Désolé, une erreur est survenue lors de la communication avec l\'assistant.' 
+        text: 'Désolé, une erreur est survenue lors de la communication avec l\'assistant.',
+        id: errId
       }]);
     } finally {
       setLoading(false);
@@ -70,14 +73,14 @@ export default function Chat() {
   ];
 
   const suggestions = [
-    "Quelles sont les conclusions du Rapport Annuel ?",
-    "Résume-moi le fichier Cahier des charges.",
-    "Y a-t-il des mentions de sécurité dans mes documents ?",
-    "Compare les stratégies entre mes différents projets."
+    "Quelles sont les conclusions de mes documents ?",
+    "Résume-moi les derniers fichiers ajoutés.",
+    "Y a-t-il des mentions de sécurité dans ma base ?",
+    "Analyse les stratégies de mes projets en cours."
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#212121]">
+    <div className="flex flex-col h-full bg-[#212121] relative">
       <ScrollArea className="flex-1 p-4 md:p-8">
         <div className="max-w-3xl mx-auto space-y-8 pb-20">
           {messages.length === 0 && (
@@ -89,7 +92,7 @@ export default function Chat() {
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white tracking-tight">Bonjour, comment puis-je vous aider ?</h2>
                 <p className="text-gray-400 max-w-lg mx-auto">
-                  Importez vos documents pour commencer une analyse intelligente et sécurisée.
+                  Importez vos documents pour commencer une analyse intelligente et sécurisée avec réponse vocale.
                 </p>
               </div>
 
@@ -126,46 +129,20 @@ export default function Chat() {
             </div>
           )}
           
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex gap-4 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <Avatar className={`w-8 h-8 flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-blue-600' : 'bg-white/10'}`}>
-                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
-                </Avatar>
-                <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`p-4 rounded-2xl ${
-                    msg.role === 'user' ? 'bg-[#2f2f2f] text-white shadow-lg border border-white/5' : 'text-gray-200 bg-white/5'
-                  }`}>
-                    {msg.role === 'ai' ? (
-                      <div className="prose prose-invert max-w-none text-sm leading-relaxed prose-p:my-2 prose-headings:text-white prose-strong:text-blue-400">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
-                    )}
-                  </div>
-                  
-                  {msg.role === 'ai' && msg.sources && msg.sources.length > 0 && (
-                    <div className="flex flex-wrap gap-2 px-1">
-                      <span className="text-[9px] text-gray-500 flex items-center gap-1 font-bold uppercase tracking-widest">
-                        <Database className="w-3 h-3" /> Sources consultées :
-                      </span>
-                      {msg.sources.map((src, sIdx) => (
-                        <Badge key={sIdx} variant="outline" className="text-[10px] bg-blue-500/10 border-blue-500/20 text-blue-400 font-bold py-0 rounded-md">
-                          {src}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+          {messages.map((msg) => (
+            <VoiceMessage 
+              key={msg.id}
+              text={msg.text}
+              role={msg.role}
+              messageId={msg.id}
+            />
           ))}
+
           {loading && (
             <div className="flex gap-4">
-              <Avatar className="w-8 h-8 bg-white/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-gray-400" />
-              </Avatar>
+              <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" />
+              </div>
               <div className="flex items-center gap-1.5 px-4 py-3 bg-white/5 rounded-2xl">
                 <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
                 <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -203,10 +180,13 @@ export default function Chat() {
             </Button>
           </div>
           <p className="mt-3 text-center text-[10px] text-gray-500 font-medium uppercase tracking-[0.2em]">
-            Agentic Assistant • Ingestion RAG 1000ch • Modèle Local
+            Agentic Assistant • Synthèse Vocale Active • Moteur Local
           </p>
         </div>
       </div>
+
+      {/* Contrôles Vocaux Globaux */}
+      <VoiceControls />
     </div>
   );
 }

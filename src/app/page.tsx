@@ -78,7 +78,7 @@ export default function HomePage() {
             
             <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-2">
               <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Version Alpha</div>
-              <div className="text-[10px] text-gray-400 leading-tight">Moteur RAG segmenté à 1000ch.</div>
+              <div className="text-[10px] text-gray-400 leading-tight">Moteur RAG + TTS Intégré.</div>
             </div>
           </div>
         </div>
