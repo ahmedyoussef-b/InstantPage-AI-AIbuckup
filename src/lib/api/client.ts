@@ -63,7 +63,7 @@ let mockFileSystem: FileSystemItem[] = [
 ];
 
 /**
- * Helper pour supprimer récursivement les fichiers d'une structure
+ * Helper pour supprimer récursivement les fichiers d'une structure (Reset Base)
  */
 const clearFilesOnly = (items: FileSystemItem[]): FileSystemItem[] => {
   return items
@@ -157,11 +157,44 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    console.log(`[API_CLIENT][deleteItem] Suppression de l'élément: ${id} (${name})`);
+    console.log(`[API_CLIENT][deleteItem] Suppression récursive de l'élément: ${id} (${name})`);
+    
+    let totalPurgedChunks = 0;
+
+    const findAndPurge = async (items: FileSystemItem[], targetId: string): Promise<boolean> => {
+      for (const item of items) {
+        if (item.id === targetId) {
+          // Si c'est un fichier, on purge ses chunks
+          if (item.type === 'file') {
+            const res = await deleteDocument({ docId: item.id, fileName: item.name });
+            totalPurgedChunks += res.purgedChunks;
+          } else if (item.children) {
+            // Si c'est un dossier, on purge récursivement tous les fichiers à l'intérieur
+            const purgeRecursive = async (subItems: FileSystemItem[]) => {
+              for (const sub of subItems) {
+                if (sub.type === 'file') {
+                  const res = await deleteDocument({ docId: sub.id, fileName: sub.name });
+                  totalPurgedChunks += res.purgedChunks;
+                }
+                if (sub.children) await purgeRecursive(sub.children);
+              }
+            };
+            await purgeRecursive(item.children);
+          }
+          return true;
+        }
+        if (item.children && await findAndPurge(item.children, targetId)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     try {
-      const result = await deleteDocument({ docId: id, fileName: name });
+      await findAndPurge(mockFileSystem, id);
       mockFileSystem = removeItemById(mockFileSystem, id);
-      return { success: result.success, purgedChunks: result.purgedChunks };
+      console.log(`[API_CLIENT][deleteItem] Suppression terminée. ${totalPurgedChunks} segments purgés.`);
+      return { success: true, purgedChunks: totalPurgedChunks };
     } catch (error) {
       console.error('[API_CLIENT][deleteItem] Erreur lors de la suppression:', error);
       throw error;
@@ -169,6 +202,7 @@ export const api = {
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
+    console.log(`[API_CLIENT][createFolder] Création du dossier: ${name} (Parent: ${parentId})`);
     const newFolder: FileSystemItem = {
       id: Math.random().toString(36).substring(7),
       name,
