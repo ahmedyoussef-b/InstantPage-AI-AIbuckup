@@ -54,13 +54,10 @@ const ingestDocumentFlow = ai.defineFlow(
     console.log(`[BACKEND][INGEST] Document découpé en ${chunks.length} segments.`);
 
     // 2. Génération des Embeddings (Vecteurs réels)
-    // Note: Pour un MVP, nous traitons les chunks. Dans une app de prod, 
-    // nous les enverrions vers une base vectorielle comme ChromaDB ou Firestore (Vector Search).
     console.log(`[BACKEND][INGEST] Génération des vecteurs via Google AI...`);
     
-    // Pour des raisons de performance et de quotas, nous générons l'embedding du premier chunk
-    // comme preuve de concept de "réel", ou nous pourrions tous les traiter en batch.
-    const { embeddings } = await ai.embedMany({
+    // En Genkit 1.x, embedMany retourne directement le tableau d'embeddings
+    const embeddings = await ai.embedMany({
       embedder: 'googleai/text-embedding-004',
       content: chunks.slice(0, 5), // On limite à 5 pour la démo de rapidité
     });
