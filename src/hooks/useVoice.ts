@@ -80,7 +80,45 @@ export function useVoice(): UseVoiceReturn {
     }
     
     processingRef.current = false;
-  }, []);
+  }, [state]);
+
+  // Fallback vers Web Speech API (Browser)
+  const playWithWebSpeech = (text: string, speed: number, volume: number): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!window.speechSynthesis) {
+        console.error("Web Speech API non supportée");
+        resolve();
+        return;
+      }
+
+      // Arrêter toute lecture en cours
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'fr-FR';
+      utterance.rate = speed;
+      utterance.volume = volume;
+
+      utterance.onstart = () => {
+        setState(prev => ({ ...prev, isPlaying: true, currentText: text }));
+      };
+
+      utterance.onend = () => {
+        setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
+        processNextInQueue();
+        resolve();
+      };
+
+      utterance.onerror = (e) => {
+        console.error("Erreur Web Speech API:", e);
+        setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
+        processNextInQueue();
+        resolve();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  };
 
   // Jouer un texte
   const playText = useCallback(async (text: string) => {
@@ -98,35 +136,40 @@ export function useVoice(): UseVoiceReturn {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur synthèse serveur');
+        const errorData = await response.json().catch(() => ({}));
+        console.warn(`[VOICE] Erreur serveur (${response.status}): ${errorData.error || 'Inconnu'}. Fallback Web Speech.`);
+        await playWithWebSpeech(text, state.speed, state.volume);
+        return;
       }
 
       const data: VoiceResponse = await response.json();
       
-      if (audioRef.current) {
-        // Important: utiliser le format renvoyé par le serveur
+      if (audioRef.current && data.audio) {
         const mimeType = data.format === 'wav' ? 'audio/wav' : 'audio/mpeg';
         const audioSrc = `data:${mimeType};base64,${data.audio}`;
         
         audioRef.current.src = audioSrc;
         audioRef.current.volume = state.volume;
-        audioRef.current.playbackRate = 1.0; // Piper gère déjà la vitesse côté serveur
+        audioRef.current.playbackRate = 1.0; 
         
-        await audioRef.current.play();
+        await audioRef.current.play().catch(async (err) => {
+          console.error("Erreur lecture Audio Element:", err);
+          await playWithWebSpeech(text, state.speed, state.volume);
+        });
         
         setState(prev => ({
           ...prev,
           isPlaying: true,
           currentText: text
         }));
+      } else {
+        await playWithWebSpeech(text, state.speed, state.volume);
       }
     } catch (error) {
-      console.error('Erreur lecture voice hook:', error);
-      processingRef.current = false;
-      // Optionnel: notifier l'utilisateur de l'échec de lecture
+      console.error('Erreur synthèse, passage au secours vocal:', error);
+      await playWithWebSpeech(text, state.speed, state.volume);
     }
-  }, [state.provider, state.voice, state.speed, state.volume, processNextInQueue]);
+  }, [state]);
 
   // Fonction principale pour jouer
   const play = useCallback(async (text: string, options?: Partial<VoiceOptions>) => {
@@ -145,19 +188,28 @@ export function useVoice(): UseVoiceReturn {
   const pause = useCallback(() => {
     if (audioRef.current && state.isPlaying) {
       audioRef.current.pause();
+    } else if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
     }
+    setState(prev => ({ ...prev, isPaused: true }));
   }, [state.isPlaying]);
 
   const resume = useCallback(() => {
-    if (audioRef.current && state.isPaused) {
+    if (audioRef.current && state.isPaused && audioRef.current.src) {
       audioRef.current.play().catch(console.error);
+    } else if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
     }
+    setState(prev => ({ ...prev, isPaused: false }));
   }, [state.isPaused]);
 
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = '';
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
     
     queueRef.current = [];

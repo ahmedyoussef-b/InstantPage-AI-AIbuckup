@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
     
-  } catch (error) {
-    console.error('Erreur synthèse:', error);
+  } catch (error: any) {
+    console.error('Erreur synthèse API Route:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la synthèse vocale' },
+      { error: error.message || 'Erreur lors de la synthèse vocale' },
       { status: 500 }
     );
   }
