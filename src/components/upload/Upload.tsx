@@ -139,7 +139,7 @@ export default function Upload() {
                   <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300 min-w-0">
                     {file ? getFileIcon(file.name) : <UploadIcon className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-500 shrink-0" />}
                     <span className="truncate">
-                      {file ? file.name : 'Sélectionner...'}
+                      {file ? file.name : 'Sélectionner (PDF, TXT, MD, JSON, CSV)...'}
                     </span>
                   </div>
                   <div className="text-[10px] md:text-xs font-bold text-blue-400 uppercase tracking-tighter shrink-0 ml-2">Browse</div>
