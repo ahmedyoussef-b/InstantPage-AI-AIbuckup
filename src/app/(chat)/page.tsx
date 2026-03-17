@@ -1,6 +1,3 @@
-/**
- * Route group neutralized to resolve path conflict.
- * The primary interface is now located at /src/app/page.tsx.
- * Default export removed to stop this file from acting as a route.
- */
+// This file is intentionally neutralized to resolve a routing conflict with /src/app/page.tsx.
+export default function Page() { return null; }
 export const dynamic = 'force-dynamic';

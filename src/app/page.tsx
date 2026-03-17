@@ -2,7 +2,7 @@
 
 import Chat from '@/components/chat/Chat';
 import Upload from '@/components/upload/Upload';
-import { Bot, LayoutDashboard, Settings, MessageSquare, ShieldCheck } from 'lucide-react';
+import { Bot, LayoutDashboard, Settings, MessageSquare, ShieldCheck, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
 /**
@@ -47,6 +47,13 @@ export default function HomePage() {
               <ShieldCheck className="w-3 h-3" /> Mode Local : Activé
             </div>
             <Link 
+              href="/help" 
+              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-xl transition-all"
+            >
+              <HelpCircle className="w-4 h-4" />
+              Centre d'Aide
+            </Link>
+            <Link 
               href="/settings" 
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-xl transition-all"
             >
@@ -61,9 +68,14 @@ export default function HomePage() {
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
         <header className="h-14 border-b border-white/5 flex items-center px-6 justify-between md:hidden bg-[#171717]">
           <h1 className="font-semibold text-white text-sm">Agentic Assistant</h1>
-          <Link href="/admin" className="text-gray-400">
-            <LayoutDashboard className="w-5 h-5" />
-          </Link>
+          <div className="flex gap-4">
+            <Link href="/help" className="text-gray-400">
+              <HelpCircle className="w-5 h-5" />
+            </Link>
+            <Link href="/admin" className="text-gray-400">
+              <LayoutDashboard className="w-5 h-5" />
+            </Link>
+          </div>
         </header>
         
         <div className="flex-1 overflow-hidden relative">
