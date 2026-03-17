@@ -1,10 +1,9 @@
-
 'use server';
 /**
  * @fileOverview Agentic Chat Flow for the Personal Assistant.
  * 
  * - chat - Main function for conversational interaction.
- * - ChatInput - Input schema including current text and history.
+ * - ChatInput - Input schema including current text, history, and known files.
  * - ChatOutput - Output schema including the answer and source citations.
  */
 
@@ -19,6 +18,7 @@ const MessageSchema = z.object({
 const ChatInputSchema = z.object({
   text: z.string(),
   history: z.array(MessageSchema).optional(),
+  availableFiles: z.array(z.string()).optional().describe('Liste des fichiers actuellement indexés dans la base de données.'),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -32,63 +32,69 @@ export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
  * Tool for retrieving context from local documents.
- * The LLM decides when to call this based on the user's query.
  */
 const retrieveDocuments = ai.defineTool(
   {
     name: 'retrieveDocuments',
-    description: 'Recherche des informations pertinentes dans la base de documents de l\'utilisateur (PDF, TXT, MD, JSON, CSV). Utilisez cet outil PRIORITAIREMENT si la question porte sur le contenu des fichiers importés ou si l\'utilisateur demande un résumé/analyse de document.',
-    inputSchema: z.object({ query: z.string().describe('La recherche textuelle à effectuer dans les documents.') }),
+    description: 'Recherche des informations pertinentes dans les documents de l\'utilisateur. Utilisez cet outil si la question porte sur des fichiers importés.',
+    inputSchema: z.object({ 
+      query: z.string().describe('La recherche textuelle à effectuer.'),
+      targetFiles: z.array(z.string()).optional().describe('Fichiers spécifiques à cibler si mentionnés.')
+    }),
     outputSchema: z.object({
       context: z.string(),
       sources: z.array(z.string()),
     }),
   },
   async (input) => {
-    console.log(`[BACKEND][TOOL:retrieveDocuments] Searching for: "${input.query}"`);
+    console.log(`[BACKEND][TOOL:retrieveDocuments] Recherche : "${input.query}"`);
     
-    // Simulated RAG Retrieval logic
-    // In a real implementation, this would query a vector database like ChromaDB or Pinecone
-    const result = {
-      context: "D'après les documents indexés (Rapport_Annuel_2023.pdf et Strategie_Q1.md), l'entreprise prévoit une transition vers des architectures agentiques d'ici la fin de l'année. La sécurité des données locales est citée comme la priorité numéro 1.",
-      sources: ["Rapport_Annuel_2023.pdf", "Strategie_Q1.md"],
-    };
+    // Simulation d'une recherche RAG basée sur les fichiers connus
+    const files = input.targetFiles && input.targetFiles.length > 0 
+      ? input.targetFiles 
+      : ["Document_Principal.pdf"];
 
-    console.log(`[BACKEND][TOOL:retrieveDocuments] Found ${result.sources.length} relevant sources.`);
-    return result;
+    return {
+      context: `Résultat de la recherche sémantique dans ${files.join(', ')} : Les données indiquent une progression conforme aux objectifs fixés.`,
+      sources: files,
+    };
   }
 );
 
 /**
- * Main chat flow that acts as an Agent.
+ * Main chat flow.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Received user query: "${input.text}"`);
-  console.log(`[BACKEND][FLOW:chat] History length: ${input.history?.length || 0} messages.`);
+  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}" | Files known: ${input.availableFiles?.length || 0}`);
+
+  const filesList = input.availableFiles?.length 
+    ? `Tu as accès aux fichiers suivants : ${input.availableFiles.join(', ')}.`
+    : "Aucun fichier n'est actuellement indexé. Invite l'utilisateur à en uploader.";
 
   const response = await ai.generate({
-    system: `Tu es un assistant personnel intelligent et agentique capable d'analyser des documents locaux.
+    system: `Tu es un assistant personnel intelligent. 
+    ${filesList}
     TES RÈGLES :
     1. Réponds TOUJOURS en français.
-    2. Utilise SYSTEMATIQUEMENT l'outil 'retrieveDocuments' si la question porte sur des fichiers, des rapports, ou des données que l'utilisateur a pu importer.
-    3. Si l'utilisateur pose une question générale, réponds directement.
-    4. Si tu utilises des documents pour ta réponse, tu DOIS citer les sources à la fin de ton texte de manière élégante.
-    5. Formate tes réponses en Markdown (gras pour les points clés, listes à puces pour les énumérations).
-    6. Garde un ton professionnel, précis et synthétique.`,
+    2. Utilise l'outil 'retrieveDocuments' si l'utilisateur pose une question sur ses fichiers.
+    3. Si tu utilises des sources, cite-les clairement à la fin.
+    4. Formate tes réponses en Markdown.
+    5. Sois précis et professionnel.`,
     prompt: input.text,
     history: input.history,
     tools: [retrieveDocuments],
   });
 
-  console.log(`[BACKEND][FLOW:chat] AI response generated. Length: ${response.text.length} chars.`);
-
-  // Extract sources if they were mentioned in the text (simulated for prototype)
-  const simulatedSources = [];
-  if (response.text.includes('Rapport_Annuel_2023.pdf')) simulatedSources.push("Rapport_Annuel_2023.pdf");
-  if (response.text.includes('Strategie_Q1.md')) simulatedSources.push("Strategie_Q1.md");
+  // Extraction simple des sources pour l'UI
+  const sources: string[] = [];
+  if (input.availableFiles) {
+    input.availableFiles.forEach(f => {
+      if (response.text.includes(f)) sources.push(f);
+    });
+  }
 
   return {
     answer: response.text,
-    sources: simulatedSources,
+    sources: sources.length > 0 ? sources : undefined,
   };
 }
