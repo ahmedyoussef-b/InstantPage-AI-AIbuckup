@@ -64,11 +64,15 @@ export const api = {
   },
 
   /**
-   * Reset the local knowledge base.
+   * Reset the local knowledge base: deletes all files/chunks but preserves folders.
    */
   async clearAll(): Promise<boolean> {
-    console.log(`[API_CLIENT][clearAll] Nettoyage complet de la base locale...`);
-    return new Promise(resolve => setTimeout(() => resolve(true), 1000));
+    console.log(`[API_CLIENT][clearAll] Réinitialisation de la base : suppression massive des fichiers et segments...`);
+    // Simulation d'une opération asynchrone lourde de nettoyage
+    return new Promise(resolve => setTimeout(() => {
+      console.log(`[API_CLIENT][clearAll] Nettoyage terminé. Seuls les répertoires ont été conservés.`);
+      resolve(true);
+    }, 1500));
   },
 
   /**

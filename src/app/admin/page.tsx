@@ -21,11 +21,12 @@ import {
   FileJson,
   Plus,
   Search,
-  Eye,
   Layers,
-  Box
+  Box,
+  Eraser,
+  AlertTriangle
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -38,12 +39,25 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDocChunks, setSelectedDocChunks] = useState<ChunkMetadata[]>([]);
@@ -69,6 +83,24 @@ export default function AdminPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Chargement de la base échoué." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    console.log('[UI_ADMIN] Réinitialisation de la base (Fichiers & Chunks)...');
+    setResetting(true);
+    try {
+      await api.clearAll();
+      toast({ 
+        title: "Base réinitialisée", 
+        description: "Tous les fichiers et segments ont été supprimés. Les répertoires ont été conservés." 
+      });
+      loadData();
+    } catch (e) {
+      console.error('[UI_ADMIN] Erreur réinitialisation:', e);
+      toast({ variant: "destructive", title: "Erreur", description: "La réinitialisation a échoué." });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -252,6 +284,36 @@ export default function AdminPage() {
         </div>
         
         <div className="flex items-center gap-3">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-400/10 gap-2 h-11 px-4 rounded-xl font-bold">
+                <Eraser className="w-4 h-4" /> Reset Base
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-[#2f2f2f] border-white/10 text-white rounded-3xl">
+              <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2 text-red-400">
+                  <AlertTriangle className="w-6 h-6" />
+                  <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Réinitialisation complète ?</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-gray-400 text-sm">
+                  Cette action va supprimer **tous les fichiers** et leurs segments vectoriels (chunks). 
+                  <br /><br />
+                  <span className="text-white font-bold italic">Seuls les dossiers et l'arborescence seront conservés.</span> Cette opération est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2 mt-6">
+                <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl font-bold">Annuler</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleResetDatabase}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 font-bold shadow-lg shadow-red-500/10"
+                >
+                  Confirmer le Reset
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 px-6 rounded-xl font-bold shadow-lg shadow-blue-500/10">
@@ -424,4 +486,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
