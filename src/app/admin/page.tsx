@@ -53,6 +53,111 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
+// --- Components Helpers ---
+
+const getFileIcon = (fileName: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return <FileText className="w-4 h-4 text-red-400" />;
+  if (ext === 'md') return <FileCode className="w-4 h-4 text-blue-400" />;
+  if (ext === 'csv') return <Table className="w-4 h-4 text-green-400" />;
+  if (ext === 'json') return <FileJson className="w-4 h-4 text-yellow-400" />;
+  return <FileText className="w-4 h-4 text-gray-400" />;
+};
+
+const formatSize = (bytes?: number) => {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+};
+
+const TreeNode = ({ 
+  item, 
+  depth = 0, 
+  onDelete, 
+  onViewChunks 
+}: { 
+  item: FileSystemItem, 
+  depth?: number,
+  onDelete: (id: string, name: string) => void,
+  onViewChunks: (id: string, name: string) => void
+}) => {
+  const [isOpen, setIsOpen] = useState(depth === 0);
+  const isFolder = item.type === 'folder';
+
+  return (
+    <div className="select-none">
+      <div 
+        className="flex items-center group hover:bg-white/5 py-2 px-3 rounded-xl cursor-pointer transition-all"
+        style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
+      >
+        {isFolder ? (
+          <button onClick={() => setIsOpen(!isOpen)} className="mr-2 p-1 hover:bg-white/10 rounded-md transition-colors">
+            {isOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+          </button>
+        ) : (
+          <div className="w-6 mr-2" />
+        )}
+
+        <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => isFolder && setIsOpen(!isOpen)}>
+          {isFolder ? <Folder className="w-5 h-5 text-blue-400 fill-blue-400/10" /> : getFileIcon(item.name)}
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold truncate">{item.name}</span>
+            {!isFolder && (
+              <span className="text-[10px] text-gray-500 font-medium">
+                {formatSize(item.size)} • {item.chunks} segments • {new Date(item.uploadedAt!).toLocaleDateString('fr-FR')}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {!isFolder && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-gray-400 hover:text-blue-400"
+              onClick={(e) => { e.stopPropagation(); onViewChunks(item.id, item.name); }}
+            >
+              <Layers className="w-4 h-4" />
+            </Button>
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-gray-400 hover:text-red-400"
+            onClick={(e) => { e.stopPropagation(); onDelete(item.id, item.name); }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {isFolder && isOpen && item.children && (
+        <div className="animate-in slide-in-from-top-1 fade-in duration-300">
+          {item.children.length === 0 ? (
+            <div className="text-[10px] text-gray-600 italic py-2" style={{ paddingLeft: `${(depth + 1) * 1.5 + 2.5}rem` }}>
+              (Dossier vide)
+            </div>
+          ) : (
+            item.children.map(child => (
+              <TreeNode 
+                key={child.id} 
+                item={child} 
+                depth={depth + 1} 
+                onDelete={onDelete} 
+                onViewChunks={onViewChunks}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Main Page ---
+
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([]);
@@ -68,7 +173,7 @@ export default function AdminPage() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    console.log('[UI_ADMIN] Chargement des données de la base...');
+    console.log('[UI_ADMIN] Actualisation des données...');
     setLoading(true);
     try {
       const [statsData, fsData] = await Promise.all([
@@ -77,68 +182,38 @@ export default function AdminPage() {
       ]);
       setStats(statsData);
       setFileSystem(fsData);
-      console.log('[UI_ADMIN] Données chargées avec succès.');
     } catch (err) {
       console.error('[UI_ADMIN] Erreur de chargement:', err);
-      toast({ variant: "destructive", title: "Erreur", description: "Chargement de la base échoué." });
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de rafraîchir la base." });
     } finally {
       setLoading(false);
     }
   };
 
   const handleResetDatabase = async () => {
-    console.log('[UI_ADMIN] Réinitialisation de la base (Fichiers & Chunks)...');
     setResetting(true);
     try {
       await api.clearAll();
       toast({ 
         title: "Base réinitialisée", 
-        description: "Tous les fichiers et segments ont été supprimés. Les répertoires ont été conservés." 
+        description: "Tous les fichiers ont été purgés. Les dossiers vides sont conservés." 
       });
       loadData();
     } catch (e) {
-      console.error('[UI_ADMIN] Erreur réinitialisation:', e);
       toast({ variant: "destructive", title: "Erreur", description: "La réinitialisation a échoué." });
     } finally {
       setResetting(false);
     }
   };
 
-  const handleViewChunks = async (docId: string, docName: string) => {
-    console.log(`[UI_ADMIN] Ouverture de l'explorateur de chunks pour: ${docName}`);
-    try {
-      const chunks = await api.getDocChunks(docId);
-      setSelectedDocChunks(chunks);
-      setViewingDocName(docName);
-      setIsPreviewOpen(true);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les segments." });
-    }
-  };
-
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) return;
-    console.log(`[UI_ADMIN] Création du dossier: ${newFolderName}`);
-    try {
-      await api.createFolder(newFolderName, null);
-      toast({ title: "Dossier créé", description: `Le répertoire '${newFolderName}' a été ajouté.` });
-      setNewFolderName('');
-      setIsDialogOpen(false);
-      loadData();
-    } catch (e) {
-      console.error('[UI_ADMIN] Erreur création dossier:', e);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le dossier." });
-    }
-  };
-
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Voulez-vous vraiment supprimer '${name}' ? Cette action supprimera également tous les segments (chunks) associés.`)) {
-      console.log(`[UI_ADMIN] Suppression de l'élément: ${id} (${name})`);
+    if (confirm(`Voulez-vous vraiment supprimer '${name}' ? Cette action supprimera tous les fichiers et segments associés.`)) {
+      console.log(`[UI_ADMIN] Demande suppression de: ${name}`);
       try {
         const result = await api.deleteItem(id, name);
         toast({ 
           title: "Supprimé", 
-          description: `${name} et ses ${result.purgedChunks} segments ont été retirés de la base.` 
+          description: `${name} et ses ${result.purgedChunks} segments ont été purgés.` 
         });
         loadData();
       } catch (e) {
@@ -148,126 +223,28 @@ export default function AdminPage() {
     }
   };
 
-  const formatSize = (bytes?: number) => {
-    if (!bytes) return '0 B';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-    return (bytes/(1024*1024)).toFixed(1) + ' MB';
-  };
-
-  const getFileIcon = (fileName: string) => {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') return <FileText className="w-4 h-4 text-red-400" />;
-    if (ext === 'md') return <FileCode className="w-4 h-4 text-blue-400" />;
-    if (ext === 'csv') return <Table className="w-4 h-4 text-green-400" />;
-    if (ext === 'json') return <FileJson className="w-4 h-4 text-yellow-400" />;
-    return <FileText className="w-4 h-4 text-gray-400" />;
-  };
-
-  const TreeNode = ({ item, depth = 0 }: { item: FileSystemItem, depth?: number }) => {
-    const [isOpen, setIsOpen] = useState(depth === 0);
-    const isFolder = item.type === 'folder';
-
-    return (
-      <div className="select-none">
-        <div 
-          className="flex items-center group hover:bg-white/5 py-2 px-3 rounded-xl cursor-pointer transition-all"
-          style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
-        >
-          {isFolder ? (
-            <button onClick={() => setIsOpen(!isOpen)} className="mr-2 p-1 hover:bg-white/10 rounded-md transition-colors">
-              {isOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-            </button>
-          ) : (
-            <div className="w-6 mr-2" />
-          )}
-
-          <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => isFolder && setIsOpen(!isOpen)}>
-            {isFolder ? <Folder className="w-5 h-5 text-blue-400 fill-blue-400/10" /> : getFileIcon(item.name)}
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold truncate">{item.name}</span>
-              {!isFolder && (
-                <span className="text-[10px] text-gray-500 font-medium">
-                  {formatSize(item.size)} • {item.chunks} segments • {new Date(item.uploadedAt!).toLocaleDateString('fr-FR')}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!isFolder && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-gray-400 hover:text-blue-400"
-                onClick={(e) => { e.stopPropagation(); handleViewChunks(item.id, item.name); }}
-              >
-                <Layers className="w-4 h-4" />
-              </Button>
-            )}
-            {isFolder && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-blue-400">
-                <Plus className="w-4 h-4" />
-              </Button>
-            )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-gray-400 hover:text-red-400"
-              onClick={(e) => { e.stopPropagation(); handleDelete(item.id, item.name); }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        {isFolder && isOpen && item.children && (
-          <div className="animate-in slide-in-from-top-1 fade-in duration-300">
-            {item.children.length === 0 ? (
-              <div className="text-[10px] text-gray-600 italic py-2" style={{ paddingLeft: `${(depth + 1) * 1.5 + 2.5}rem` }}>
-                (Dossier vide)
-              </div>
-            ) : (
-              item.children.map(child => <TreeNode key={child.id} item={child} depth={depth + 1} />)
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const ChunkExplorerNode = ({ item }: { item: FileSystemItem }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    if (item.type === 'folder') {
-      return (
-        <div className="space-y-1">
-          <div 
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
-          >
-            {isOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
-            <Folder className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold uppercase tracking-tight text-gray-300">{item.name}</span>
-          </div>
-          {isOpen && item.children && (
-            <div className="ml-4 border-l border-white/5 pl-2">
-              {item.children.map(child => <ChunkExplorerNode key={child.id} item={child} />)}
-            </div>
-          )}
-        </div>
-      );
+  const handleViewChunks = async (docId: string, docName: string) => {
+    try {
+      const chunks = await api.getDocChunks(docId);
+      setSelectedDocChunks(chunks);
+      setViewingDocName(docName);
+      setIsPreviewOpen(true);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Erreur", description: "Segments inaccessibles." });
     }
+  };
 
-    return (
-      <div 
-        onClick={() => handleViewChunks(item.id, item.name)}
-        className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-lg cursor-pointer group transition-all"
-      >
-        <Box className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-        <span className="text-xs text-gray-400 group-hover:text-white transition-colors">{item.name}</span>
-        <span className="ml-auto text-[10px] text-gray-600 font-mono">[{item.chunks} segments]</span>
-      </div>
-    );
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    try {
+      await api.createFolder(newFolderName, null);
+      toast({ title: "Dossier créé", description: `'${newFolderName}' ajouté à la racine.` });
+      setNewFolderName('');
+      setIsDialogOpen(false);
+      loadData();
+    } catch (e) {
+      toast({ variant: "destructive", title: "Erreur", description: "Echec création dossier." });
+    }
   };
 
   return (
@@ -279,7 +256,7 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tighter uppercase">Administration</h1>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Base de Connaissances Locale</p>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Contrôle de la Base de Connaissances</p>
           </div>
         </div>
         
@@ -294,19 +271,19 @@ export default function AdminPage() {
               <AlertDialogHeader>
                 <div className="flex items-center gap-3 mb-2 text-red-400">
                   <AlertTriangle className="w-6 h-6" />
-                  <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Réinitialisation complète ?</AlertDialogTitle>
+                  <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Réinitialisation totale ?</AlertDialogTitle>
                 </div>
                 <AlertDialogDescription className="text-gray-400 text-sm">
-                  Cette action va supprimer **tous les fichiers** et leurs segments vectoriels (chunks). 
+                  Cette action purgera TOUS les fichiers et segments vectoriels.
                   <br /><br />
-                  <span className="text-white font-bold italic">Seuls les dossiers et l'arborescence seront conservés.</span> Cette opération est irréversible.
+                  <span className="text-white font-bold italic">Seuls les répertoires seront conservés.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="gap-2 mt-6">
                 <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl font-bold">Annuler</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={handleResetDatabase}
-                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 font-bold shadow-lg shadow-red-500/10"
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 font-bold"
                 >
                   Confirmer le Reset
                 </AlertDialogAction>
@@ -316,7 +293,7 @@ export default function AdminPage() {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 px-6 rounded-xl font-bold shadow-lg shadow-blue-500/10">
+              <Button className="bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 px-6 rounded-xl font-bold">
                 <FolderPlus className="w-4 h-4" /> Nouveau Dossier
               </Button>
             </DialogTrigger>
@@ -328,7 +305,7 @@ export default function AdminPage() {
                 <Input 
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Nom du dossier (ex: Projets, Archives...)"
+                  placeholder="Nom du dossier..."
                   className="bg-black/20 border-white/10 text-white h-12 rounded-xl"
                   autoFocus
                 />
@@ -358,7 +335,7 @@ export default function AdminPage() {
             { label: 'Documents', val: stats?.totalDocuments, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-400/10' },
             { label: 'Segments', val: stats?.totalChunks, icon: Database, color: 'text-purple-400', bg: 'bg-purple-400/10' },
             { label: 'Taille Totale', val: formatSize(stats?.totalSize), icon: HardDrive, color: 'text-green-400', bg: 'bg-green-400/10' },
-            { label: 'Utilisation RAM', val: stats?.diskSpace?.used, icon: Cpu, color: 'text-yellow-400', bg: 'bg-yellow-400/10' }
+            { label: 'Moteur RAM', val: stats?.diskSpace?.used, icon: Cpu, color: 'text-yellow-400', bg: 'bg-yellow-400/10' }
           ].map((s, i) => (
             <Card key={i} className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden group hover:border-white/10 transition-all">
               <CardContent className="p-8">
@@ -375,31 +352,35 @@ export default function AdminPage() {
         </section>
 
         <Tabs defaultValue="files" className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-            <TabsList className="bg-white/5 border border-white/10 p-1 h-12 rounded-xl">
-              <TabsTrigger value="files" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold px-6">
-                📁 Fichiers
-              </TabsTrigger>
-              <TabsTrigger value="chunks" className="rounded-lg data-[state=active]:bg-purple-600 data-[state=active]:text-white font-bold px-6">
-                🧱 Segments (Chunks)
-              </TabsTrigger>
-            </TabsList>
-            <div className="h-px flex-1 bg-white/5 ml-6" />
-          </div>
+          <TabsList className="bg-white/5 border border-white/10 p-1 h-12 rounded-xl">
+            <TabsTrigger value="files" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold px-6">
+              📁 Fichiers
+            </TabsTrigger>
+            <TabsTrigger value="chunks" className="rounded-lg data-[state=active]:bg-purple-600 data-[state=active]:text-white font-bold px-6">
+              🧱 Segments (Chunks)
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="files">
             <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden min-h-[500px]">
               <CardContent className="p-8">
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-32 text-gray-500 gap-6">
-                    <RotateCcw className="w-8 h-8 text-blue-500 animate-spin" />
-                    <p className="text-sm font-bold uppercase tracking-widest animate-pulse">Chargement des fichiers...</p>
+                {loading && fileSystem.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-32 text-gray-500">
+                    <RotateCcw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                    <p className="text-xs uppercase font-bold tracking-widest">Actualisation...</p>
                   </div>
                 ) : fileSystem.length === 0 ? (
-                  <div className="text-center py-32 text-gray-500">La base est vide.</div>
+                  <div className="text-center py-32 text-gray-500 font-bold uppercase tracking-widest opacity-30">La base est vide.</div>
                 ) : (
-                  <div className="space-y-2">
-                    {fileSystem.map(item => <TreeNode key={item.id} item={item} />)}
+                  <div className="space-y-1">
+                    {fileSystem.map(item => (
+                      <TreeNode 
+                        key={item.id} 
+                        item={item} 
+                        onDelete={handleDelete}
+                        onViewChunks={handleViewChunks}
+                      />
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -407,32 +388,9 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="chunks">
-            <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden min-h-[500px]">
-              <CardContent className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                      <Search className="w-3 h-3" /> Arborescence des segments
-                    </h3>
-                    <ScrollArea className="h-[400px] pr-4">
-                      <div className="space-y-1">
-                        {fileSystem.map(item => <ChunkExplorerNode key={item.id} item={item} />)}
-                      </div>
-                    </ScrollArea>
-                  </div>
-
-                  <div className="bg-black/20 rounded-2xl border border-white/5 p-6 flex flex-col items-center justify-center text-center">
-                    <div className="p-4 bg-purple-500/10 rounded-full mb-4">
-                      <Layers className="w-8 h-8 text-purple-400 opacity-50" />
-                    </div>
-                    <h4 className="text-sm font-bold text-gray-400 mb-2">Inspecteur de segments</h4>
-                    <p className="text-xs text-gray-600 max-w-xs">
-                      Sélectionnez un fichier dans la liste de gauche pour explorer ses segments individuels et vérifier la qualité du découpage RAG.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+             <div className="text-center py-32 text-gray-600 font-bold uppercase tracking-widest opacity-50">
+               Utilisez l'onglet Fichiers pour explorer les segments.
+             </div>
           </TabsContent>
         </Tabs>
       </main>
@@ -446,8 +404,8 @@ export default function AdminPage() {
                 <Box className="w-6 h-6 text-white" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Explorateur de Segments</DialogTitle>
-                <p className="text-xs text-gray-500 font-medium">Document : <span className="text-blue-400">{viewingDocName}</span></p>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Inspecteur de Segments</DialogTitle>
+                <p className="text-xs text-gray-500">Document : <span className="text-blue-400">{viewingDocName}</span></p>
               </div>
             </div>
           </DialogHeader>
@@ -455,32 +413,18 @@ export default function AdminPage() {
           <ScrollArea className="flex-1 p-8">
             <div className="grid grid-cols-1 gap-6">
               {selectedDocChunks.map((chunk) => (
-                <div key={chunk.id} className="bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-purple-500/30 transition-all group">
+                <div key={chunk.id} className="bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-purple-500/30 transition-all">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Badge className="bg-purple-600/20 text-purple-400 border-purple-500/20 px-3 font-black">SEGMENT #{chunk.index}</Badge>
-                      <span className="text-[10px] text-gray-500 font-mono tracking-tighter uppercase">{chunk.id}</span>
-                    </div>
-                    <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-                      Taille : {chunk.size} ch
-                    </div>
+                    <Badge className="bg-purple-600/20 text-purple-400 border-purple-500/20 px-3 font-black">SEGMENT #{chunk.index}</Badge>
+                    <span className="text-[10px] text-gray-600 font-mono">{chunk.id}</span>
                   </div>
-                  <div className="relative">
-                    <div className="absolute -left-2 top-0 bottom-0 w-1 bg-purple-600/30 rounded-full" />
-                    <p className="text-sm text-gray-300 leading-relaxed pl-4 whitespace-pre-wrap">
-                      {chunk.text}
-                    </p>
-                  </div>
+                  <p className="text-sm text-gray-300 leading-relaxed pl-4 border-l-2 border-purple-600/30">
+                    {chunk.text}
+                  </p>
                 </div>
               ))}
             </div>
           </ScrollArea>
-
-          <div className="p-6 bg-[#252525] border-t border-white/5 text-center">
-            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-              Visualisation des segments indexés pour la recherche vectorielle (RAG 1000ch)
-            </p>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
