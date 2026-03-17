@@ -79,11 +79,14 @@ export default function AdminPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Voulez-vous vraiment supprimer '${name}' ? Cette action est irréversible.`)) {
+    if (confirm(`Voulez-vous vraiment supprimer '${name}' ? Cette action supprimera également tous les segments (chunks) associés.`)) {
       console.log(`[UI_ADMIN] Suppression de l'élément: ${id} (${name})`);
       try {
-        await api.deleteItem(id);
-        toast({ title: "Supprimé", description: `${name} a été retiré de la base.` });
+        const result = await api.deleteItem(id, name);
+        toast({ 
+          title: "Supprimé", 
+          description: `${name} et ses ${result.purgedChunks} segments ont été retirés de la base.` 
+        });
         loadData();
       } catch (e) {
         console.error('[UI_ADMIN] Erreur suppression:', e);

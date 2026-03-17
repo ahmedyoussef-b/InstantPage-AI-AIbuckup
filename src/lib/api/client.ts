@@ -3,6 +3,7 @@
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
+import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
  * Client-side API for the Agentic Personal Assistant.
@@ -25,7 +26,6 @@ export const api = {
 
       console.log(`[API_CLIENT][upload] Ingestion serveur réussie. DocID: ${result.docId} affecté au dossier: ${parentId || 'Racine'}`);
       
-      // Note: Dans une app réelle, nous enregistrerions ici le docId avec son parentId dans la BDD
       return {
         success: true,
         chunks: result.chunks,
@@ -72,11 +72,21 @@ export const api = {
   },
 
   /**
-   * Delete a specific item (file or folder)
+   * Delete a specific item (file or folder) with cascade chunk cleanup.
    */
-  async deleteItem(id: string): Promise<boolean> {
-    console.log(`[API_CLIENT][deleteItem] Suppression définitive de l'élément: ${id}`);
-    return new Promise(resolve => setTimeout(() => resolve(true), 500));
+  async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
+    console.log(`[API_CLIENT][deleteItem] Suppression de l'élément: ${id} (${name})`);
+    try {
+      const result = await deleteDocument({ docId: id, fileName: name });
+      console.log(`[API_CLIENT][deleteItem] Suppression réussie. ${result.purgedChunks} segments purgés.`);
+      return {
+        success: result.success,
+        purgedChunks: result.purgedChunks
+      };
+    } catch (error) {
+      console.error('[API_CLIENT][deleteItem] Erreur lors de la suppression:', error);
+      throw error;
+    }
   },
 
   /**
