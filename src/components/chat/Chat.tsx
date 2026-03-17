@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api/client';
 import { Send, Bot, User, Database, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,7 +39,6 @@ export default function Chat() {
     setMessages(currentMessages);
 
     try {
-      // Pass full history to the API for conversational memory
       const data = await api.chat(trimmed, messages);
       
       setMessages(prev => [...prev, { 
@@ -89,7 +90,7 @@ export default function Chat() {
                   }`}>
                     {msg.role === 'ai' ? (
                       <div className="prose prose-invert max-w-none text-sm leading-relaxed prose-p:my-2 prose-headings:text-white">
-                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
