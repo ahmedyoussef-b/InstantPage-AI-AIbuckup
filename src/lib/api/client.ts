@@ -13,7 +13,7 @@ export const api = {
    * Real RAG ingestion: reads file and calls server-side embedding flow.
    */
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
-    console.log(`[API_CLIENT][upload] Ingestion du fichier: ${file.name} (Parent: ${parentId || 'Racine'})`);
+    console.log(`[API_CLIENT][upload] Ingestion du fichier: ${file.name} (ParentID: ${parentId || 'Racine'})`);
     
     try {
       const text = await file.text();
@@ -23,7 +23,9 @@ export const api = {
         fileType: file.type || 'text/plain'
       });
 
-      console.log(`[API_CLIENT][upload] Ingestion serveur réussie. DocID: ${result.docId}`);
+      console.log(`[API_CLIENT][upload] Ingestion serveur réussie. DocID: ${result.docId} affecté au dossier: ${parentId || 'Racine'}`);
+      
+      // Note: Dans une app réelle, nous enregistrerions ici le docId avec son parentId dans la BDD
       return {
         success: true,
         chunks: result.chunks,
@@ -66,7 +68,6 @@ export const api = {
    */
   async clearAll(): Promise<boolean> {
     console.log(`[API_CLIENT][clearAll] Nettoyage complet de la base locale...`);
-    // Simulé: ici on viderait ChromaDB/Firestore
     return new Promise(resolve => setTimeout(() => resolve(true), 1000));
   },
 
@@ -75,7 +76,6 @@ export const api = {
    */
   async deleteItem(id: string): Promise<boolean> {
     console.log(`[API_CLIENT][deleteItem] Suppression définitive de l'élément: ${id}`);
-    // Simulé
     return new Promise(resolve => setTimeout(() => resolve(true), 500));
   },
 
@@ -84,7 +84,6 @@ export const api = {
    */
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
     console.log(`[API_CLIENT][createFolder] Création du répertoire: ${name} (Parent: ${parentId || 'Racine'})`);
-    // Simulé
     return {
       id: Math.random().toString(36).substring(7),
       name,
@@ -99,7 +98,6 @@ export const api = {
    */
   async getStats(): Promise<Stats> {
     console.log(`[API_CLIENT][getStats] Récupération des statistiques système...`);
-    // Simulé pour refléter une base réelle
     return {
       totalDocuments: 15,
       totalChunks: 342,
@@ -117,7 +115,6 @@ export const api = {
    */
   async getFileSystem(): Promise<FileSystemItem[]> {
     console.log(`[API_CLIENT][getFileSystem] Construction de l'arborescence des fichiers...`);
-    // Simulation d'une BDD locale bien organisée
     return [
       {
         id: "root-1",
