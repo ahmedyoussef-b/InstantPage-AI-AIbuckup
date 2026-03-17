@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Document, Stats } from '@/types';
@@ -13,11 +14,12 @@ export const api = {
    * 1. Extraction 2. Chunking (1000 chars) 3. Embedding 4. Vector Storage
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
-    // Artificial delay to simulate processing
+    // Artificial delay to simulate local processing
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Chunking logic: 1000 characters per segment as specified
-    // For the simulation, we use file size as a proxy for character count
+    // Chunking logic: 1000 characters per segment as per user requirements
+    // We simulate character extraction from the file size for this MVP
+    // Assuming roughly 1 byte per character for basic text
     const chunks = Math.max(1, Math.ceil(file.size / 1000));
     
     return {
