@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { VoiceOptions, VoiceResponse, VoiceState } from '@/types/voice';
+import { cleanTextForTTS } from '@/lib/utils/textCleaner';
 
 interface UseVoiceReturn {
   isPlaying: boolean;
@@ -35,7 +36,6 @@ export function useVoice(): UseVoiceReturn {
   const queueRef = useRef<string[]>([]);
   const processingRef = useRef<boolean>(false);
 
-  // Initialiser l'élément audio
   useEffect(() => {
     audioRef.current = new Audio();
     
@@ -53,7 +53,7 @@ export function useVoice(): UseVoiceReturn {
     };
     
     audioRef.current.onerror = (e) => {
-      console.warn('⚠️ Élément audio: Impossible de lire la source. Fallback possible.');
+      console.warn('⚠️ Audio Element Error. Attempting fallback...');
       setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
       processingRef.current = false;
       processNextInQueue();
@@ -67,7 +67,6 @@ export function useVoice(): UseVoiceReturn {
     };
   }, []);
 
-  // Traiter la file d'attente
   const processNextInQueue = useCallback(async () => {
     if (processingRef.current || queueRef.current.length === 0) {
       return;
@@ -80,29 +79,34 @@ export function useVoice(): UseVoiceReturn {
       try {
         await playText(nextText);
       } catch (error) {
-        console.error('❌ Erreur traitement file:', error);
+        console.error('❌ Error processing queue:', error);
       }
     }
     
     processingRef.current = false;
   }, []);
 
-  // Fallback vers Web Speech API (Browser)
   const playWithWebSpeech = useCallback((text: string, speed: number, volume: number): Promise<void> => {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !window.speechSynthesis) {
-        console.warn("⚠️ Web Speech API non supportée");
+        console.warn("⚠️ Web Speech API not supported");
         resolve();
         return;
       }
 
-      // Arrêter toute lecture en cours pour éviter les superpositions
+      const cleanText = cleanTextForTTS(text);
       window.speechSynthesis.cancel();
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = 'fr-FR';
       utterance.rate = speed;
       utterance.volume = volume;
+
+      const voices = window.speechSynthesis.getVoices();
+      const frenchVoice = voices.find(v => v.lang.includes('fr'));
+      if (frenchVoice) {
+        utterance.voice = frenchVoice;
+      }
 
       utterance.onstart = () => {
         setState(prev => ({ ...prev, isPlaying: true, currentText: text }));
@@ -114,37 +118,28 @@ export function useVoice(): UseVoiceReturn {
         resolve();
       };
 
-      utterance.onerror = (e: any) => {
-        // On affiche l'erreur spécifique du navigateur (ex: 'not-allowed', 'canceled')
-        const errorCode = e.error || 'unknown';
-        if (errorCode === 'not-allowed') {
-          console.warn("🔇 Lecture vocale bloquée par le navigateur (interaction utilisateur requise).");
-        } else if (errorCode !== 'interrupted') {
-          console.error(`❌ Erreur Web Speech API: ${errorCode}`);
+      utterance.onerror = (e) => {
+        if (e.error !== 'interrupted') {
+          console.error("❌ Web Speech API Error:", e.error);
         }
-        
         setState(prev => ({ ...prev, isPlaying: false, currentText: null }));
         processNextInQueue();
         resolve();
       };
 
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.error("❌ Échec critique speechSynthesis.speak:", err);
-        resolve();
-      }
+      window.speechSynthesis.speak(utterance);
     });
   }, [processNextInQueue]);
 
-  // Jouer un texte
   const playText = useCallback(async (text: string) => {
     try {
+      const cleanText = cleanTextForTTS(text);
+      
       const response = await fetch('/api/voice/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
+          text: cleanText,
           provider: state.provider,
           voice: state.voice,
           speed: state.speed,
@@ -153,9 +148,7 @@ export function useVoice(): UseVoiceReturn {
       });
       
       if (!response.ok) {
-        // En cas d'erreur 500 ou autre, on bascule direct sur le navigateur
-        await playWithWebSpeech(text, state.speed, state.volume);
-        return;
+        throw new Error('Server synthesis failed');
       }
 
       const data: VoiceResponse = await response.json();
@@ -166,7 +159,6 @@ export function useVoice(): UseVoiceReturn {
         
         audioRef.current.src = audioSrc;
         audioRef.current.volume = state.volume;
-        audioRef.current.playbackRate = 1.0; 
         
         await audioRef.current.play();
         
@@ -183,7 +175,6 @@ export function useVoice(): UseVoiceReturn {
     }
   }, [state.provider, state.voice, state.speed, state.volume, playWithWebSpeech]);
 
-  // Fonction principale pour jouer
   const play = useCallback(async (text: string, options?: Partial<VoiceOptions>) => {
     if (options) {
       setState(prev => ({ ...prev, ...options }));
