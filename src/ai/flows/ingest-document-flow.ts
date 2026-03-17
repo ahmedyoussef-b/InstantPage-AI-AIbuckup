@@ -30,6 +30,7 @@ export type IngestOutput = z.infer<typeof IngestOutputSchema>;
  */
 function chunkText(text: string, size: number): string[] {
   const chunks = [];
+  if (!text) return [];
   for (let i = 0; i < text.length; i += size) {
     chunks.push(text.substring(i, i + size));
   }
@@ -54,20 +55,26 @@ const ingestDocumentFlow = ai.defineFlow(
     console.log(`[BACKEND][INGEST] Document découpé en ${chunks.length} segments.`);
 
     // 2. Génération des Embeddings (Vecteurs réels)
-    console.log(`[BACKEND][INGEST] Génération des vecteurs via Google AI...`);
+    // On utilise embedding-001 qui est plus stable sur toutes les versions d'API
+    console.log(`[BACKEND][INGEST] Génération des vecteurs via Google AI (embedding-001)...`);
     
-    // En Genkit 1.x, embedMany retourne directement le tableau d'embeddings
-    const embeddings = await ai.embedMany({
-      embedder: 'googleai/text-embedding-004',
-      content: chunks.slice(0, 5), // On limite à 5 pour la démo de rapidité
-    });
-
-    console.log(`[BACKEND][INGEST] ${embeddings.length} vecteurs générés avec succès.`);
+    let embeddings: any[] = [];
+    if (chunks.length > 0) {
+      try {
+        embeddings = await ai.embedMany({
+          embedder: 'googleai/embedding-001',
+          content: chunks.slice(0, 10), // On limite pour la démo
+        });
+        console.log(`[BACKEND][INGEST] ${embeddings.length} vecteurs générés avec succès.`);
+      } catch (e) {
+        console.error(`[BACKEND][INGEST] Erreur lors de la génération des embeddings:`, e);
+      }
+    }
 
     return {
       docId: Math.random().toString(36).substring(7),
       chunks: chunks.length,
-      embeddingModel: 'text-embedding-004',
+      embeddingModel: 'embedding-001',
       processedAt: new Date().toISOString(),
     };
   }

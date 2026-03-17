@@ -7,7 +7,6 @@ import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
  * État local simulé persistant pour la session.
- * On utilise une variable globale au module pour qu'elle survive aux re-renders.
  */
 let mockFileSystem: FileSystemItem[] = [
   {
@@ -41,18 +40,18 @@ const getAllFileContents = (items: FileSystemItem[]): string => {
   return context;
 };
 
-// Helper pour trouver tous les fichiers dans un dossier (pour la purge récursive)
+// Trouve tous les fichiers dans un élément (récursif)
 const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystemItem[] => {
   let files: FileSystemItem[] = [];
   
-  const search = (currentItems: FileSystemItem[], found: boolean) => {
+  const search = (currentItems: FileSystemItem[], parentMatched: boolean) => {
     currentItems.forEach(item => {
-      const isTarget = item.id === targetId || found;
-      if (isTarget && item.type === 'file') {
+      const isMatch = item.id === targetId || parentMatched;
+      if (isMatch && item.type === 'file') {
         files.push(item);
       }
       if (item.children) {
-        search(item.children, isTarget);
+        search(item.children, isMatch);
       }
     });
   };
@@ -82,18 +81,18 @@ export const api = {
         parentId: parentId
       };
 
-      const addItem = (items: FileSystemItem[]): FileSystemItem[] => {
+      const addItemToTree = (items: FileSystemItem[]): FileSystemItem[] => {
         if (!parentId) return [...items, newFile];
         return items.map(item => {
           if (item.id === parentId && item.type === 'folder') {
             return { ...item, children: [...(item.children || []), newFile] };
           }
-          if (item.children) return { ...item, children: addItem(item.children) };
+          if (item.children) return { ...item, children: addItemToTree(item.children) };
           return item;
         });
       };
 
-      mockFileSystem = addItem(mockFileSystem);
+      mockFileSystem = addItemToTree(mockFileSystem);
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error) {
       console.error("[API_CLIENT] Upload failed:", error);
@@ -126,43 +125,49 @@ export const api = {
 
   async clearAll(): Promise<boolean> {
     console.log("[API_CLIENT] Clearing all files, keeping folders...");
-    const keepFolders = (items: FileSystemItem[]): FileSystemItem[] => {
+    const keepFoldersOnly = (items: FileSystemItem[]): FileSystemItem[] => {
       return items
         .filter(item => item.type === 'folder')
-        .map(f => ({ ...f, children: f.children ? keepFolders(f.children) : [] }));
+        .map(f => ({ ...f, children: f.children ? keepFoldersOnly(f.children) : [] }));
     };
-    mockFileSystem = keepFolders(mockFileSystem);
+    mockFileSystem = keepFoldersOnly(mockFileSystem);
     return true;
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    console.log(`[API_CLIENT] Deleting item: ${name} (ID: ${id})`);
+    console.log(`[API_CLIENT] Suppression de l'élément: ${name} (ID: ${id})`);
     let totalPurged = 0;
     
-    // 1. Purge des segments de tous les fichiers concernés (récursivement)
+    // 1. Identification récursive des fichiers à purger
     const filesToPurge = findFilesToPurge(mockFileSystem, id);
+    console.log(`[API_CLIENT] ${filesToPurge.length} fichiers identifiés pour purge RAG.`);
+
     for (const file of filesToPurge) {
       try {
-        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name });
+        // On tente la suppression serveur, mais on ne bloque pas si l'action serveur échoue (ex: 404 Action)
+        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(err => {
+          console.warn(`[API_CLIENT] Purge serveur échouée pour ${file.name} (Action 404?), suppression locale uniquement.`);
+          return { purgedChunks: file.chunks || 0 };
+        });
         totalPurged += purgeResult.purgedChunks;
       } catch (e) {
-        console.warn(`[API_CLIENT] Failed to purge segments for ${file.name}, skipping server purge...`, e);
         totalPurged += (file.chunks || 0);
       }
     }
     
     // 2. Retrait de l'arborescence locale
-    const removeItem = (items: FileSystemItem[]): FileSystemItem[] => {
+    const removeItemFromTree = (items: FileSystemItem[]): FileSystemItem[] => {
       return items.filter(item => {
         if (item.id === id) return false;
         if (item.children) {
-          item.children = removeItem(item.children);
+          item.children = removeItemFromTree(item.children);
         }
         return true;
       });
     };
     
-    mockFileSystem = removeItem(mockFileSystem);
+    mockFileSystem = removeItemFromTree(mockFileSystem);
+    console.log(`[API_CLIENT] Élément retiré de l'arborescence locale.`);
     return { success: true, purgedChunks: totalPurged };
   },
 
@@ -174,17 +179,19 @@ export const api = {
       parentId,
       children: []
     };
-    const addFolder = (items: FileSystemItem[]): FileSystemItem[] => {
+    
+    const addFolderToTree = (items: FileSystemItem[]): FileSystemItem[] => {
       if (!parentId) return [...items, newFolder];
       return items.map(item => {
         if (item.id === parentId && item.type === 'folder') {
           return { ...item, children: [...(item.children || []), newFolder] };
         }
-        if (item.children) return { ...item, children: addFolder(item.children) };
+        if (item.children) return { ...item, children: addFolderToTree(item.children) };
         return item;
       });
     };
-    mockFileSystem = addFolder(mockFileSystem);
+    
+    mockFileSystem = addFolderToTree(mockFileSystem);
     return newFolder;
   },
 
@@ -214,18 +221,18 @@ export const api = {
   },
 
   async getDocChunks(docId: string): Promise<ChunkMetadata[]> {
-    const findFile = (items: FileSystemItem[]): FileSystemItem | null => {
+    const findFileInTree = (items: FileSystemItem[]): FileSystemItem | null => {
       for (const item of items) {
         if (item.id === docId) return item;
         if (item.children) {
-          const found = findFile(item.children);
+          const found = findFileInTree(item.children);
           if (found) return found;
         }
       }
       return null;
     };
 
-    const file = findFile(mockFileSystem);
+    const file = findFileInTree(mockFileSystem);
     if (!file || !file.content) return [];
 
     const segments = file.content.match(/.{1,1000}/g) || [];
