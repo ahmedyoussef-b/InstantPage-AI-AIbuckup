@@ -2,9 +2,7 @@
 /**
  * @fileOverview Agentic Chat Flow for the Personal Assistant.
  * 
- * - chat - Main function for conversational interaction.
- * - ChatInput - Input schema including current text, history, and known files.
- * - ChatOutput - Output schema including the answer and source citations.
+ * - chat - Main function for conversational interaction with document context.
  */
 
 import { ai } from '@/ai/genkit';
@@ -18,7 +16,8 @@ const MessageSchema = z.object({
 const ChatInputSchema = z.object({
   text: z.string(),
   history: z.array(MessageSchema).optional(),
-  availableFiles: z.array(z.string()).optional().describe('Liste des fichiers actuellement indexés dans la base de données.'),
+  availableFiles: z.array(z.string()).optional(),
+  documentContext: z.string().optional().describe('Le contenu textuel extrait des documents de l\'utilisateur.'),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -30,62 +29,31 @@ const ChatOutputSchema = z.object({
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
-/**
- * Tool for retrieving context from local documents.
- */
-const retrieveDocuments = ai.defineTool(
-  {
-    name: 'retrieveDocuments',
-    description: 'Recherche des informations pertinentes dans les documents de l\'utilisateur. Utilisez cet outil si la question porte sur des fichiers importés.',
-    inputSchema: z.object({ 
-      query: z.string().describe('La recherche textuelle à effectuer.'),
-      targetFiles: z.array(z.string()).optional().describe('Fichiers spécifiques à cibler si mentionnés.')
-    }),
-    outputSchema: z.object({
-      context: z.string(),
-      sources: z.array(z.string()),
-    }),
-  },
-  async (input) => {
-    console.log(`[BACKEND][TOOL:retrieveDocuments] Recherche : "${input.query}"`);
-    
-    // Simulation d'une recherche RAG basée sur les fichiers connus
-    const files = input.targetFiles && input.targetFiles.length > 0 
-      ? input.targetFiles 
-      : ["Document_Principal.pdf"];
-
-    return {
-      context: `Résultat de la recherche sémantique dans ${files.join(', ')} : Les données indiquent une progression conforme aux objectifs fixés.`,
-      sources: files,
-    };
-  }
-);
-
-/**
- * Main chat flow.
- */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}" | Files known: ${input.availableFiles?.length || 0}`);
+  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}" | Context Size: ${input.documentContext?.length || 0} chars`);
 
-  const filesList = input.availableFiles?.length 
-    ? `Tu as accès aux fichiers suivants : ${input.availableFiles.join(', ')}.`
-    : "Aucun fichier n'est actuellement indexé. Invite l'utilisateur à en uploader.";
+  const contextPrompt = input.documentContext 
+    ? `Voici le contenu de tes documents pour t'aider à répondre :\n\n${input.documentContext}`
+    : "Aucun contenu de document n'est disponible pour le moment.";
 
   const response = await ai.generate({
-    system: `Tu es un assistant personnel intelligent. 
-    ${filesList}
-    TES RÈGLES :
+    system: `Tu es un assistant personnel intelligent et expert en analyse de documents.
+    
+    CONTEXTE DES DOCUMENTS :
+    ${contextPrompt}
+
+    RÈGLES DE RÉPONSE :
     1. Réponds TOUJOURS en français.
-    2. Utilise l'outil 'retrieveDocuments' si l'utilisateur pose une question sur ses fichiers.
-    3. Si tu utilises des sources, cite-les clairement à la fin.
-    4. Formate tes réponses en Markdown.
-    5. Sois précis et professionnel.`,
+    2. Utilise UNIQUEMENT les informations fournies dans le contexte ci-dessus pour répondre aux questions sur les documents.
+    3. Si l'information n'est pas dans le contexte, dis-le poliment.
+    4. Cite le nom des fichiers sources si tu les connais.
+    5. Formate ta réponse en Markdown (gras, listes, tableaux si nécessaire).
+    6. Sois précis, professionnel et concis.`,
     prompt: input.text,
     history: input.history,
-    tools: [retrieveDocuments],
   });
 
-  // Extraction simple des sources pour l'UI
+  // Extraction simple des sources mentionnées pour l'UI
   const sources: string[] = [];
   if (input.availableFiles) {
     input.availableFiles.forEach(f => {

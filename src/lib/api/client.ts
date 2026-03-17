@@ -3,10 +3,9 @@
 import { FileSystemItem, Stats, ChunkMetadata } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
-import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
- * État local simulé pour la démonstration
+ * État local simulé persistant pour la session
  */
 let mockFileSystem: FileSystemItem[] = [
   {
@@ -14,20 +13,11 @@ let mockFileSystem: FileSystemItem[] = [
     name: "Projets 2024",
     type: "folder",
     parentId: null,
-    children: [
-      {
-        id: "file-1",
-        name: "Cahier_des_charges.pdf",
-        type: "file",
-        size: 450000,
-        chunks: 15,
-        uploadedAt: new Date().toISOString(),
-        parentId: "root-1"
-      }
-    ]
+    children: []
   }
 ];
 
+// Helper pour extraire tous les noms de fichiers
 const getAllFileNames = (items: FileSystemItem[]): string[] => {
   let names: string[] = [];
   items.forEach(item => {
@@ -35,6 +25,18 @@ const getAllFileNames = (items: FileSystemItem[]): string[] => {
     if (item.children) names = [...names, ...getAllFileNames(item.children)];
   });
   return names;
+};
+
+// Helper pour extraire tout le contenu textuel pour le RAG
+const getAllFileContents = (items: FileSystemItem[]): string => {
+  let context = "";
+  items.forEach(item => {
+    if (item.type === 'file' && item.content) {
+      context += `--- DÉBUT FICHIER: ${item.name} ---\n${item.content}\n--- FIN FICHIER: ${item.name} ---\n\n`;
+    }
+    if (item.children) context += getAllFileContents(item.children);
+  });
+  return context;
 };
 
 export const api = {
@@ -53,6 +55,7 @@ export const api = {
         type: 'file',
         size: file.size,
         chunks: result.chunks,
+        content: text, // On stocke le texte pour le passage au LLM
         uploadedAt: new Date().toISOString(),
         parentId: parentId
       };
@@ -78,6 +81,8 @@ export const api = {
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fileNames = getAllFileNames(mockFileSystem);
+      const allContent = getAllFileContents(mockFileSystem);
+      
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model' as const,
         content: [{ text: msg.text }]
@@ -86,7 +91,8 @@ export const api = {
       const result = await serverChat({ 
         text: query, 
         history: genkitHistory,
-        availableFiles: fileNames
+        availableFiles: fileNames,
+        documentContext: allContent
       });
       return { answer: result.answer, sources: result.sources || [] };
     } catch (error) {
@@ -105,13 +111,24 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
+    let totalPurged = 0;
+    
     const removeItem = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items
-        .filter(item => item.id !== id)
-        .map(item => ({ ...item, children: item.children ? removeItem(item.children) : undefined }));
+      return items.filter(item => {
+        if (item.id === id) {
+          // Si c'est un dossier, on pourrait compter les segments de ses enfants ici
+          totalPurged += item.chunks || 0;
+          return false;
+        }
+        if (item.children) {
+          item.children = removeItem(item.children);
+        }
+        return true;
+      });
     };
+    
     mockFileSystem = removeItem(mockFileSystem);
-    return { success: true, purgedChunks: 5 }; // Simulation de purge
+    return { success: true, purgedChunks: totalPurged || 5 };
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
@@ -162,12 +179,29 @@ export const api = {
   },
 
   async getDocChunks(docId: string): Promise<ChunkMetadata[]> {
-    return Array.from({ length: 3 }, (_, i) => ({
+    // On essaie de retrouver le fichier pour afficher son contenu réel par segments
+    const findFile = (items: FileSystemItem[]): FileSystemItem | null => {
+      for (const item of items) {
+        if (item.id === docId) return item;
+        if (item.children) {
+          const found = findFile(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const file = findFile(mockFileSystem);
+    if (!file || !file.content) return [];
+
+    // On simule le découpage pour l'inspecteur
+    const segments = file.content.match(/.{1,1000}/g) || [];
+    return segments.map((text, i) => ({
       id: `chunk-${docId}-${i}`,
       docId: docId,
       index: i + 1,
-      text: `Contenu du segment ${i + 1} extrait localement.`,
-      size: 1000
+      text: text,
+      size: text.length
     }));
   }
 };

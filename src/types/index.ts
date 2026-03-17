@@ -17,6 +17,7 @@ export interface FileSystemItem {
   type: 'file' | 'folder';
   size?: number;
   chunks?: number;
+  content?: string; // Ajout du contenu textuel pour le RAG
   uploadedAt?: string;
   parentId: string | null;
   children?: FileSystemItem[];
