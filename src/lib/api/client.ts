@@ -63,6 +63,29 @@ const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystem
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     try {
+      // --- DÉTECTION DES DOUBLONS ---
+      const findFolder = (list: FileSystemItem[]): FileSystemItem | null => {
+        for (const item of list) {
+          if (item.id === parentId) return item;
+          if (item.children) {
+            const found = findFolder(item.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const targetList = parentId 
+        ? findFolder(mockFileSystem)?.children || []
+        : mockFileSystem.filter(i => i.parentId === null);
+
+      const isDuplicate = targetList.some(item => item.type === 'file' && item.name === file.name);
+
+      if (isDuplicate) {
+        throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
+      }
+      // -------------------------------
+
       const text = await file.text();
       const result = await ingestDocument({
         fileName: file.name,
@@ -94,8 +117,8 @@ export const api = {
 
       mockFileSystem = addItemToTree(mockFileSystem);
       return { success: true, chunks: result.chunks, docId: result.docId };
-    } catch (error) {
-      console.error("[API_CLIENT] Upload failed:", error);
+    } catch (error: any) {
+      console.error("[API_CLIENT] Upload failed:", error.message);
       throw error;
     }
   },
@@ -144,9 +167,8 @@ export const api = {
 
     for (const file of filesToPurge) {
       try {
-        // On tente la suppression serveur, mais on ne bloque pas si l'action serveur échoue (ex: 404 Action)
         const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(err => {
-          console.warn(`[API_CLIENT] Purge serveur échouée pour ${file.name} (Action 404?), suppression locale uniquement.`);
+          console.warn(`[API_CLIENT] Purge serveur échouée pour ${file.name}, suppression locale uniquement.`);
           return { purgedChunks: file.chunks || 0 };
         });
         totalPurged += purgeResult.purgedChunks;

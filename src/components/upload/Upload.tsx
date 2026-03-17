@@ -88,10 +88,10 @@ export default function Upload() {
       });
       setFile(null);
       if (inputRef.current) inputRef.current.value = '';
-    } catch (error) {
+    } catch (error: any) {
       setStatus({ 
         type: 'error', 
-        message: "Échec de l'indexation." 
+        message: error.message || "Échec de l'indexation." 
       });
     } finally {
       setUploading(false);
