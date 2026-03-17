@@ -6,17 +6,41 @@ import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
- * État local simulé persistant pour la session.
+ * Persistance locale pour éviter le reset au redémarrage.
  */
-let mockFileSystem: FileSystemItem[] = [
-  {
-    id: "root-1",
-    name: "Projets 2024",
-    type: "folder",
-    parentId: null,
-    children: []
+const STORAGE_KEY = 'agentic_assistant_db';
+
+const getInitialFileSystem = (): FileSystemItem[] => {
+  if (typeof window === 'undefined') return [];
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error("[API_CLIENT] Erreur lecture storage:", e);
+    }
   }
-];
+  // État par défaut si vide
+  const defaultFS: FileSystemItem[] = [
+    {
+      id: "root-1",
+      name: "Projets 2024",
+      type: "folder",
+      parentId: null,
+      children: []
+    }
+  ];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultFS));
+  return defaultFS;
+};
+
+let mockFileSystem: FileSystemItem[] = getInitialFileSystem();
+
+const saveToStorage = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockFileSystem));
+  }
+};
 
 // Helper pour extraire tous les noms de fichiers
 const getAllFileNames = (items: FileSystemItem[]): string[] => {
@@ -116,6 +140,7 @@ export const api = {
       };
 
       mockFileSystem = addItemToTree(mockFileSystem);
+      saveToStorage();
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
       console.error("[API_CLIENT] Upload failed:", error.message);
@@ -154,6 +179,7 @@ export const api = {
         .map(f => ({ ...f, children: f.children ? keepFoldersOnly(f.children) : [] }));
     };
     mockFileSystem = keepFoldersOnly(mockFileSystem);
+    saveToStorage();
     return true;
   },
 
@@ -163,8 +189,7 @@ export const api = {
     
     // 1. Identification récursive des fichiers à purger
     const filesToPurge = findFilesToPurge(mockFileSystem, id);
-    console.log(`[API_CLIENT] ${filesToPurge.length} fichiers identifiés pour purge RAG.`);
-
+    
     for (const file of filesToPurge) {
       try {
         const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(err => {
@@ -189,7 +214,7 @@ export const api = {
     };
     
     mockFileSystem = removeItemFromTree(mockFileSystem);
-    console.log(`[API_CLIENT] Élément retiré de l'arborescence locale.`);
+    saveToStorage();
     return { success: true, purgedChunks: totalPurged };
   },
 
@@ -214,6 +239,7 @@ export const api = {
     };
     
     mockFileSystem = addFolderToTree(mockFileSystem);
+    saveToStorage();
     return newFolder;
   },
 
@@ -234,11 +260,12 @@ export const api = {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "Local", used: "0.1 GB", free: "Illimité" }
+      diskSpace: { total: "Persistant (Browser)", used: `${(stats.size / 1024 / 1024).toFixed(2)} MB`, free: "Local" }
     };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
+    // Toujours re-vérifier si une mise à jour externe a eu lieu (optionnel mais plus sûr)
     return [...mockFileSystem];
   },
 
