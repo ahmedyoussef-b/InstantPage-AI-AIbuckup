@@ -14,7 +14,6 @@ import {
   Trash2, 
   Eye,
   Cpu,
-  Search,
   FileCode,
   Table,
   FileJson
@@ -24,10 +23,6 @@ import { Table as UiTable, TableBody, TableCell, TableHead, TableHeader, TableRo
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
-/**
- * Admin Dashboard for RAG Knowledge Base management.
- * Strictly follows the requested mockup for monitoring chunks and system health.
- */
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -95,7 +90,6 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#171717] text-white p-4 md:p-8">
-      {/* Header Actions */}
       <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-600 rounded-lg">
@@ -138,7 +132,6 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl mx-auto space-y-10">
-        {/* Statistics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-xl">
             <CardHeader className="pb-2">
@@ -185,10 +178,9 @@ export default function AdminPage() {
           </Card>
         </div>
 
-        {/* Documents List */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-1">
-            <span className="text-lg font-bold">📚 DOCUMENTS INDEXÉS</span>
+            <span className="text-lg font-bold uppercase tracking-tight">📚 Documents Indexés</span>
             <div className="h-px flex-1 bg-white/5" />
           </div>
 
@@ -207,9 +199,9 @@ export default function AdminPage() {
                 <UiTable>
                   <TableHeader className="bg-white/5">
                     <TableRow className="border-white/5 hover:bg-transparent">
-                      <TableHead className="text-gray-400 text-xs font-bold uppercase py-4">Nom du fichier</TableHead>
+                      <TableHead className="text-gray-400 text-xs font-bold uppercase py-4">Fichier</TableHead>
                       <TableHead className="text-gray-400 text-xs font-bold uppercase py-4 text-center">Taille</TableHead>
-                      <TableHead className="text-gray-400 text-xs font-bold uppercase py-4 text-center">Chunks (1000ch)</TableHead>
+                      <TableHead className="text-gray-400 text-xs font-bold uppercase py-4 text-center">Segments (1000ch)</TableHead>
                       <TableHead className="text-gray-400 text-xs font-bold uppercase py-4 text-right pr-6">Action</TableHead>
                     </TableRow>
                   </TableHeader>

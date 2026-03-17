@@ -11,7 +11,7 @@ import Link from 'next/link';
  */
 export default function HomePage() {
   return (
-    <main className="h-screen flex bg-[#171717] overflow-hidden">
+    <main className="h-screen flex bg-[#171717] overflow-hidden selection:bg-blue-500/30">
       {/* Sidebar - Navigation and Branding */}
       <aside className="w-64 flex-col hidden md:flex border-r border-white/5 bg-[#171717]">
         <div className="p-4 flex flex-col h-full">

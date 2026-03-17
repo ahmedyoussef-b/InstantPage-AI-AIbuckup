@@ -5,7 +5,7 @@ import { chat as serverChat } from '@/ai/flows/chat-flow';
 
 /**
  * Client-side API for the Agentic Personal Assistant.
- * Simulates a 100% local RAG environment with Ollama and ChromaDB logic.
+ * Simulates the RAG process: Extraction, 1000-char Chunking, and Vector Indexing.
  */
 export const api = {
   /**
@@ -13,9 +13,13 @@ export const api = {
    * 1. Extraction 2. Chunking (1000 chars) 3. Embedding 4. Vector Storage
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
+    // Artificial delay to simulate processing
     await new Promise(resolve => setTimeout(resolve, 2000));
-    // Implementation: 1000 characters per chunk as specified
+    
+    // Chunking logic: 1000 characters per segment as specified
+    // For the simulation, we use file size as a proxy for character count
     const chunks = Math.max(1, Math.ceil(file.size / 1000));
+    
     return {
       success: true,
       chunks,
@@ -24,12 +28,12 @@ export const api = {
   },
 
   /**
-   * Real RAG-based agentic chat interaction via Genkit.
+   * Real agentic chat interaction via Genkit.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const genkitHistory = history.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
+        role: msg.role === 'user' ? 'user' : 'model' as const,
         content: [{ text: msg.text }]
       }));
 
@@ -49,7 +53,7 @@ export const api = {
   },
 
   /**
-   * Clear the entire local vector database (ChromaDB simulation).
+   * Clear the entire local vector database.
    */
   async clearAll(): Promise<boolean> {
     await new Promise(resolve => setTimeout(resolve, 1000));
