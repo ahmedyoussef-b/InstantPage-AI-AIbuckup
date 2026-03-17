@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api/client';
-import { Send, Bot, User, Database, Sparkles, FileText, Brain, ShieldCheck, ListChecks } from 'lucide-react';
+import { Send, Bot, User, Database, Sparkles, FileText, Brain, ShieldCheck, ListChecks, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,21 +29,22 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async () => {
-    const trimmed = input.trim();
+  const sendMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || input;
+    const trimmed = textToSend.trim();
     if (!trimmed || loading) return;
 
     console.log(`[UI_CHAT] User initiated send: "${trimmed}"`);
 
     setLoading(true);
-    setInput('');
+    if (!textOverride) setInput('');
     const userMsg: Message = { role: 'user', text: trimmed };
     const currentMessages = [...messages, userMsg];
     setMessages(currentMessages);
 
     try {
       const data = await api.chat(trimmed, messages);
-      console.log(`[UI_CHAT] AI response received. Sources found: ${data.sources.length}`);
+      console.log(`[UI_CHAT] AI response received. Sources found: ${data.sources?.length || 0}`);
       
       setMessages(prev => [...prev, { 
         role: 'ai', 
@@ -67,6 +69,13 @@ export default function Chat() {
     { icon: <ListChecks className="w-4 h-4 text-orange-400" />, title: "Citations Sources", desc: "Transparence des réponses" }
   ];
 
+  const suggestions = [
+    "Quelles sont les conclusions du Rapport Annuel ?",
+    "Résume-moi le fichier Cahier des charges.",
+    "Y a-t-il des mentions de sécurité dans mes documents ?",
+    "Compare les stratégies entre mes différents projets."
+  ];
+
   return (
     <div className="flex flex-col h-full bg-[#212121]">
       <ScrollArea className="flex-1 p-4 md:p-8">
@@ -80,7 +89,7 @@ export default function Chat() {
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white tracking-tight">Bonjour, comment puis-je vous aider ?</h2>
                 <p className="text-gray-400 max-w-lg mx-auto">
-                  Votre assistant personnel agentique est prêt. Voici ce que nous pouvons faire ensemble :
+                  Importez vos documents pour commencer une analyse intelligente et sécurisée.
                 </p>
               </div>
 
@@ -96,6 +105,23 @@ export default function Chat() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+
+              <div className="w-full max-w-2xl space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  <HelpCircle className="w-3.5 h-3.5" /> Suggestions de questions
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => sendMessage(s)}
+                      className="text-xs text-gray-300 bg-white/5 border border-white/10 px-4 py-2 rounded-xl hover:bg-blue-600/20 hover:border-blue-500/30 transition-all text-left"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -122,7 +148,7 @@ export default function Chat() {
                   {msg.role === 'ai' && msg.sources && msg.sources.length > 0 && (
                     <div className="flex flex-wrap gap-2 px-1">
                       <span className="text-[9px] text-gray-500 flex items-center gap-1 font-bold uppercase tracking-widest">
-                        <Database className="w-3 h-3" /> Sources :
+                        <Database className="w-3 h-3" /> Sources consultées :
                       </span>
                       {msg.sources.map((src, sIdx) => (
                         <Badge key={sIdx} variant="outline" className="text-[10px] bg-blue-500/10 border-blue-500/20 text-blue-400 font-bold py-0 rounded-md">
@@ -168,7 +194,7 @@ export default function Chat() {
               rows={1}
             />
             <Button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={loading || !input.trim()}
               size="icon"
               className="absolute right-3 bottom-3 bg-blue-600 text-white hover:bg-blue-500 rounded-xl disabled:opacity-30 transition-all w-9 h-9 shadow-lg"
