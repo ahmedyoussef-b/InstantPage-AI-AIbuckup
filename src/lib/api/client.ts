@@ -1,6 +1,6 @@
 'use client';
 
-import { FileSystemItem, Stats } from '@/types';
+import { FileSystemItem, Stats, ChunkMetadata } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
@@ -187,5 +187,19 @@ export const api = {
         parentId: null
       }
     ];
+  },
+
+  /**
+   * Simulated retrieval of chunks for a specific document.
+   */
+  async getDocChunks(docId: string): Promise<ChunkMetadata[]> {
+    console.log(`[API_CLIENT][getDocChunks] Récupération des segments pour le document: ${docId}`);
+    return Array.from({ length: 5 }, (_, i) => ({
+      id: `chunk-${docId}-${i}`,
+      docId: docId,
+      index: i + 1,
+      text: `Contenu du segment ${i + 1} extrait du document. Ce texte représente une portion de 1000 caractères maximum utilisée par le moteur RAG pour la recherche vectorielle locale.`,
+      size: 1000
+    }));
   }
 };

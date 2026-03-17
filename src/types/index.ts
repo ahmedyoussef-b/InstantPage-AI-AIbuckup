@@ -3,6 +3,14 @@ export interface Message {
   text: string;
 }
 
+export interface ChunkMetadata {
+  id: string;
+  docId: string;
+  index: number;
+  text: string;
+  size: number;
+}
+
 export interface FileSystemItem {
   id: string;
   name: string;

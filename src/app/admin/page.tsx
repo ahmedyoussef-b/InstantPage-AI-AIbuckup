@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
-import { Stats, FileSystemItem } from '@/types';
+import { Stats, FileSystemItem, ChunkMetadata } from '@/types';
 import { 
   ArrowLeft, 
   Database, 
@@ -19,12 +19,17 @@ import {
   FileCode,
   Table,
   FileJson,
-  Plus
+  Plus,
+  Search,
+  Eye,
+  Layers,
+  Box
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Dialog, 
   DialogContent, 
@@ -33,6 +38,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -40,6 +46,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [newFolderName, setNewFolderName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDocChunks, setSelectedDocChunks] = useState<ChunkMetadata[]>([]);
+  const [viewingDocName, setViewingDocName] = useState('');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { loadData(); }, []);
@@ -60,6 +69,18 @@ export default function AdminPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Chargement de la base échoué." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewChunks = async (docId: string, docName: string) => {
+    console.log(`[UI_ADMIN] Ouverture de l'explorateur de chunks pour: ${docName}`);
+    try {
+      const chunks = await api.getDocChunks(docId);
+      setSelectedDocChunks(chunks);
+      setViewingDocName(docName);
+      setIsPreviewOpen(true);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les segments." });
     }
   };
 
@@ -142,6 +163,16 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isFolder && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-gray-400 hover:text-blue-400"
+                onClick={(e) => { e.stopPropagation(); handleViewChunks(item.id, item.name); }}
+              >
+                <Layers className="w-4 h-4" />
+              </Button>
+            )}
             {isFolder && (
               <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-blue-400">
                 <Plus className="w-4 h-4" />
@@ -169,6 +200,40 @@ export default function AdminPage() {
             )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const ChunkExplorerNode = ({ item }: { item: FileSystemItem }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    if (item.type === 'folder') {
+      return (
+        <div className="space-y-1">
+          <div 
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-2 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+          >
+            {isOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
+            <Folder className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-bold uppercase tracking-tight text-gray-300">{item.name}</span>
+          </div>
+          {isOpen && item.children && (
+            <div className="ml-4 border-l border-white/5 pl-2">
+              {item.children.map(child => <ChunkExplorerNode key={child.id} item={child} />)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        onClick={() => handleViewChunks(item.id, item.name)}
+        className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-lg cursor-pointer group transition-all"
+      >
+        <Box className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+        <span className="text-xs text-gray-400 group-hover:text-white transition-colors">{item.name}</span>
+        <span className="ml-auto text-[10px] text-gray-600 font-mono">[{item.chunks} segments]</span>
       </div>
     );
   };
@@ -247,36 +312,116 @@ export default function AdminPage() {
           ))}
         </section>
 
-        <section className="space-y-6">
-          <div className="flex items-center gap-4 px-1">
-            <h2 className="text-lg font-black uppercase tracking-tight">📚 Explorateur de connaissances</h2>
-            <div className="h-px flex-1 bg-white/5" />
+        <Tabs defaultValue="files" className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <TabsList className="bg-white/5 border border-white/10 p-1 h-12 rounded-xl">
+              <TabsTrigger value="files" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold px-6">
+                📁 Fichiers
+              </TabsTrigger>
+              <TabsTrigger value="chunks" className="rounded-lg data-[state=active]:bg-purple-600 data-[state=active]:text-white font-bold px-6">
+                🧱 Segments (Chunks)
+              </TabsTrigger>
+            </TabsList>
+            <div className="h-px flex-1 bg-white/5 ml-6" />
           </div>
 
-          <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden min-h-[500px]">
-            <CardContent className="p-8">
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-32 text-gray-500 gap-6">
-                  <div className="relative">
-                    <Database className="w-12 h-12 text-blue-600/20" />
-                    <RotateCcw className="w-6 h-6 text-blue-500 animate-spin absolute -bottom-1 -right-1" />
+          <TabsContent value="files">
+            <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden min-h-[500px]">
+              <CardContent className="p-8">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-32 text-gray-500 gap-6">
+                    <RotateCcw className="w-8 h-8 text-blue-500 animate-spin" />
+                    <p className="text-sm font-bold uppercase tracking-widest animate-pulse">Chargement des fichiers...</p>
                   </div>
-                  <p className="text-sm font-bold uppercase tracking-widest animate-pulse">Synchronisation de la base...</p>
+                ) : fileSystem.length === 0 ? (
+                  <div className="text-center py-32 text-gray-500">La base est vide.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {fileSystem.map(item => <TreeNode key={item.id} item={item} />)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="chunks">
+            <Card className="bg-[#2f2f2f] border-white/5 text-white shadow-2xl rounded-2xl overflow-hidden min-h-[500px]">
+              <CardContent className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                      <Search className="w-3 h-3" /> Arborescence des segments
+                    </h3>
+                    <ScrollArea className="h-[400px] pr-4">
+                      <div className="space-y-1">
+                        {fileSystem.map(item => <ChunkExplorerNode key={item.id} item={item} />)}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  <div className="bg-black/20 rounded-2xl border border-white/5 p-6 flex flex-col items-center justify-center text-center">
+                    <div className="p-4 bg-purple-500/10 rounded-full mb-4">
+                      <Layers className="w-8 h-8 text-purple-400 opacity-50" />
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-400 mb-2">Inspecteur de segments</h4>
+                    <p className="text-xs text-gray-600 max-w-xs">
+                      Sélectionnez un fichier dans la liste de gauche pour explorer ses segments individuels et vérifier la qualité du découpage RAG.
+                    </p>
+                  </div>
                 </div>
-              ) : fileSystem.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-32 text-gray-500 italic text-center space-y-4">
-                  <Folder className="w-12 h-12 opacity-10" />
-                  <p className="max-w-xs text-sm">La base de connaissances est vide. Créez des dossiers ou uploadez des fichiers depuis le chat.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {fileSystem.map(item => <TreeNode key={item.id} item={item} />)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
+
+      {/* Chunk Inspection Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="bg-[#1e1e1e] border-white/10 text-white max-w-4xl max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-3xl">
+          <DialogHeader className="p-8 border-b border-white/5 bg-[#252525]">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-600 rounded-xl">
+                <Box className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Explorateur de Segments</DialogTitle>
+                <p className="text-xs text-gray-500 font-medium">Document : <span className="text-blue-400">{viewingDocName}</span></p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 p-8">
+            <div className="grid grid-cols-1 gap-6">
+              {selectedDocChunks.map((chunk) => (
+                <div key={chunk.id} className="bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-purple-500/30 transition-all group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-purple-600/20 text-purple-400 border-purple-500/20 px-3 font-black">SEGMENT #{chunk.index}</Badge>
+                      <span className="text-[10px] text-gray-500 font-mono tracking-tighter uppercase">{chunk.id}</span>
+                    </div>
+                    <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+                      Taille : {chunk.size} ch
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute -left-2 top-0 bottom-0 w-1 bg-purple-600/30 rounded-full" />
+                    <p className="text-sm text-gray-300 leading-relaxed pl-4 whitespace-pre-wrap">
+                      {chunk.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+
+          <div className="p-6 bg-[#252525] border-t border-white/5 text-center">
+            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+              Visualisation des segments indexés pour la recherche vectorielle (RAG 1000ch)
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
