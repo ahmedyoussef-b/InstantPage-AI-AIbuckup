@@ -2,32 +2,42 @@
 
 import { Document, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
+import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 
 /**
  * Client-side API for the Agentic Personal Assistant.
- * Simulates the RAG process: 100% Local Ingestion & Vector Indexing.
+ * Orchestrates real RAG ingestion and conversational flows.
  */
 export const api = {
   /**
-   * Simulates the RAG ingestion process: 
+   * Real RAG ingestion: reads file and calls server-side embedding flow.
    */
   async upload(file: File): Promise<{ success: boolean; chunks: number; docId: string }> {
-    console.log(`[API_CLIENT][upload] Starting upload for: ${file.name} (${file.size} bytes)`);
+    console.log(`[API_CLIENT][upload] Reading file: ${file.name}`);
     
-    // Artificial delay to simulate local processing (Extraction + Embedding)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Technical Spec: 1000 characters per segment
-    const chunks = Math.max(1, Math.ceil(file.size / 1000));
-    const docId = Math.random().toString(36).substring(7);
+    try {
+      // Extraction du texte côté client (lecture simple)
+      const text = await file.text();
+      
+      console.log(`[API_CLIENT][upload] Sending content to server for real embedding...`);
+      
+      const result = await ingestDocument({
+        fileName: file.name,
+        fileContent: text,
+        fileType: file.type || 'text/plain'
+      });
 
-    console.log(`[API_CLIENT][upload] Processed ${file.name}: ${chunks} chunks generated. DocID: ${docId}`);
-    
-    return {
-      success: true,
-      chunks,
-      docId,
-    };
+      console.log(`[API_CLIENT][upload] Server processing complete. DocID: ${result.docId}`);
+      
+      return {
+        success: true,
+        chunks: result.chunks,
+        docId: result.docId,
+      };
+    } catch (error) {
+      console.error('[API_CLIENT][upload] Ingestion error:', error);
+      throw error;
+    }
   },
 
   /**
@@ -85,7 +95,6 @@ export const api = {
         free: "Unlimited"
       }
     };
-    console.log(`[API_CLIENT][getStats] Stats retrieved: ${stats.totalDocuments} docs, ${stats.totalChunks} chunks.`);
     return stats;
   },
 
@@ -93,7 +102,6 @@ export const api = {
    * Returns metadata of all documents indexed in the local base.
    */
   async getDocuments(): Promise<Document[]> {
-    console.log(`[API_CLIENT][getDocuments] Fetching indexed documents list...`);
     const docs = [
       {
         id: "1",
@@ -117,7 +125,6 @@ export const api = {
         uploadedAt: new Date().toISOString()
       }
     ];
-    console.log(`[API_CLIENT][getDocuments] Found ${docs.length} documents.`);
     return docs;
   }
 };
