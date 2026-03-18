@@ -10,7 +10,8 @@ import {
   HardDrive, 
   Menu, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  Cpu
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +67,18 @@ export default function HomePage() {
             {!collapsed && <span className="truncate">Base de Connaissances</span>}
           </Link>
         </div>
+
+        {!collapsed && (
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
+             <div className="flex items-center gap-2">
+               <Cpu className="w-4 h-4 text-yellow-400" />
+               <span className="text-[10px] font-black text-white uppercase tracking-widest">Modèle Spécialisé</span>
+             </div>
+             <p className="text-[9px] text-gray-500 leading-relaxed">
+               Quantification 4-bit activée pour une précision maximale sur vos documents.
+             </p>
+          </div>
+        )}
       </div>
 
       <div className="pt-6 mt-auto border-t border-white/5 space-y-4 shrink-0">
@@ -75,7 +88,7 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
                 <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
               </div>
-              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local</Badge>
+              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local VFS</Badge>
             </div>
           </>
         ) : (
@@ -118,7 +131,7 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
-                  <SheetTitle className="sr-only">Menu de Navigation</SheetTitle>
+                  <SheetTitle className="text-white text-sm uppercase font-black tracking-widest">Menu de Navigation</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>

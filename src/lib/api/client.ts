@@ -1,8 +1,7 @@
-'use client';
-
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persitante (VFS).
  * Persistance stable via synchronisation atomique du localStorage.
+ * Inclut désormais l'exportation du corpus pour le fine-tuning (Innovation 7).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -10,7 +9,7 @@ import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V10';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V11';
 
 /**
  * Charge le système de fichiers depuis le stockage local.
@@ -35,13 +34,13 @@ const saveLocalFS = (fs: FileSystemItem[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
   } catch (e: any) {
-    console.error("[API_CLIENT] Échec de sauvegarde (Quota dépassé ?) :", e.message);
+    console.error("[API_CLIENT] Échec de sauvegarde :", e.message);
   }
 };
 
 export const api = {
   /**
-   * Ingestion d'un document avec extraction de graphe côté serveur.
+   * Ingestion d'un document.
    */
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
@@ -52,7 +51,6 @@ export const api = {
 
     try {
       const text = await file.text();
-      // Appel au flux serveur pour l'ingestion IA
       const result = await ingestDocument({
         fileName: file.name,
         fileContent: text,
@@ -68,12 +66,11 @@ export const api = {
         content: text,
         uploadedAt: new Date().toISOString(),
         parentId,
-        // On stocke les métadonnées thématiques
         tags: result.concepts
       };
 
-      // @ts-ignore - Stockage des nœuds du graphe pour recherche hybride
-      newFile.graphNodes = result.graphData?.nodes || [];
+      // Stockage des nœuds du graphe
+      (newFile as any).graphNodes = result.graphData?.nodes || [];
 
       saveLocalFS([...fs, newFile]);
       return { success: true, chunks: result.chunks, docId: result.docId };
@@ -84,14 +81,13 @@ export const api = {
   },
 
   /**
-   * Chat intelligent avec RAG Hybride consolidé.
+   * Chat intelligent avec RAG Hybride et Routage Spécialisé.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fs = loadLocalFS();
       const files = fs.filter(i => i.type === 'file');
       
-      // Recherche croisée via le moteur hybride
       const context = await hybridRAG.retrieve(query, files);
       
       const genkitHistory = history.map(msg => ({
@@ -110,11 +106,24 @@ export const api = {
     }
   },
 
+  /**
+   * Innovation 7 : Exporte tous les documents pour le fine-tuning du modèle spécialisé.
+   */
+  async exportCorpus(): Promise<string> {
+    const fs = loadLocalFS();
+    const contents = fs
+      .filter(item => item.type === 'file' && item.content)
+      .map(item => `--- DOCUMENT: ${item.name} ---\n${item.content}`)
+      .join('\n\n');
+    
+    console.log(`[AI][CORPUS] Corpus généré : ${contents.length} caractères.`);
+    return contents;
+  },
+
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
     const fs = loadLocalFS();
     const newFs = fs.filter(item => item.id !== id);
     saveLocalFS(newFs);
-    // Nettoyage asynchrone côté serveur
     deleteDocument({ docId: id, fileName: name }).catch(() => {});
     return { success: true, purgedChunks: 1 };
   },
@@ -153,9 +162,9 @@ export const api = {
       totalChunks: chunks,
       totalSize: size,
       diskSpace: { 
-        total: "Local Storage", 
+        total: "Local Storage Stable", 
         used: `${(size / 1024).toFixed(1)} KB`, 
-        free: "Quota variable" 
+        free: "Quota VFS" 
       }
     };
   },
