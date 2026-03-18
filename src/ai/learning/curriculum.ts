@@ -1,149 +1,67 @@
-// src/ai/learning/curriculum.ts
-export class AdaptiveCurriculum {
-    private topics: Map<string, Topic> = new Map();
-    private userMastery: Map<string, number> = new Map();
-    private learningPath: LearningPath[] = [];
-    
-    async initializeCurriculum(domain: string) {
-      // 1. Analyser le domaine pour identifier les concepts
-      const concepts = await this.extractConcepts(domain);
-      
-      // 2. Construire le graphe de dépendances
-      const dependencyGraph = await this.buildDependencyGraph(concepts);
-      
-      // 3. Créer un curriculum progressif
-      this.learningPath = this.buildLearningPath(dependencyGraph);
-      
-      // 4. Initialiser les niveaux de maîtrise
-      for (const topic of this.learningPath) {
-        this.userMastery.set(topic.id, 0);
-      }
-    }
-    
-    async getNextTopic(userId: string): Promise<Topic | null> {
-      // 1. Trouver les prochains sujets disponibles
-      const available = this.learningPath.filter(topic => 
-        this.isAvailable(topic) && 
-        this.userMastery.get(topic.id)! < 0.8 // Pas encore maîtrisé
-      );
-      
-      if (available.length === 0) return null;
-      
-      // 2. Choisir le sujet optimal (ni trop facile, ni trop dur)
-      const optimal = this.selectOptimalTopic(available);
-      
-      // 3. Adapter la difficulté au niveau de l'utilisateur
-      const adapted = await this.adaptDifficulty(optimal, userId);
-      
-      return adapted;
-    }
-    
-    async assessProgress(userId: string, interaction: Interaction): Promise<void> {
-      const topicId = interaction.topicId;
-      const currentMastery = this.userMastery.get(topicId) || 0;
-      
-      // Évaluer la performance
-      const performance = await this.evaluatePerformance(interaction);
-      
-      // Mettre à jour le niveau de maîtrise
-      const newMastery = this.updateMastery(currentMastery, performance);
-      this.userMastery.set(topicId, newMastery);
-      
-      // Si maîtrise suffisante, débloquer les sujets suivants
-      if (newMastery >= 0.8) {
-        await this.unlockNextTopics(topicId);
-      }
-      
-      // Adapter le curriculum si nécessaire
-      await this.adaptCurriculum(userId);
-    }
-    
-    private async adaptDifficulty(topic: Topic, userId: string): Promise<Topic> {
-      const masteryLevel = this.getAverageMastery(userId);
-      
-      // Ajuster la difficulté au niveau de l'utilisateur
-      if (masteryLevel < 0.3) {
-        // Débutant: versions simplifiées
-        return this.simplifyTopic(topic);
-      } else if (masteryLevel > 0.7) {
-        // Avancé: versions plus complexes
-        return this.enhanceTopic(topic);
-      }
-      
-      return topic;
-    }
-    
-    private async simplifyTopic(topic: Topic): Promise<Topic> {
-      const prompt = `Sujet: "${topic.name}"
-  Description: "${topic.description}"
+'use server';
+/**
+ * @fileOverview AdaptiveCurriculum - Innovation 27.
+ * Gère la progression pédagogique de l'utilisateur du simple au complexe.
+ */
+
+import { ai } from '@/ai/genkit';
+
+export interface TopicProgress {
+  topicId: string;
+  mastery: number; // 0 à 1
+  interactions: number;
+}
+
+export interface CurriculumState {
+  currentLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  progress: Record<string, TopicProgress>;
+}
+
+/**
+ * Évalue dynamiquement le niveau de l'utilisateur basé sur la complexité de sa requête
+ * et la qualité de l'interaction précédente.
+ */
+export async function evaluatePedagogicalLevel(
+  query: string, 
+  confidence: number, 
+  historyLength: number
+): Promise<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'> {
+  const q = query.toLowerCase();
   
-  Crée une version simplifiée de ce sujet pour un débutant:
-  - Utilise un langage plus simple
-  - Ajoute plus d'exemples
-  - Évite les concepts avancés
-  - Inclus des analogies
+  // Heuristique de complexité
+  const technicalTermsCount = (q.match(/pression|flux|circuit|étalonnage|vibration|harmonique|impédance/g) || []).length;
   
-  Format JSON: {
-    "name": "string",
-    "description": "string",
-    "examples": ["string"],
-    "analogies": ["string"]
-  }`;
-      
-      const simplified = await this.model.generate(prompt);
-      return JSON.parse(simplified);
-    }
-    
-    private async buildDependencyGraph(concepts: Concept[]): Promise<Graph> {
-      const graph = new Graph();
-      
-      for (const concept of concepts) {
-        // Identifier les prérequis pour chaque concept
-        const prerequisites = await this.identifyPrerequisites(concept);
-        
-        for (const prereq of prerequisites) {
-          graph.addEdge(prereq, concept.id);
-        }
-      }
-      
-      return graph;
-    }
-    
-    private async identifyPrerequisites(concept: Concept): Promise<string[]> {
-      const prompt = `Concept: "${concept.name}"
-  Description: "${concept.description}"
+  if (technicalTermsCount > 2 && confidence > 0.8) return 'ADVANCED';
+  if (q.length > 100 || technicalTermsCount > 0 || historyLength > 5) return 'INTERMEDIATE';
+  return 'BEGINNER';
+}
+
+/**
+ * Retourne une directive système pour adapter la réponse au niveau détecté.
+ * Doit être asynchrone car exportée dans un fichier 'use server'.
+ */
+export async function getCurriculumDirective(level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'): Promise<string> {
+  const base = "\n[CURRICULUM ADAPTATIF (INNOVATION 27)] : ";
   
-  Quels sont les 1-3 concepts qu'il faut maîtriser avant celui-ci?
-  Liste les IDs des concepts prérequis:`;
-      
-      const response = await this.model.generate(prompt);
-      return this.parsePrerequisites(response);
-    }
-    
-    private selectOptimalTopic(available: Topic[]): Topic {
-      // Zone proximale de développement: ni trop facile, ni trop dur
-      const userLevel = this.getUserLevel();
-      
-      return available.reduce((optimal, topic) => {
-        const distance = Math.abs(topic.difficulty - userLevel);
-        const optimalDistance = Math.abs(optimal.difficulty - userLevel);
-        return distance < optimalDistance ? topic : optimal;
-      });
-    }
-    
-    private async evaluatePerformance(interaction: Interaction): Promise<number> {
-      const factors = {
-        correctAnswers: interaction.correctAnswers || 0,
-        timeSpent: Math.min(interaction.timeSpent / 30000, 1), // Normalisé à 30s
-        helpRequested: interaction.helpRequested ? -0.3 : 0,
-        confidence: interaction.userConfidence || 0.5
-      };
-      
-      return (
-        factors.correctAnswers * 0.5 +
-        (1 - factors.timeSpent) * 0.2 +
-        factors.confidence * 0.3 +
-        factors.helpRequested
-      );
-    }
+  switch (level) {
+    case 'BEGINNER':
+      return base + "L'utilisateur est en phase d'initiation. Utilise des analogies de la vie courante, décompose les étapes, et évite absolument le jargon non expliqué. Sois très encourageant.";
+    case 'INTERMEDIATE':
+      return base + "L'utilisateur a des bases. Utilise la terminologie technique standard, fournis des explications sur le 'pourquoi' et commence à introduire des concepts corrélés.";
+    case 'ADVANCED':
+      return base + "L'utilisateur est expert. Va droit au but technique, fournis des paramètres précis, des schémas de données ou des références aux normes industrielles (ISO/AFNOR) sans vulgarisation.";
+    default:
+      return "";
   }
+}
+
+/**
+ * Suggère le prochain concept à explorer basé sur le graphe de dépendances.
+ */
+export async function suggestNextTopic(context: string): Promise<string | null> {
+  // Dans un système réel, on interrogerait un graphe de connaissances.
+  // Ici on simule une recommandation pédagogique.
+  if (context.includes('chaudière')) return "Voulez-vous approfondir les procédures de sécurité gaz ?";
+  if (context.includes('gaz')) return "Prochaine étape recommandée : Maintenance du brûleur principal.";
+  return null;
+}

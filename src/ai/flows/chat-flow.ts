@@ -16,6 +16,7 @@ import { extractPoliciesFromHistory, suggestActionFromPolicy, type Demonstration
 import { submitWorkflow } from '@/ai/actions/async-workflow';
 import { predictNextActions } from '@/ai/actions/predictive-engine';
 import { recall, remember, type Episode } from '@/ai/learning/episodic-memory';
+import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } from '@/ai/learning/curriculum';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -43,6 +44,7 @@ const ChatOutputSchema = z.object({
   asyncTaskId: z.string().optional(),
   undoAvailable: z.boolean().optional(),
   newMemoryEpisode: z.any().optional(),
+  pedagogicalLevel: z.string().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -63,6 +65,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     if (memory.summary) {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
+
+    // 0.1 Innovation 27: Curriculum Adaptatif
+    const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
+    const pedaDirective = await getCurriculumDirective(pedaLevel);
+    docContext += ` ${pedaDirective}`;
 
     // 1. Innovation 23: Workflow Asynchrone
     if (q.match(/audit complet|analyse massive|traitement profond|longue tâche/i)) {
@@ -160,17 +167,23 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       tags: [metaResult.confidence > 0.8 ? 'important' : 'routine']
     };
 
+    // 8. Innovation 27: Prochaine thématique
+    const nextStep = await suggestNextTopic(input.text + " " + metaResult.answer);
+    const finalSuggestions = metaResult.suggestions || [];
+    if (nextStep) finalSuggestions.push(nextStep);
+
     return {
       answer: prefixOutput + metaResult.answer,
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
-      suggestions: metaResult.suggestions,
+      suggestions: finalSuggestions,
       proactiveSuggestions,
       planGenerated,
       demoPolicyApplied,
       undoAvailable,
       actionTaken: actionDecision.type === 'use_tool' ? actionDecision : undefined,
-      newMemoryEpisode
+      newMemoryEpisode,
+      pedagogicalLevel: pedaLevel
     };
   };
 
