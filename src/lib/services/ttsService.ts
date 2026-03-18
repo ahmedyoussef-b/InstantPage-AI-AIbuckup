@@ -1,21 +1,14 @@
 // lib/services/ttsService.ts
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import piperProvider from './ttsProviders/piperProvider';
 import edgeProvider from './ttsProviders/edgeProvider';
 import ttsCache from './ttsCache';
 import { VoiceOptions, VoiceResponse, VoiceInfo } from '@/types/voice';
+import crypto from 'crypto';
 
-const execAsync = promisify(exec);
-
-// 🔧 INTERFACE POUR LES PROVIDERS TTS
 interface TTSProvider {
   synthesize: (text: string, options: any) => Promise<Buffer>;
   checkHealth: () => Promise<boolean>;
-  getVoices?: () => Promise<string[]>;
+  getVoices?: () => Promise<string[] | any[]>;
 }
 
 class TTSService {
@@ -27,11 +20,11 @@ class TTSService {
 
   constructor() {
     this.providers = {
-      piper: piperProvider,
-      edge: edgeProvider
+      piper: piperProvider as any,
+      edge: edgeProvider as any
     };
     
-    this.defaultProvider = (process.env.TTS_DEFAULT_PROVIDER as 'piper' | 'edge') || 'piper';
+    this.defaultProvider = (process.env.TTS_DEFAULT_PROVIDER as 'piper' | 'edge') || 'edge';
     this.fallbackProvider = 'edge';
     this.cache = ttsCache;
     
@@ -61,16 +54,9 @@ class TTSService {
         }
       }
     };
-
-    console.log('✅ Service TTS initialisé');
   }
 
-  /**
-   * Synthétiser un texte en audio
-   */
   async synthesize(options: VoiceOptions): Promise<VoiceResponse> {
-    console.log('🔊 Synthèse vocale:', options.text.substring(0, 50) + '...');
-    
     const {
       text,
       provider = this.defaultProvider,
@@ -81,30 +67,19 @@ class TTSService {
     } = options;
 
     try {
-      // ✅ Conversion sécurisée du type provider
       const selectedProvider = (provider || this.defaultProvider) as 'piper' | 'edge';
-      
-      // Sélectionner le provider
       const ttsProvider = this.providers[selectedProvider];
+      
       if (!ttsProvider) {
         throw new Error(`Provider TTS non trouvé: ${selectedProvider}`);
       }
 
-      // Format attendu selon le provider
       const format = selectedProvider === 'piper' ? 'wav' : 'mp3';
-
-      // Vérifier le cache
-      const cacheKey = this.generateCacheKey(text, { 
-        provider: selectedProvider, 
-        voice, 
-        language, 
-        speed 
-      }) + '.' + format;
+      const cacheKey = this.generateCacheKey(text, { provider: selectedProvider, voice, language, speed }) + '.' + format;
       
       if (cache) {
         const cachedAudio = await this.cache.get(cacheKey);
         if (cachedAudio) {
-          console.log('✅ Audio récupéré du cache');
           return {
             audio: cachedAudio.toString('base64'),
             format: format as 'mp3' | 'wav',
@@ -114,24 +89,17 @@ class TTSService {
         }
       }
 
-      // Obtenir le modèle de voix
       const voiceModel = this.getVoiceModel(language, selectedProvider, voice);
-      console.log(`🔄 Provider: ${selectedProvider}, Voix: ${voiceModel}`);
-      
-      // Synthétiser
       const audioBuffer = await ttsProvider.synthesize(text, {
         voice: voiceModel,
         speed,
         language
       });
 
-      // Sauvegarder dans le cache
       if (cache) {
         await this.cache.set(cacheKey, audioBuffer);
       }
 
-      console.log(`✅ Synthèse réussie: ${audioBuffer.length} bytes`);
-      
       return {
         audio: audioBuffer.toString('base64'),
         format: format as 'mp3' | 'wav',
@@ -141,16 +109,9 @@ class TTSService {
 
     } catch (error: any) {
       console.error('❌ Erreur synthèse:', error.message);
-      
-      // Fallback automatique
       if (provider !== this.fallbackProvider) {
-        console.log(`🔄 Tentative de fallback vers ${this.fallbackProvider}...`);
-        return this.synthesize({ 
-          ...options, 
-          provider: this.fallbackProvider 
-        });
+        return this.synthesize({ ...options, provider: this.fallbackProvider });
       }
-      
       throw error;
     }
   }
@@ -158,7 +119,6 @@ class TTSService {
   private getVoiceModel(language: string, provider: 'piper' | 'edge', voiceType: string): string {
     return this.voices[language]?.[provider]?.[voiceType] || 
            this.voices[language]?.[provider]?.default ||
-           this.voices['fr-FR']?.[provider]?.default ||
            'default';
   }
 
@@ -174,7 +134,6 @@ class TTSService {
 
   async listVoices(): Promise<VoiceInfo[]> {
     const voices: VoiceInfo[] = [];
-    
     for (const [lang, langData] of Object.entries(this.voices)) {
       for (const [provider, providerVoices] of Object.entries(langData as Record<string, any>)) {
         for (const [voiceId, modelName] of Object.entries(providerVoices as Record<string, string>)) {
@@ -184,7 +143,7 @@ class TTSService {
               name: modelName as string,
               language: lang,
               gender: voiceId.includes('female') ? 'female' : 'male',
-              provider: provider as 'piper' | 'edge'
+              provider: provider as string
             });
           }
         }

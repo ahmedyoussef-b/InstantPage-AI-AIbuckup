@@ -3,14 +3,11 @@ import { STTOptions, STTResult } from '@/types/voice';
 
 /**
  * VoskProvider - Désactivé temporairement à cause des contraintes de compilation native (ffi-napi).
- * La logique est conservée pour réactivation future si l'environnement supporte Python/Node-Gyp.
+ * Utilisation de WebSpeech API comme alternative robuste pour le prototype.
  */
 class VoskProvider {
-  private initialized: boolean = false;
-  private isListeningFlag: boolean = false;
-
   async isAvailable(): Promise<boolean> {
-    return false; // Désactivé pour éviter les erreurs npm install
+    return false;
   }
 
   async isInitialized(): Promise<boolean> {
@@ -22,28 +19,23 @@ class VoskProvider {
   }
 
   async initialize(): Promise<boolean> {
-    console.warn('⚠️ VoskProvider est désactivé (problème de dépendances natives). Utilisation de WebSpeech.');
     return false;
   }
 
   async startListening(
-    options: STTOptions,
-    onResult: (result: STTResult) => void,
+    _options: STTOptions,
+    _onResult: (result: STTResult) => void,
     onError: (error: string) => void
   ): Promise<void> {
-    onError('Vosk non disponible');
-  }
-
-  async processAudioChunk(chunk: Buffer): Promise<Partial<STTResult> | null> {
-    return null;
+    onError('Vosk non disponible dans cet environnement.');
   }
 
   async stopListening(): Promise<string> {
     return '';
   }
 
-  async transcribeFile(audioBuffer: Buffer, options: STTOptions): Promise<string> {
-    throw new Error('Vosk non disponible pour la transcription');
+  async transcribeFile(): Promise<string> {
+    throw new Error('Vosk non disponible');
   }
 
   getCurrentVolume(): number {

@@ -15,20 +15,14 @@ import {
   Folder,
   ChevronRight,
   ChevronDown,
-  Cpu,
   FileCode,
   Table,
   FileJson,
-  Plus,
-  Search,
   Layers,
   Box,
-  Eraser,
-  AlertTriangle,
   Zap,
   History,
   Moon,
-  Sparkles,
   RefreshCw,
   Brain,
   TrendingUp,
@@ -52,6 +46,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { cn } from '@/lib/utils';
 
 // --- Components Helpers ---
 
@@ -183,7 +178,6 @@ export default function AdminPage() {
   const [trainingData, setTrainingData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [revectorizingId, setRevectorizingId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDocChunks, setSelectedDocChunks] = useState<ChunkMetadata[]>([]);
@@ -218,7 +212,7 @@ export default function AdminPage() {
       const result = await api.runGlobalOptimization();
       toast({ 
         title: "Auto-amélioration réussie", 
-        description: `${result.consolidatedDocs} docs enrichis, ${result.newRules} règles distillées. ✨` 
+        description: `${result.consolidatedDocs || 0} docs enrichis, ${result.newRules || 0} règles distillées. ✨` 
       });
       loadData();
     } catch (e) {
@@ -241,15 +235,12 @@ export default function AdminPage() {
   };
 
   const handleRevectorize = async (id: string, name: string) => {
-    setRevectorizingId(id);
     try {
       const result = await api.revectorizeDocument(id);
       toast({ title: "Document enrichi", description: `${name} est passé en version ${result.version}.` });
       loadData();
     } catch (e) {
       toast({ variant: "destructive", title: "Erreur", description: "La re-vectorisation a échoué." });
-    } finally {
-      setRevectorizingId(null);
     }
   };
 
@@ -268,14 +259,14 @@ export default function AdminPage() {
       };
       
       const doc = findDoc(fs);
-      if (doc && doc.content) {
-        const text = doc.enhancedContent || doc.content;
+      if (doc && (doc.content || doc.enhancedContent)) {
+        const text = doc.enhancedContent || doc.content || '';
         const simulatedChunks = [];
         for (let i = 0; i < text.length; i += 1000) {
           simulatedChunks.push({
             id: `chunk-${i}`,
             docId,
-            index: i / 1000 + 1,
+            index: Math.floor(i / 1000) + 1,
             text: text.substring(i, i + 1000),
             size: 1000
           });
@@ -344,7 +335,7 @@ export default function AdminPage() {
 
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={loadData} className="bg-white/5 border-white/10 h-10 md:h-11 w-10 md:w-11 rounded-xl">
-              <RotateCcw className={`w-4 md:w-5 h-4 md:h-5 text-blue-400 ${loading ? 'animate-spin' : ''}`} />
+              <RotateCcw className={cn("w-4 md:w-5 h-4 md:h-5 text-blue-400", loading && "animate-spin")} />
             </Button>
             <Button variant="outline" size="icon" asChild className="bg-white/5 border-white/10 h-10 md:h-11 w-10 md:w-11 rounded-xl">
               <Link href="/">
@@ -470,9 +461,9 @@ export default function AdminPage() {
                   <div>
                     <div className="flex justify-between items-end mb-2">
                       <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Collecte de données</p>
-                      <p className="text-xs font-bold text-white">{trainingData?.pipelineStatus?.dataProgress}%</p>
+                      <p className="text-xs font-bold text-white">{trainingData?.pipelineStatus?.dataProgress || 0}%</p>
                     </div>
-                    <Progress value={trainingData?.pipelineStatus?.dataProgress} className="h-2 bg-white/5" />
+                    <Progress value={trainingData?.pipelineStatus?.dataProgress || 0} className="h-2 bg-white/5" />
                     <p className="text-[9px] text-gray-500 mt-2 italic">Entraînement nocturne programmé : {trainingData?.pipelineStatus?.nextScheduledCycle}</p>
                   </div>
 
@@ -495,7 +486,7 @@ export default function AdminPage() {
                   <div className="pt-4 border-t border-white/5">
                     <p className="text-[9px] font-black text-gray-500 uppercase mb-2">Dernier Entraînement</p>
                     <p className="text-xs font-medium text-gray-300">Durée: {trainingData?.pipelineStatus?.lastTrainingDuration}</p>
-                    <p className="text-xs font-medium text-gray-300">Gain relatif: +{(trainingData?.improvementTrend?.[trainingData.improvementTrend.length-1] * 100).toFixed(1)}%</p>
+                    <p className="text-xs font-medium text-gray-300">Gain relatif: +{(trainingData?.improvementTrend?.[trainingData.improvementTrend.length-1] * 100 || 0).toFixed(1)}%</p>
                   </div>
                 </div>
               </Card>

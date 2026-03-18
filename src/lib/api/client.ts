@@ -4,7 +4,7 @@
  */
 import { FileSystemItem, Stats } from '@/types';
 import { continuousLearning } from '@/ai/continuous-learning';
-import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
+import { type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
@@ -27,7 +27,8 @@ const loadMemory = (): Episode[] => {
 
 const saveMemory = async (episodes: Episode[]) => {
   if (typeof window === 'undefined') return;
-  const optimized = await applyForgetting(episodes);
+  // Note: applyForgetting est appelé côté serveur ou simulé ici pour éviter les imports 'use server'
+  const optimized = episodes.slice(0, 50); 
   localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
 };
 
@@ -37,40 +38,41 @@ const saveMemory = async (episodes: Episode[]) => {
 async function safeJsonParse(res: Response) {
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
-    return await res.json();
+    try {
+      return await res.json();
+    } catch (e) {
+      throw new Error("La réponse du serveur est malformée.");
+    }
   }
   const text = await res.text();
-  throw new Error(`Réponse invalide du serveur (${res.status}). Attendu JSON, reçu: ${text.substring(0, 50)}...`);
+  // Si on reçoit du HTML (erreur serveur), on extrait le message d'erreur si possible
+  if (text.includes('<html>')) {
+    throw new Error(`Erreur serveur (${res.status}). Veuillez vérifier que le backend est opérationnel.`);
+  }
+  throw new Error(`Réponse inattendue (${res.status}): ${text.substring(0, 100)}`);
 }
 
 export const api = {
-  /**
-   * Pipeline d'ingestion avec enrichissement sémantique (Phase 1).
-   */
   async upload(file: File, parentId: string | null = null): Promise<any> {
-    const fs = loadLocalFS();
-    const text = await file.text();
+    if (!(file instanceof File)) throw new Error("Le fichier est invalide.");
     
-    // Appel à l'API d'ingestion Elite
+    const fs = loadLocalFS();
     const formData = new FormData();
     formData.append('file', file);
     formData.append('userId', 'default-user');
     
     const res = await fetch('/api/ingest', { method: 'POST', body: formData });
-    
-    if (!res.ok) {
-      const errorData = await safeJsonParse(res).catch(() => ({ error: "Erreur serveur inconnue" }));
-      throw new Error(errorData.error || `Erreur lors de l'upload (${res.status})`);
-    }
-
     const result = await safeJsonParse(res);
 
+    if (result.error) throw new Error(result.error);
+
+    const text = await file.text().catch(() => "");
     const newFile: FileSystemItem = {
-      id: result.documentId,
+      id: result.documentId || Math.random().toString(36).substring(7),
       name: file.name,
       type: 'file',
       size: file.size,
-      chunks: result.stats.chunks,
+      chunks: result.stats?.chunks || 0,
       content: text,
       uploadedAt: new Date().toISOString(),
       parentId,
@@ -79,16 +81,10 @@ export const api = {
     };
 
     saveLocalFS([...fs, newFile]);
-    return { success: true, chunks: result.stats.chunks };
+    return result;
   },
 
-  /**
-   * ORCHESTRATEUR ELITE 32 - Routage intelligent et boucle d'apprentissage.
-   */
   async chat(query: string, history: any[] = []): Promise<any> {
-    console.log("[API][ORCHESTRATOR] Traitement de la demande...");
-
-    // 1. ROUTING & EXECUTION via API Hybride
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,26 +96,16 @@ export const api = {
       })
     });
 
-    if (!response.ok) {
-      const errorData = await safeJsonParse(response).catch(() => ({ error: "Échec de la communication avec l'assistant." }));
-      throw new Error(errorData.error || "Erreur de communication.");
-    }
-    
     const result = await safeJsonParse(response);
+    if (result.error) throw new Error(result.error);
 
-    // 2. APPRENTISSAGE : Enregistrement de l'épisode de mémoire (Phase 4)
     if (result.newMemoryEpisode) {
       const currentMemory = loadMemory();
       await saveMemory([result.newMemoryEpisode, ...currentMemory]);
     }
 
-    // 3. AMÉLIORATION : Application des règles apprises localement (Innovation 28)
     const finalAnswer = continuousLearning.applyRules(result.answer);
-
-    return { 
-      ...result, 
-      answer: finalAnswer
-    };
+    return { ...result, answer: finalAnswer };
   },
 
   async deleteItem(id: string): Promise<any> {
@@ -151,7 +137,7 @@ export const api = {
     return buildTree(null);
   },
 
-  async submitFeedback(query: string, response: string, rating: number): Promise<void> {
+  async submitFeedback(query: string, _response: string, rating: number): Promise<void> {
     await implicitRL.processSignal(rating >= 4 ? 'ACCEPTANCE' : 'CORRECTION', { isTechnical: query.length > 50 });
   },
 
