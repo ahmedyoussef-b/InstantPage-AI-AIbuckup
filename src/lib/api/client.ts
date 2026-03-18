@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais l'apprentissage par démonstration (Innovation 22).
+ * Intègre désormais la mémoire épisodique multi-niveaux (Innovation 25).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -8,10 +8,11 @@ import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
+import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V12';
-const ANALOGY_KEY = 'AGENTIC_ANALOGIES_V1';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
+const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -24,6 +25,21 @@ const loadLocalFS = (): FileSystemItem[] => {
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
+};
+
+const loadMemory = (): Episode[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(MEMORY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+};
+
+const saveMemory = async (episodes: Episode[]) => {
+  if (typeof window === 'undefined') return;
+  // Appliquer l'oubli intelligent avant de sauvegarder
+  const optimized = await applyForgetting(episodes);
+  localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
 };
 
 const loadDemonstrations = (): any[] => {
@@ -68,6 +84,7 @@ export const api = {
     const files = fs.filter(i => i.type === 'file');
     const context = await hybridRAG.retrieve(query, files);
     const demonstrations = loadDemonstrations();
+    const episodicMemory = loadMemory();
     
     const genkitHistory = history.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
@@ -78,12 +95,13 @@ export const api = {
       text: query, 
       history: genkitHistory,
       documentContext: context,
-      demonstrationHistory: demonstrations
+      demonstrationHistory: demonstrations,
+      episodicMemory: episodicMemory
     });
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
-    // Innovation 22: Enregistrer cette interaction comme une démonstration si utile
+    // Enregistrement démonstration (Innovation 22)
     if (response.actionTaken) {
       saveDemonstration({
         timestamp: Date.now(),
@@ -91,6 +109,16 @@ export const api = {
         action: response.actionTaken,
         result: response.answer.substring(0, 100)
       });
+    }
+
+    // Mémorisation épisodique (Innovation 25)
+    if (response.newMemoryEpisode) {
+      const updatedMemory = [{
+        ...response.newMemoryEpisode,
+        id: `epi-${Math.random().toString(36).substring(7)}`,
+        timestamp: Date.now()
+      }, ...episodicMemory];
+      saveMemory(updatedMemory);
     }
 
     return { ...response, answer: correctedAnswer };

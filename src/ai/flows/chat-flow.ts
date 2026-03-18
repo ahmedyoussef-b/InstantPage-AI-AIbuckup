@@ -15,6 +15,7 @@ import { validateAction, suggestAlternative } from '@/ai/actions/contextual-vali
 import { extractPoliciesFromHistory, suggestActionFromPolicy, type Demonstration } from '@/ai/actions/demonstration-learner';
 import { submitWorkflow } from '@/ai/actions/async-workflow';
 import { predictNextActions } from '@/ai/actions/predictive-engine';
+import { recall, remember, type Episode } from '@/ai/learning/episodic-memory';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -22,6 +23,7 @@ const ChatInputSchema = z.object({
   documentContext: z.string().optional(),
   analogyMemory: z.array(z.any()).optional(),
   demonstrationHistory: z.array(z.any()).optional(),
+  episodicMemory: z.array(z.any()).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -40,6 +42,7 @@ const ChatOutputSchema = z.object({
   demoPolicyApplied: z.boolean().optional(),
   asyncTaskId: z.string().optional(),
   undoAvailable: z.boolean().optional(),
+  newMemoryEpisode: z.any().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -54,6 +57,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let demoPolicyApplied = false;
     let undoAvailable = false;
     let proactiveSuggestions: any[] = [];
+
+    // 0. Innovation 25: Rappel de mémoire épisodique
+    const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
+    if (memory.summary) {
+      docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
+    }
 
     // 1. Innovation 23: Workflow Asynchrone
     if (q.match(/audit complet|analyse massive|traitement profond|longue tâche/i)) {
@@ -78,15 +87,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     // 3. Innovation 22 & 24: Apprentissage & Prédiction
     const history = (input.demonstrationHistory || []) as Demonstration[];
     if (history.length > 0) {
-      // Apprentissage par démonstration
       const policies = await extractPoliciesFromHistory(history);
       const suggestedAction = await suggestActionFromPolicy(input.text, docContext, policies);
       if (suggestedAction) {
         demoPolicyApplied = true;
         docContext += `\n[ACTION APPRISE DÉTECTÉE: ${suggestedAction.type}]`;
       }
-
-      // Innovation 24: Prédiction proactive
       proactiveSuggestions = await predictNextActions(history, input.text + " " + docContext);
     }
 
@@ -129,13 +135,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     // 6. Génération avec Méta-cognition (Innovation 13)
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
-      // Innovation 12: Analogies
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
       
-      // Innovation 9: Contraste
       if (query.match(/différence|versus|vs|comparer/i)) return await contrastiveReasoning.reason(query, ctx);
 
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
@@ -147,6 +151,15 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
+    // 7. Innovation 25: Préparer l'épisode de mémoire
+    const newMemoryEpisode = {
+      type: 'interaction',
+      content: metaResult.answer.substring(0, 200),
+      context: input.text,
+      importance: metaResult.confidence,
+      tags: [metaResult.confidence > 0.8 ? 'important' : 'routine']
+    };
+
     return {
       answer: prefixOutput + metaResult.answer,
       confidence: metaResult.confidence,
@@ -156,7 +169,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       planGenerated,
       demoPolicyApplied,
       undoAvailable,
-      actionTaken: actionDecision.type === 'use_tool' ? actionDecision : undefined
+      actionTaken: actionDecision.type === 'use_tool' ? actionDecision : undefined,
+      newMemoryEpisode
     };
   };
 
