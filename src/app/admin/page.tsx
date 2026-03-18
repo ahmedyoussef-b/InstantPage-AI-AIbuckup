@@ -514,7 +514,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                       <p className="text-[10px] font-black text-blue-400 uppercase mb-2">Pattern Communauté</p>
-                      <p className="text-xs font-bold text-gray-200">Tendance détectée : Priorisation du test de pression sur les chaudières à condensation (> 80% succès).</p>
+                      <p className="text-xs font-bold text-gray-200">Tendance détectée : Priorisation du test de pression sur les chaudières à condensation (&gt; 80% succès).</p>
                     </div>
                     <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                       <p className="text-[10px] font-black text-purple-400 uppercase mb-2">Hiérarchie Extraite</p>
