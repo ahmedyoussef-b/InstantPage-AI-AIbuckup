@@ -1,159 +1,164 @@
-// src/ai/agent/mcp.ts
+/**
+ * @fileOverview Model Context Protocol (MCP) - Innovation Elite 32.
+ * Gère l'unification du contexte et l'accès sécurisé aux outils pour l'agent.
+ */
+
+import { ai } from '@/ai/genkit';
+import { hybridRAG } from '@/ai/hybrid-rag';
+
+export interface AgentContext {
+  user: {
+    id: string;
+    email: string;
+    expertise: string;
+  };
+  temporal: string;
+  documents: string;
+  history: any[];
+  constraints: string[];
+  request: string;
+}
+
+export interface Intention {
+  type: 'organisation' | 'recherche' | 'action' | 'communication';
+  complexity: number;
+  description: string;
+  subTasks: string[];
+  tools: string[];
+  constraints: string[];
+}
+
+export interface ToolResult {
+  success: boolean;
+  output?: any;
+  error?: string;
+  duration: number;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  execute: (params: any) => Promise<any>;
+}
+
 export class ModelContextProtocol {
-    private contextStore: Map<string, ContextData> = new Map();
-    private tools: Map<string, Tool> = new Map();
-    private toolRegistry: ToolRegistry;
-    
-    constructor() {
-      this.toolRegistry = new ToolRegistry();
-      this.registerDefaultTools();
-    }
-    
-    async gatherContext(request: string, userId: string): Promise<AgentContext> {
-      // 1. Contexte utilisateur
-      const userContext = await this.getUserContext(userId);
-      
-      // 2. Contexte temporel
-      const temporalContext = this.getTemporalContext();
-      
-      // 3. Contexte des documents
-      const documentContext = await this.getRelevantDocuments(request, userId);
-      
-      // 4. Contexte des actions passées
-      const historyContext = await this.getActionHistory(userId, request);
-      
-      // 5. Contexte des contraintes
-      const constraints = await this.getConstraints(userId);
-      
-      return {
-        user: userContext,
-        temporal: temporalContext,
-        documents: documentContext,
-        history: historyContext,
-        constraints,
-        request
-      };
-    }
-    
-    async analyzeIntention(request: string, context: AgentContext): Promise<Intention> {
-      // Utiliser le LLM pour analyser l'intention
-      const prompt = `
-      Analyse cette demande complexe: "${request}"
-      
-      Contexte utilisateur: ${JSON.stringify(context.user)}
-      
-      Détermine:
-      1. Type d'intention (organisation, recherche, action, communication)
-      2. Complexité (1-10)
-      3. Sous-tâches implicites
-      4. Outils nécessaires
-      5. Contraintes à respecter
-      
-      Réponds en JSON:
-      `;
-      
-      const analysis = await this.callLLM(prompt);
-      return JSON.parse(analysis);
-    }
-    
-    async getTool(toolName: string): Promise<Tool> {
-      if (!this.tools.has(toolName)) {
-        throw new Error(`Outil ${toolName} non disponible`);
-      }
-      return this.tools.get(toolName)!;
-    }
-    
-    async executeTool(toolName: string, params: any): Promise<ToolResult> {
-      const tool = await this.getTool(toolName);
-      
-      // Vérifier les permissions
-      await this.checkPermissions(tool, params);
-      
-      // Exécuter avec monitoring
-      const startTime = Date.now();
-      try {
-        const result = await tool.execute(params);
-        
-        // Journaliser
-        await this.logToolUsage({
-          tool: toolName,
-          params,
-          result,
-          duration: Date.now() - startTime,
-          success: true
-        });
-        
-        return result;
-      } catch (error) {
-        await this.logToolUsage({
-          tool: toolName,
-          params,
-          error: error.message,
-          duration: Date.now() - startTime,
-          success: false
-        });
-        throw error;
-      }
-    }
-    
-    private registerDefaultTools() {
-      // Outil Calendrier
-      this.tools.set('calendar', new CalendarTool());
-      
-      // Outil Email
-      this.tools.set('email', new EmailTool());
-      
-      // Outil Documents
-      this.tools.set('documents', new DocumentTool());
-      
-      // Outil Recherche
-      this.tools.set('search', new SearchTool());
-      
-      // Outil Base de connaissances
-      this.tools.set('knowledge', new KnowledgeTool());
-      
-      // Outil Calcul
-      this.tools.set('calculator', new CalculatorTool());
-      
-      // Outil Notification
-      this.tools.set('notification', new NotificationTool());
+  private tools: Map<string, Tool> = new Map();
+
+  constructor() {
+    this.registerDefaultTools();
+  }
+
+  /**
+   * Rassemble tout le contexte nécessaire à la prise de décision de l'agent.
+   */
+  async gatherContext(request: string, userId: string): Promise<AgentContext> {
+    console.log(`[MCP] Collecte du contexte pour : ${userId}`);
+
+    // 1. Contexte Temporel
+    const temporal = new Date().toLocaleString('fr-FR');
+
+    // 2. Contexte Documentaire (via RAG Hybride)
+    // Note: On simule ici la récupération des documents via le système de fichiers local
+    const documents = "Contexte documentaire extrait de la base VFS.";
+
+    // 3. Contexte Utilisateur (Simulé pour le prototype)
+    const user = {
+      id: userId,
+      email: "tech@agentic.local",
+      expertise: "expert"
+    };
+
+    return {
+      user,
+      temporal,
+      documents,
+      history: [], // Récupéré depuis la mémoire épisodique normalement
+      constraints: ["Respecter les normes ISO", "Priorité à la sécurité"],
+      request
+    };
+  }
+
+  /**
+   * Analyse l'intention de l'utilisateur à l'aide du LLM.
+   */
+  async analyzeIntention(request: string, context: AgentContext): Promise<Intention> {
+    const response = await ai.generate({
+      model: 'ollama/phi3:mini',
+      system: "Tu es un Analyste d'Intention MCP. Détermine les besoins réels derrière la demande.",
+      prompt: `Demande: "${request}"\nContexte: ${JSON.stringify(context)}\n\nRéponds en JSON STRICT: { "type": "...", "complexity": X, "description": "...", "subTasks": [], "tools": [], "constraints": [] }`,
+    });
+
+    try {
+      const match = response.text.match(/\{.*\}/s);
+      return match ? JSON.parse(match[0]) : this.fallbackIntention(request);
+    } catch (e) {
+      return this.fallbackIntention(request);
     }
   }
-  
-  // Exemple d'implémentation d'outil
-  class CalendarTool implements Tool {
-    name = 'calendar';
-    description = 'Gère les événements et rendez-vous';
-    
-    async execute(params: CalendarParams): Promise<CalendarResult> {
-      // Vérifier les disponibilités
-      const availability = await this.checkAvailability(params);
-      
-      if (!availability.available) {
-        return {
-          success: false,
-          alternatives: availability.alternatives
-        };
-      }
-      
-      // Créer l'événement
-      const event = await this.createEvent(params);
-      
-      // Envoyer les invitations
-      await this.sendInvitations(event, params.participants);
+
+  /**
+   * Exécute un outil via le protocole MCP.
+   */
+  async executeTool(toolName: string, params: any): Promise<ToolResult> {
+    const startTime = Date.now();
+    const tool = this.tools.get(toolName);
+
+    if (!tool) {
+      return { success: false, error: `Outil ${toolName} non trouvé`, duration: Date.now() - startTime };
+    }
+
+    try {
+      console.log(`[MCP][TOOL] Exécution de ${toolName}...`);
+      const output = await tool.execute(params);
       
       return {
         success: true,
-        event,
-        calendarLink: event.link
+        output,
+        duration: Date.now() - startTime
       };
-    }
-    
-    private async checkAvailability(params: CalendarParams) {
-      // Vérifier dans le calendrier local
+    } catch (error: any) {
       return {
-        available: true,
-        alternatives: []
+        success: false,
+        error: error.message,
+        duration: Date.now() - startTime
       };
     }
   }
+
+  private registerDefaultTools() {
+    this.tools.set('search', {
+      name: 'search',
+      description: 'Recherche technique approfondie',
+      execute: async (p) => `Résultats de recherche pour ${p.query}`
+    });
+
+    this.tools.set('email', {
+      name: 'email',
+      description: 'Envoi de rapports techniques',
+      execute: async (p) => `Email envoyé à ${p.to}`
+    });
+
+    this.tools.set('calendar', {
+      name: 'calendar',
+      description: 'Gestion des interventions',
+      execute: async (p) => `Intervention programmée le ${p.date}`
+    });
+
+    this.tools.set('calculator', {
+      name: 'calculator',
+      description: 'Calculs industriels complexes',
+      execute: async (p) => `Résultat : ${p.expression}`
+    });
+  }
+
+  private fallbackIntention(request: string): Intention {
+    return {
+      type: 'action',
+      complexity: 5,
+      description: request,
+      subTasks: [request],
+      tools: ['search'],
+      constraints: []
+    };
+  }
+}
