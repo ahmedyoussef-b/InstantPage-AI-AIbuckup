@@ -1,59 +1,26 @@
-// src/ai/training/daily-learning-cycle.ts
-export class DailyLearningCycle {
-    private pipeline: TrainingPipeline;
-    private registry: ModelRegistry;
+/**
+ * @fileOverview DailyLearningCycle - Cycle d'apprentissage quotidien.
+ */
+import { runFullTrainingCycle } from './training-pipeline';
+import { registerAndDeployModel } from './model-registry';
+
+/**
+ * Lance le cycle d'apprentissage quotidien.
+ */
+export async function runDailyLearningCycle(context: { memory: any[], documents: any[] }) {
+  console.log("🌅 DÉMARRAGE DU CYCLE D'APPRENTISSAGE QUOTIDIEN");
+  
+  // 1. Si assez de données, lancer un entraînement
+  if (context.memory.length > 50) {
+    const evaluation = await runFullTrainingCycle(context);
     
-    constructor() {
-      this.pipeline = new TrainingPipeline();
-      this.registry = new ModelRegistry();
+    // 2. Si amélioration notable, le registry gère déjà le déploiement
+    if (evaluation.deployed) {
+      console.log(`🚀 Nouveau modèle déployé avec succès : Gain de ${Math.round(evaluation.gain * 100)}%`);
     }
-    
-    async runDailyCycle() {
-      console.log("🌅 DÉMARRAGE DU CYCLE D'APPRENTISSAGE QUOTIDIEN");
-      
-      // 1. Collecter les données du jour
-      const todayData = await this.collectTodayData();
-      console.log(`📊 Données du jour: ${todayData.length} interactions`);
-      
-      // 2. Si assez de données, lancer un entraînement
-      if (todayData.length > 100) {
-        const evaluation = await this.pipeline.runTrainingCycle();
-        
-        // 3. Si amélioration, proposer un test A/B
-        if (evaluation.improvement > 0.03) {
-          await this.registry.a_b_test(evaluation.newModel);
-        }
-      }
-      
-      // 4. Mise à jour des embeddings
-      await this.updateEmbeddings(todayData);
-      
-      // 5. Nettoyage des vieilles données
-      await this.cleanOldData();
-      
-      console.log("✨ CYCLE QUOTIDIEN TERMINÉ");
-    }
-    
-    private async collectTodayData() {
-      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-      
-      return await db.interactions.find({
-        timestamp: { $gt: oneDayAgo }
-      });
-    }
-    
-    private async updateEmbeddings(newData: any[]) {
-      // Re-vectoriser avec les nouvelles données
-      for (const item of newData) {
-        const embedding = await getEmbedding(item.content);
-        
-        await vectorDB.update(item.id, {
-          vector: embedding,
-          metadata: {
-            ...item,
-            lastUpdated: Date.now()
-          }
-        });
-      }
-    }
+  } else {
+    console.log("📊 Données insuffisantes pour un cycle ML aujourd'hui.");
   }
+  
+  console.log("✨ CYCLE QUOTIDIEN TERMINÉ");
+}

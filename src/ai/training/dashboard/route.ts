@@ -1,13 +1,26 @@
 // src/app/api/training/dashboard/route.ts
+import { getCurrentActiveModel, listAllModels } from '@/ai/training/model-registry';
+
 export async function GET() {
-    const registry = new ModelRegistry();
-    const stats = await getTrainingStats();
+    const currentModel = await getCurrentActiveModel();
+    const allModels = await listAllModels();
+    
+    // Simuler des stats (Dans une vraie app, on interrogerait la DB)
+    const stats = {
+      totalInteractions: 1250,
+      corrections: 42,
+      avgSatisfaction: 0.88,
+      dataSize: "12 MB",
+      todayData: 15,
+      nextTraining: "Ce soir, 02:00",
+      improvements: [0.02, 0.05, 0.03]
+    };
     
     return Response.json({
       currentModel: {
-        id: registry.currentModel,
-        deployedAt: registry.getCurrentModel()?.deployedAt,
-        metrics: registry.getCurrentModel()?.metrics
+        id: currentModel.id,
+        deployedAt: currentModel.deployedAt,
+        metrics: currentModel.metrics
       },
       trainingStats: {
         totalInteractions: stats.totalInteractions,
@@ -15,13 +28,13 @@ export async function GET() {
         avgSatisfaction: stats.avgSatisfaction,
         dataSize: stats.dataSize
       },
-      recentImprovements: stats.improvements.slice(-7),
+      recentImprovements: stats.improvements,
       nextTraining: {
         scheduledFor: stats.nextTraining,
         dataAvailable: stats.todayData,
         threshold: 100,
         ready: stats.todayData >= 100
       },
-      models: await registry.listModels()
+      models: allModels
     });
   }

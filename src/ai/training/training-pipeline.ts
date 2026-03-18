@@ -6,7 +6,7 @@ import { collectTrainingData } from './data-collector';
 import { prepareDataset } from './data-preparer';
 import { trainModel } from './model-trainer';
 import { evaluateModel } from './model-evaluator';
-import { modelRegistry } from './model-registry';
+import { registerAndDeployModel } from './model-registry';
 
 /**
  * Exécute un cycle complet d'entraînement et de déploiement.
@@ -31,7 +31,8 @@ export async function runFullTrainingCycle(context: { memory: any[], documents: 
     const evaluation = await evaluateModel(result.modelPath, dataset.test);
 
     // 5. DÉCISION & DÉPLOIEMENT
-    const deployed = await modelRegistry.registerAndDeploy(result.modelPath, evaluation.accuracy);
+    // Utilisation de la fonction du registry
+    const deployed = await registerAndDeployModel(result.modelPath, evaluation.accuracy, evaluation.metrics);
 
     return {
       status: 'completed',
