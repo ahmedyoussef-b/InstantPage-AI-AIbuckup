@@ -152,7 +152,8 @@ export const api = {
       documentContext: context,
       demonstrationHistory: demonstrations,
       episodicMemory: episodicMemory,
-      distilledRules: distilledRules
+      distilledRules: distilledRules,
+      pendingReviews: pendingReviews
     });
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
@@ -172,8 +173,8 @@ export const api = {
       }, ...episodicMemory];
       saveMemory(updatedMemory);
       
-      // Innovation 29: Créer un item de révision pour les points importants
-      if (response.confidence > 0.85) {
+      // 4. Innovation 29: Créer un item de révision pour les points importants
+      if (response.confidence > 0.85 && response.newMemoryEpisode.content.length > 50) {
         const newItem: KnowledgeItem = {
           id: `rep-${Math.random().toString(36).substring(7)}`,
           content: response.newMemoryEpisode.content,
@@ -190,8 +191,7 @@ export const api = {
 
     return { 
       ...response, 
-      answer: correctedAnswer,
-      pendingReviews: pendingReviews.length > 0 ? pendingReviews : undefined
+      answer: correctedAnswer
     };
   },
 

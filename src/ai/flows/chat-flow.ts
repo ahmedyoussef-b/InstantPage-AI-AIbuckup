@@ -15,7 +15,7 @@ import { validateAction, suggestAlternative } from '@/ai/actions/contextual-vali
 import { extractPoliciesFromHistory, suggestActionFromPolicy, type Demonstration } from '@/ai/actions/demonstration-learner';
 import { submitWorkflow } from '@/ai/actions/async-workflow';
 import { predictNextActions } from '@/ai/actions/predictive-engine';
-import { recall, remember, type Episode } from '@/ai/learning/episodic-memory';
+import { recall, type Episode } from '@/ai/learning/episodic-memory';
 import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } from '@/ai/learning/curriculum';
 import { distillInteractions, getApplicableRules, type DistilledRule } from '@/ai/learning/knowledge-distillation';
 import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
@@ -87,7 +87,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
 
-    // 0.3 Innovation 29: Génération d'une question de réactivation si besoin
+    // 0.3 Innovation 29: Réactivation Espacée (Génération de question)
     if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
       const itemToReview = input.pendingReviews[0] as KnowledgeItem;
       reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
@@ -192,7 +192,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
-    // 7. Innovation 25: Préparation de l'épisode de mémoire pour consolidation
+    // 7. Innovation 25: Préparation de l'épisode de mémoire
     const newMemoryEpisode = {
       type: 'interaction',
       content: metaResult.answer.substring(0, 250),
@@ -210,7 +210,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       }
     }
 
-    // 9. Innovation 27: Suggestion de la prochaine thématique pédagogique
+    // 9. Innovation 27: Suggestion de la prochaine thématique
     const nextStep = await suggestNextTopic(input.text + " " + metaResult.answer);
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);

@@ -2,7 +2,7 @@
 
 AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 29 innovations majeures consolidées.
 
-## 🚀 Les 29 Innovations Majeures
+## 🚀 Les 29 Innovations Majeures (Elite Architecture)
 
 ### 1. Architecture Multi-Modèles & Routeur Sémantique
 Le système dirige chaque question vers le modèle le plus adapté (Llama 3, Phi-3, TinyLlama) pour une précision maximale.
