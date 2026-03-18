@@ -11,6 +11,7 @@ import { latentTree } from '@/ai/reasoning/latent-tree';
 import { analogicalReasoner, type SolvedProblem } from '@/ai/reasoning/analogical';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
 import { counterfactualReasoner } from '@/ai/reasoning/counterfactual';
+import { modularReasoner } from '@/ai/reasoning/modular';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -32,8 +33,8 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent intégrant les 14 Innovations Élite.
- * Version stabilisée avec raisonnement contrefactuel et méta-cognition.
+ * Chat Intelligent intégrant les 15 Innovations Élite.
+ * Version stabilisée avec Raisonnement Modulaire (Innovation 15).
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
@@ -55,23 +56,28 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         return await latentTree.reason(query, ctx);
       }
 
-      // CAS B : Vérification Auto-Consistante (Innovation 10) - Pour les faits et chiffres
+      // CAS B : Raisonnement Modulaire (Innovation 15) - Pour les questions multi-facettes
+      if (q.match(/et|avec|aussi|impact|conséquence|calcul|période/i) && q.length > 40 && ctx.length > 100) {
+        return await modularReasoner.reason(query, ctx);
+      }
+
+      // CAS C : Vérification Auto-Consistante (Innovation 10) - Pour les faits et chiffres
       if (q.match(/vrai|faux|est-ce que|valeur|seuil|pression|limite|autorisé|obligatoire|combien|température/i) && ctx.length > 50) {
         const result = await selfConsistencyReasoner.reason(query, ctx);
         return result.answer;
       }
 
-      // CAS C : Raisonnement par Contraste (Innovation 9) - Pour les définitions et différences
+      // CAS D : Raisonnement par Contraste (Innovation 9) - Pour les définitions et différences
       if ((q.includes('définition') || q.includes('différence') || q.includes('comparer') || q.includes('vs')) && ctx.length > 100) {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // CAS D : Raisonnement Contrefactuel (Innovation 14) - Pour l'analyse de causes
+      // CAS E : Raisonnement Contrefactuel (Innovation 14) - Pour l'analyse de causes
       if (q.match(/pourquoi|cause|raison|si on avait|impact de|origine de|facteur|influence/i) && ctx.length > 100) {
         return await counterfactualReasoner.reason(query, ctx);
       }
 
-      // CAS E : Chaîne de Pensée Dynamique (Innovation 6) - Pour les problèmes techniques
+      // CAS F : Chaîne de Pensée Dynamique (Innovation 6) - Pour les problèmes techniques
       if (q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|circuit|réparer|étape/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
