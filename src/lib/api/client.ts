@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais la mémoire épisodique multi-niveaux (Innovation 25).
+ * Intègre désormais l'Apprentissage par Renforcement Implicite (Innovation 26).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -9,6 +9,7 @@ import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
+import { implicitRL } from '@/ai/learning/implicit-rl';
 
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
@@ -37,7 +38,6 @@ const loadMemory = (): Episode[] => {
 
 const saveMemory = async (episodes: Episode[]) => {
   if (typeof window === 'undefined') return;
-  // Appliquer l'oubli intelligent avant de sauvegarder
   const optimized = await applyForgetting(episodes);
   localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
 };
@@ -86,13 +86,17 @@ export const api = {
     const demonstrations = loadDemonstrations();
     const episodicMemory = loadMemory();
     
+    // Charger le profil RL
+    implicitRL.loadProfile();
+    const rlDirective = implicitRL.getSystemDirective();
+    
     const genkitHistory = history.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       content: [{ text: msg.text || '' }]
     }));
     
     const response = await serverChat({ 
-      text: query, 
+      text: query + (rlDirective ? ` ${rlDirective}` : ""), 
       history: genkitHistory,
       documentContext: context,
       demonstrationHistory: demonstrations,
@@ -101,6 +105,12 @@ export const api = {
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
+    // Signaux RL Implicites
+    if (history.length > 0 && query.length < 15) {
+      // Si la question est très courte après une réponse, c'est souvent une acceptation ou une suite logique
+      implicitRL.processSignal('ACCEPTANCE', { isLong: response.answer.length > 200 });
+    }
+
     // Enregistrement démonstration (Innovation 22)
     if (response.actionTaken) {
       saveDemonstration({
@@ -125,6 +135,8 @@ export const api = {
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
+    // Signal de récompense négative forte pour le RL
+    await implicitRL.processSignal('CORRECTION', { isLong: original.length > 200 });
     return await continuousLearning.recordCorrection(original, corrected);
   },
 

@@ -1,8 +1,8 @@
 # AGENTIC - Assistant IA Professionnel Hybrid RAG
 
-AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 25 innovations majeures consolidées.
+AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 26 innovations majeures consolidées.
 
-## 🚀 Les 25 Innovations Majeures
+## 🚀 Les 26 Innovations Majeures
 
 ### 1. Architecture Multi-Modèles & Routeur Sémantique
 Le système dirige chaque question vers le modèle le plus adapté (Llama 3, Phi-3, TinyLlama) pour une précision maximale.
@@ -78,6 +78,9 @@ Analyse des patterns temporels et contextuels pour suggérer la prochaine action
 
 ### 25. Mémoire Épisodique Multi-Niveaux (Innovation Apprentissage)
 Gestion cognitive de la mémoire à horizons temporels (Travail, Court terme, Long terme) avec oubli sémantique intelligent.
+
+### 26. Apprentissage par Renforcement Implicite (Innovation RL)
+L'IA déduit des signaux de récompense à partir de vos corrections et comportements pour ajuster son style et ses politiques de réponse.
 
 ## 🛠️ Stack Technique
 
