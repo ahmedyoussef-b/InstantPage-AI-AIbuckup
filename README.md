@@ -1,4 +1,4 @@
-# AGENTIC - Assistant IA Professionnel Hybrid RAG
+# AGENTIC - Assistant IA Professionnel Hybrid RAG (Elite 27)
 
 AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 27 innovations majeures consolidées.
 
@@ -53,37 +53,37 @@ Décomposition des questions en modules spécialisés (Logique, Causal, Mathéma
 Dialogue interne entre plusieurs instances d'IA qui se critiquent et s'améliorent mutuellement sur plusieurs cycles.
 
 ### 17. Toolformer Local - Auto-apprentissage d'outils
-L'IA apprend et décide d'utiliser des outils externes (Calcul, Search, Shell) de manière autonome avec vérification par prédiction.
+L'IA décide d'utiliser des outils (Calcul, Search, Shell) de manière autonome avec cycle de prédiction-vérification.
 
 ### 18. Planification Hiérarchique (Hierarchical Planning)
-Décomposition des tâches complexes en sous-actions exécutables avec validation multi-niveaux pour les missions stratégiques.
+Décomposition des tâches complexes en sous-actions atomiques avec validation multi-niveaux.
 
 ### 19. Exécution Réversible (Reversible Actions)
-Sécurisation des actions de l'IA par snapshots et historique complet permettant l'annulation (Undo) des opérations.
+Sécurisation des actions de l'IA par snapshots et historique complet permettant l'annulation (Undo) instantanée.
 
 ### 20. Orchestration Multi-Agents Spécialisés
-Déploiement d'une équipe d'experts IA (Analyste, Technicien, Sécurité) collaborant en temps réel pour une précision industrielle d'élite.
+Déploiement d'une équipe d'experts IA (Analyste, Technicien, Sécurité) collaborant en temps réel pour une précision d'élite.
 
 ### 21. Validation Contextuelle avant Exécution
 Pare-feu de sécurité analysant la pertinence et le risque de chaque action par rapport au contexte avant toute exécution réelle.
 
 ### 22. Apprentissage par Démonstration (Learning from Demonstration)
-L'IA observe les actions de l'utilisateur et apprend à reproduire des workflows complexes pour automatiser vos tâches récurrentes.
+L'IA observe les actions de l'utilisateur et apprend à reproduire des workflows complexes pour automatiser les tâches répétitives.
 
 ### 23. Workflow Asynchrone Non-Bloquant
-Exécution des tâches lourdes en arrière-plan avec suivi de progression temps réel, permettant une utilisation fluide du chat en parallèle.
+Exécution des tâches lourdes en arrière-plan avec suivi de progression, permettant une utilisation fluide du chat en parallèle.
 
 ### 24. Actions Prédictives Proactives
 Analyse des patterns temporels et contextuels pour suggérer la prochaine action pertinente avant même qu'elle ne soit demandée.
 
 ### 25. Mémoire Épisodique Multi-Niveaux (Cognition Temporelle)
-Gestion cognitive de la mémoire à horizons temporels (Travail, Court terme, Long terme) avec oubli sémantique intelligent.
+Gestion de la mémoire à horizons temporels (Travail, Court terme, Long terme) avec oubli sémantique intelligent.
 
-### 26. Apprentissage par Renforcement Implicite (Innovation RL)
-L'IA déduit des signaux de récompense à partir de vos comportements (reformulations, hésitations, corrections) pour ajuster son style et ses politiques.
+### 26. Apprentissage par Renforcement Implicite (Implicit RL)
+L'IA déduit des signaux de récompense à partir de vos comportements (reformulations, hésitations) pour ajuster ses politiques.
 
 ### 27. Curriculum Learning Adaptatif
-Organisation progressive de l'apprentissage (du simple au complexe) adaptée dynamiquement au niveau de maîtrise détecté de l'utilisateur.
+Organisation pédagogique de l'apprentissage (ZPD) adaptée dynamiquement au niveau de maîtrise détecté de l'utilisateur.
 
 ## 🛠️ Stack Technique
 

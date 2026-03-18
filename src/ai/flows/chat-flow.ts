@@ -66,7 +66,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
 
-    // 0.1 Innovation 27: Curriculum Adaptatif
+    // 0.1 Innovation 27: Curriculum Adaptatif (ZPD)
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
@@ -75,7 +75,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     if (q.match(/audit complet|analyse massive|traitement profond|longue tâche/i)) {
       const taskId = await submitWorkflow('ANALYSIS_HEAVY', input.text);
       return {
-        answer: `🚀 **Workflow Asynchrone (Innovation 23)** : Analyse profonde lancée en arrière-plan.\n\nID : \`${taskId}\`.\n\nVous serez notifié de la progression.`,
+        answer: `🚀 **Workflow Asynchrone (Innovation 23)** : Analyse profonde lancée en arrière-plan.\n\nID : \`${taskId}\`.\n\nVous serez notifié de la progression via l'interface locale.`,
         confidence: 1.0,
         asyncTaskId: taskId
       };
@@ -91,7 +91,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 3. Innovation 22 & 24: Apprentissage & Prédiction
+    // 3. Innovation 22 & 24: Apprentissage par démonstration & Prédiction proactive
     const history = (input.demonstrationHistory || []) as Demonstration[];
     if (history.length > 0) {
       const policies = await extractPoliciesFromHistory(history);
@@ -103,19 +103,20 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       proactiveSuggestions = await predictNextActions(history, input.text + " " + docContext);
     }
 
-    // 4. Innovation 20: Orchestration Multi-Agents
-    if (q.length > 300 || q.includes('audit technique complet')) {
+    // 4. Innovation 20: Orchestration Multi-Agents Spécialisés
+    if (q.length > 300 || q.includes('audit technique complet') || q.includes('analyse multi-agents')) {
       const orchestration = await orchestrateMultiAgents(input.text, docContext);
       multiAgentActive = true;
       return {
         answer: orchestration.finalAnswer,
         confidence: orchestration.consensusScore,
         multiAgentActive: true,
-        proactiveSuggestions
+        proactiveSuggestions,
+        pedagogicalLevel: pedaLevel
       };
     }
 
-    // 5. Toolformer & Planification (Innovation 17 & 18)
+    // 5. Innovation 17 & 18: Toolformer & Planification Hiérarchique
     const actionDecision = await toolformer.decideAction(input.text, docContext);
     
     if (q.match(/préparer|planifier|organiser|décomposer/i) || q.length > 150) {
@@ -124,7 +125,10 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       
       if (!validation.valid) {
         const alternative = await suggestAlternative({ type: 'PLANIFICATION', task: input.text }, validation.reason || "");
-        return { answer: `⚠️ **Sécurité**: ${validation.reason}\n\n${alternative ? `Suggestion : ${JSON.stringify(alternative)}` : ""}`, confidence: 0.1 };
+        return { 
+          answer: `⚠️ **Sécurité**: ${validation.reason}\n\n${alternative ? `Alternative sécurisée suggérée : ${JSON.stringify(alternative)}` : ""}`, 
+          confidence: 0.1 
+        };
       }
 
       prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
@@ -136,38 +140,46 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       if (validation.valid) {
         await recordAction(actionDecision.tool || 'tool', actionDecision.params, docContext);
         undoAvailable = true;
-        prefixOutput = `🔧 **Action** : \`${actionDecision.tool}\` (${actionDecision.expectedOutcome})\n\n`;
+        prefixOutput = `🔧 **Action Toolformer** : \`${actionDecision.tool}\` (${actionDecision.expectedOutcome})\n\n`;
       }
     }
 
     // 6. Génération avec Méta-cognition (Innovation 13)
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
+      // 6.1 Raisonnement par Analogie (Innovation 12)
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
       
+      // 6.2 Raisonnement par Contraste (Innovation 9)
       if (query.match(/différence|versus|vs|comparer/i)) return await contrastiveReasoning.reason(query, ctx);
 
+      // 6.3 Routage Sémantique (Innovation 1) & Prompting Dynamique (Innovation 5)
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
+      
       const { ai } = await import('@/ai/genkit');
-      const response = await ai.generate({ model: `ollama/${targetModel}`, prompt: optimizedPrompt, config: { temperature: 0.4 } });
+      const response = await ai.generate({ 
+        model: `ollama/${targetModel}`, 
+        prompt: optimizedPrompt, 
+        config: { temperature: 0.4 } 
+      });
       return response.text;
     };
 
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
-    // 7. Innovation 25: Préparer l'épisode de mémoire
+    // 7. Innovation 25: Préparation de l'épisode de mémoire pour consolidation
     const newMemoryEpisode = {
       type: 'interaction',
-      content: metaResult.answer.substring(0, 200),
+      content: metaResult.answer.substring(0, 250),
       context: input.text,
       importance: metaResult.confidence,
-      tags: [metaResult.confidence > 0.8 ? 'important' : 'routine']
+      tags: [metaResult.confidence > 0.8 ? 'important' : 'routine', pedaLevel.toLowerCase()]
     };
 
-    // 8. Innovation 27: Prochaine thématique
+    // 8. Innovation 27: Suggestion de la prochaine thématique pédagogique
     const nextStep = await suggestNextTopic(input.text + " " + metaResult.answer);
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);
@@ -187,6 +199,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     };
   };
 
+  // Cache Sémantique Intelligent (Innovation 2)
   const cached = await semanticCache.getOrCompute(input.text, async () => {
     const res = await computeAnswer();
     return JSON.stringify(res);
