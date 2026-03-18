@@ -22,18 +22,21 @@ export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
  * Chat avec Routage Sémantique, Cache Intelligent et Prompt Dynamique.
+ * Exploite le cache sémantique pour réduire les appels au modèle principal.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
+  // Fonction de calcul de réponse (exécutée uniquement en cas de cache miss)
   const computeAnswer = async () => {
     // 1. Détermination du modèle via le routeur sémantique
-    const targetModel = await semanticRouter.route(input.text);
+    const hasContext = !!input.documentContext && input.documentContext.length > 100;
+    const targetModel = await semanticRouter.route(input.text, hasContext);
 
     // 2. Construction du prompt dynamique adaptatif
     const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, input.documentContext || "");
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Timeout 30s
       
       const url = 'http://localhost:11434/api/generate';
       
@@ -44,7 +47,10 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
           model: targetModel, 
           prompt: optimizedPrompt,
           stream: false,
-          options: { temperature: 0.7 }
+          options: { 
+            temperature: 0.7,
+            num_ctx: 4096 // Contexte étendu pour le RAG Hybride
+          }
         }),
         signal: controller.signal
       });
@@ -63,11 +69,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     }
   };
 
-  // 3. Utilisation du cache sémantique pour optimiser la réponse
+  // 3. Utilisation du cache sémantique intelligent
+  // Si une question similaire a déjà été traitée (seuil 85%), le cache retourne une réponse adaptée
   const finalAnswer = await semanticCache.getOrCompute(input.text, computeAnswer);
 
   return {
     answer: finalAnswer,
-    sources: [],
+    sources: [], // Les sources sont déjà intégrées dans le contexte via HybridRAG
   };
 }
