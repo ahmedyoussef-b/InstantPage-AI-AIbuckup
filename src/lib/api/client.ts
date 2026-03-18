@@ -105,7 +105,7 @@ export const api = {
     const episodicMemory = loadMemory();
     const distilledRules = loadDistilledRules();
     
-    // --- INNOVATION 26: SIGNaux IMPLICITES ---
+    // --- INNOVATION 26: SIGNAUX IMPLICITES ---
     implicitRL.loadProfile();
     const now = Date.now();
     

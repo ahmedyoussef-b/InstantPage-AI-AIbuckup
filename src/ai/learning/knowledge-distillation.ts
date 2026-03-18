@@ -2,6 +2,7 @@
 /**
  * @fileOverview KnowledgeDistillation - Innovation 28.
  * Synthétise les interactions passées en règles compactes et modèles par domaine.
+ * Version stabilisée pour l'exécution asynchrone (Next.js 15).
  */
 
 import { ai } from '@/ai/genkit';
@@ -34,10 +35,11 @@ export async function distillInteractions(episodes: Episode[]): Promise<Distilla
   try {
     const response = await ai.generate({
       model: 'ollama/phi3:mini',
-      system: "Tu es un Expert en Distillation de Connaissances. Analyse les logs d'interactions et extrait 2-3 règles générales et compactes sous format JSON.",
-      prompt: `Logs : ${JSON.stringify(episodes.slice(-10).map(e => e.content))}
+      system: "Tu es un Expert en Distillation de Connaissances. Ton rôle est d'analyser les logs d'interactions techniques et d'extraire des règles de comportement générales et compactes.",
+      prompt: `Logs d'interactions récentes : ${JSON.stringify(episodes.slice(-15).map(e => e.content))}
       
-      Format attendu : { "rules": [{"domain": "catégorie", "pattern": "situation détectée", "instruction": "conseil technique"}] }`,
+      Génère au maximum 3 règles structurées.
+      Format JSON STRICT : { "rules": [{"domain": "catégorie technique", "pattern": "situation détectée", "instruction": "conseil technique précis"}] }`,
     });
 
     const match = response.text.match(/\{.*\}/s);
@@ -45,15 +47,15 @@ export async function distillInteractions(episodes: Episode[]): Promise<Distilla
 
     const rules: DistilledRule[] = (data.rules || []).map((r: any) => ({
       id: `rule-${Math.random().toString(36).substring(7)}`,
-      domain: r.domain,
-      pattern: r.pattern,
+      domain: r.domain || 'Général',
+      pattern: r.pattern || 'Routine',
       instruction: r.instruction,
-      confidence: 0.85
+      confidence: 0.9
     }));
 
     return {
       rules,
-      summary: `Distillation réussie : ${rules.length} règles extraites.`,
+      summary: `Distillation terminée : ${rules.length} règles extraites.`,
       compressionRatio: episodes.length / (rules.length || 1)
     };
   } catch (error) {
@@ -63,12 +65,13 @@ export async function distillInteractions(episodes: Episode[]): Promise<Distilla
 }
 
 /**
- * Filtre et applique les règles distillées à un contexte donné.
+ * Filtre et applique les règles distillées à une requête utilisateur.
  */
 export async function getApplicableRules(query: string, rules: DistilledRule[]): Promise<string> {
   const q = query.toLowerCase();
   const applicable = rules.filter(r => 
-    q.includes(r.domain.toLowerCase()) || q.includes(r.pattern.toLowerCase())
+    q.includes((r.domain || '').toLowerCase()) || 
+    q.includes((r.pattern || '').toLowerCase())
   );
 
   if (applicable.length === 0) return "";
