@@ -20,6 +20,7 @@ import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } fr
 import { distillInteractions, getApplicableRules, type DistilledRule } from '@/ai/learning/knowledge-distillation';
 import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
 import { transferKnowledge, detectTransferNeed, type TransferResult } from '@/ai/learning/transfer-learning';
+import { extractTaskFeatures, selectOptimalStrategy, getMetaLearningDirective } from '@/ai/learning/meta-learning';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -54,6 +55,7 @@ const ChatOutputSchema = z.object({
   newDistilledRules: z.array(z.any()).optional(),
   reviewQuestion: z.string().optional(),
   crossDomainTransfer: z.any().optional(),
+  metaStrategy: z.string().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -72,32 +74,40 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let proactiveSuggestions: any[] = [];
     let reviewQuestion: string | undefined = undefined;
     let crossDomainTransferResult: TransferResult | undefined = undefined;
+    let activeMetaStrategy: string = "";
 
-    // 0. Innovation 25: Rappel de mémoire épisodique
+    // 0. Innovation 31: Méta-Apprentissage (Sélection de la stratégie optimale)
+    const taskFeatures = await extractTaskFeatures(input.text, docContext);
+    const metaStrategy = await selectOptimalStrategy(taskFeatures);
+    activeMetaStrategy = metaStrategy.name;
+    const metaDirective = await getMetaLearningDirective(metaStrategy);
+    docContext += ` ${metaDirective}`;
+
+    // 0.1 Innovation 25: Rappel de mémoire épisodique
     const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
     if (memory.summary) {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
 
-    // 0.1 Innovation 30: Détection de besoin de transfert cross-domaine
+    // 0.2 Innovation 30: Détection de besoin de transfert cross-domaine
     const transferNeed = await detectTransferNeed(input.text);
     if (transferNeed) {
       crossDomainTransferResult = await transferKnowledge(transferNeed.concept, transferNeed.source, transferNeed.target);
       docContext += `\n[TRANSFERT DÉTECTÉ : ${crossDomainTransferResult.adaptedConcept} appliqué à ${crossDomainTransferResult.targetDomain}]`;
     }
 
-    // 0.2 Innovation 28: Application des règles distillées
+    // 0.3 Innovation 28: Application des règles distillées
     if (input.distilledRules && input.distilledRules.length > 0) {
       const rulesContext = await getApplicableRules(input.text, input.distilledRules as DistilledRule[]);
       if (rulesContext) docContext += ` ${rulesContext}`;
     }
 
-    // 0.3 Innovation 27: Curriculum Adaptatif (ZPD)
+    // 0.4 Innovation 27: Curriculum Adaptatif (ZPD)
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
 
-    // 0.4 Innovation 29: Réactivation Espacée (Génération de question)
+    // 0.5 Innovation 29: Réactivation Espacée (Génération de question)
     if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
       const itemToReview = input.pendingReviews[0] as KnowledgeItem;
       reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
@@ -109,7 +119,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return {
         answer: `🚀 **Workflow Asynchrone (Innovation 23)** : Analyse profonde lancée en arrière-plan.\n\nID : \`${taskId}\`.\n\nVous serez notifié de la progression via l'interface locale.`,
         confidence: 1.0,
-        asyncTaskId: taskId
+        asyncTaskId: taskId,
+        metaStrategy: activeMetaStrategy
       };
     }
 
@@ -119,7 +130,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return {
         answer: undoResult.message,
         confidence: 1.0,
-        undoAvailable: false
+        undoAvailable: false,
+        metaStrategy: activeMetaStrategy
       };
     }
 
@@ -144,7 +156,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         confidence: orchestration.consensusScore,
         multiAgentActive: true,
         proactiveSuggestions,
-        pedagogicalLevel: pedaLevel
+        pedagogicalLevel: pedaLevel,
+        metaStrategy: activeMetaStrategy
       };
     }
 
@@ -159,7 +172,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         const alternative = await suggestAlternative({ type: 'PLANIFICATION', task: input.text }, validation.reason || "");
         return { 
           answer: `⚠️ **Sécurité**: ${validation.reason}\n\n${alternative ? `Alternative sécurisée suggérée : ${JSON.stringify(alternative)}` : ""}`, 
-          confidence: 0.1 
+          confidence: 0.1,
+          metaStrategy: activeMetaStrategy
         };
       }
 
@@ -225,12 +239,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);
 
-    // Final answer with review question if available
+    // Final answer formatting
     let finalAnswer = prefixOutput + metaResult.answer;
     
-    // Add transfer summary if occurred
     if (crossDomainTransferResult) {
-      finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : Le concept "${crossDomainTransferResult.adaptedConcept}" a été adapté du domaine "${crossDomainTransferResult.sourceDomain}" vers "${crossDomainTransferResult.targetDomain}".\n*Adaptations : ${crossDomainTransferResult.adaptations.join(', ')}*`;
+      finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : Le concept "${crossDomainTransferResult.adaptedConcept}" a été adapté du domaine "${crossDomainTransferResult.sourceDomain}" vers "${crossDomainTransferResult.targetDomain}".`;
     }
 
     if (reviewQuestion) {
@@ -252,7 +265,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       distillationPerformed,
       newDistilledRules,
       reviewQuestion,
-      crossDomainTransfer: crossDomainTransferResult
+      crossDomainTransfer: crossDomainTransferResult,
+      metaStrategy: activeMetaStrategy
     };
   };
 
