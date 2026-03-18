@@ -47,25 +47,25 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         if (analogResponse) return analogResponse;
       }
 
-      // 2. Sélection du mode de raisonnement
+      // 2. Sélection du mode de raisonnement dynamique
       
-      // CAS A : Arbre de Décision Latent (Innovation 11)
-      if (q.match(/dois-je|devrais-je|choisir|décider|investir|opportunité|conseille-moi|quel choix/i) && ctx.length > 50) {
+      // CAS A : Arbre de Décision Latent (Innovation 11) - Pour les choix complexes
+      if (q.match(/dois-je|devrais-je|choisir|décider|investir|opportunité|quel choix|stratégie/i) && ctx.length > 50) {
         return await latentTree.reason(query, ctx);
       }
 
-      // CAS B : Vérification Auto-Consistante (Innovation 10)
+      // CAS B : Vérification Auto-Consistante (Innovation 10) - Pour les faits et chiffres
       if (q.match(/vrai|faux|est-ce que|valeur|seuil|pression|limite|autorisé|obligatoire|combien|température/i) && ctx.length > 50) {
         const result = await selfConsistencyReasoner.reason(query, ctx);
         return result.answer;
       }
 
-      // CAS C : Raisonnement par Contraste (Innovation 9)
-      if ((q.includes('définition') || q.includes('différence') || q.includes('comparer')) && ctx.length > 100) {
+      // CAS C : Raisonnement par Contraste (Innovation 9) - Pour les définitions et différences
+      if ((q.includes('définition') || q.includes('différence') || q.includes('comparer') || q.includes('vs')) && ctx.length > 100) {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // CAS D : Chaîne de Pensée Dynamique (Innovation 6)
+      // CAS D : Chaîne de Pensée Dynamique (Innovation 6) - Pour les problèmes techniques
       if (q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|circuit|réparer|étape/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
@@ -82,18 +82,18 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         config: { temperature: 0.4, num_ctx: 4096 }
       });
 
-      return response.text || "Désolé, je n'ai pas pu formuler de réponse.";
+      return response.text || "Désolé, je n'ai pas pu formuler de réponse technique précise.";
     };
 
     // 4. Application de la Méta-cognition (Innovation 13)
-    // Elle englobe tout le processus de génération
+    // Elle englobe tout le processus pour assurer l'humilité cognitive
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
       answer: metaResult.answer,
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
-      isAnalogical: q.includes('analogie') // Simplification pour le flag
+      isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0)
     };
   };
 

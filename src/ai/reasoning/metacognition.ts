@@ -1,6 +1,7 @@
 /**
  * @fileOverview MetacognitiveReasoner - Innovation 13.
  * L'IA évalue sa propre compréhension et confiance avant et après avoir répondu.
+ * Version stabilisée avec parsing JSON robuste et gestion d'erreurs.
  */
 
 export interface MetacognitiveResult {
@@ -22,13 +23,14 @@ export class MetacognitiveReasoner {
       // 1. Évaluation préliminaire de la compréhension
       const assessment = await this.assessQuestion(question, context);
       
-      if (assessment.confidence < 0.3) {
-        console.warn("[AI][REASONING] Confiance initiale trop faible pour répondre.");
+      // Si la confiance initiale est extrêmement basse, on évite l'hallucination
+      if (assessment.confidence < 0.25) {
+        console.warn("[AI][REASONING] Confiance initiale trop faible. Admission d'ignorance.");
         return {
-          answer: "Désolé, je ne dispose pas d'assez d'informations précises dans les documents chargés pour répondre avec certitude à cette question technique.",
+          answer: "Désolé, après auto-évaluation, j'estime ne pas disposer d'assez d'informations précises dans vos documents pour répondre à cette question technique sans risque d'erreur.",
           confidence: assessment.confidence,
-          missingInfo: assessment.missingInfo,
-          suggestions: ["Essayez de reformuler la question", "Vérifiez que le document pertinent est bien indexé"]
+          missingInfo: assessment.missingInfo || "Données manquantes dans le contexte local.",
+          suggestions: ["Vérifiez que le document pertinent est indexé", "Reformulez votre demande avec plus de détails techniques"]
         };
       }
 
@@ -38,12 +40,12 @@ export class MetacognitiveReasoner {
       // 3. Auto-évaluation critique de la réponse générée
       const evaluation = await this.evaluateOwnAnswer(question, answer, context);
       
-      // 4. Synthèse finale
-      const finalConfidence = (assessment.confidence + evaluation.confidence) / 2;
+      // 4. Synthèse finale de la confiance (Moyenne pondérée)
+      const finalConfidence = (assessment.confidence * 0.4) + (evaluation.confidence * 0.6);
       
       let disclaimer = undefined;
-      if (finalConfidence < 0.6) {
-        disclaimer = "Note : Cette réponse est basée sur une déduction logique avec un niveau de confiance modéré. Une vérification manuelle est conseillée.";
+      if (finalConfidence < 0.65) {
+        disclaimer = "Note : Cette réponse est basée sur une déduction logique avec un niveau de confiance modéré. Une vérification manuelle via vos manuels techniques est recommandée.";
       }
 
       console.log(`[AI][REASONING] Méta-cognition terminée. Confiance finale: ${Math.round(finalConfidence * 100)}%`);
@@ -55,7 +57,7 @@ export class MetacognitiveReasoner {
       };
 
     } catch (error) {
-      console.error("[AI][REASONING] Échec méta-cognition:", error);
+      console.error("[AI][REASONING] Échec critique méta-cognition, fallback standard.");
       // Fallback sur une réponse simple en cas d'erreur dans le module de méta-cognition
       const answer = await generateFn(question, context);
       return { answer, confidence: 0.5 };
@@ -67,8 +69,8 @@ export class MetacognitiveReasoner {
     try {
       const response = await ai.generate({
         model: 'ollama/tinyllama:latest',
-        system: "Tu es un module d'auto-évaluation. Analyse si le contexte fourni permet de répondre à la question technique.",
-        prompt: `Question: ${question}\nContexte: ${context.substring(0, 1000)}\n\nÉvalue la capacité à répondre (Confiance entre 0.0 et 1.0) et ce qui manque. Réponds strictement en JSON: {"confidence": 0.X, "missingInfo": "..."}`,
+        system: "Tu es un module d'auto-évaluation technique. Analyse si le contexte fourni permet de répondre fidèlement à la question. Réponds UNIQUEMENT en JSON.",
+        prompt: `Question: ${question}\nContexte: ${context.substring(0, 1500)}\n\nÉvalue ta capacité à répondre (0.0 à 1.0) et ce qui manque. Format: {"confidence": 0.X, "missingInfo": "..."}`,
       });
       
       const match = response.text.match(/\{.*\}/s);
@@ -86,8 +88,8 @@ export class MetacognitiveReasoner {
     try {
       const response = await ai.generate({
         model: 'ollama/tinyllama:latest',
-        system: "Tu es un critique technique. Évalue la fidélité de la réponse par rapport au contexte technique fourni.",
-        prompt: `Question: ${question}\nRéponse: ${answer}\nContexte: ${context.substring(0, 1000)}\n\nÉvalue la précision technique (0.0 à 1.0). Réponds strictement en JSON: {"confidence": 0.X}`,
+        system: "Tu es un critique technique sévère. Évalue la fidélité de la réponse générée par rapport au contexte source. Réponds UNIQUEMENT en JSON.",
+        prompt: `Question: ${question}\nRéponse à évaluer: ${answer}\nContexte source: ${context.substring(0, 1500)}\n\nÉvalue la précision technique (0.0 à 1.0). Format: {"confidence": 0.X}`,
       });
       
       const match = response.text.match(/\{.*\}/s);
