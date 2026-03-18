@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.1 Integrée : Support de l'indexation hiérarchique.
+ * Version 32.1 Integrée : Support de l'indexation hiérarchique et re-vectorisation dynamique.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -9,8 +9,8 @@ import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
-import { getPendingReviews } from '@/ai/learning/spaced-repetition';
 import { shareKnowledge } from '@/ai/learning/collaborative-network';
+import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
@@ -56,8 +56,10 @@ export const api = {
       parentId,
       tags: result.concepts,
       graphNodes: result.graphData?.nodes,
-      hierarchy: result.hierarchy // Nouveau: Données de taxonomie
-    } as any;
+      hierarchy: result.hierarchy,
+      version: 1,
+      lastRevectorized: new Date().toISOString()
+    };
 
     saveLocalFS([...fs, newFile]);
     return { success: true, chunks: result.chunks };
@@ -67,18 +69,21 @@ export const api = {
     const fs = loadLocalFS();
     const files = fs.filter(i => i.type === 'file');
     
-    // 1. PHASE 1: COMPRENDRE - Préparation du contexte vectoriel multi-strates
-    const docContext = await hybridRAG.retrieve(query, files);
+    // Utilisation du contenu enrichi pour la recherche si disponible
+    const searchableDocs = files.map(f => ({
+      ...f,
+      content: f.enhancedContent || f.content
+    }));
+
+    const docContext = await hybridRAG.retrieve(query, searchableDocs);
     const episodicMemory = loadMemory();
     const distilledRules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
     
-    // Récupération de tous les nœuds de hiérarchie pour l'expansion sémantique
-    const allHierarchyNodes = files.flatMap(f => (f as any).hierarchy?.nodes || []);
+    const allHierarchyNodes = searchableDocs.flatMap(f => (f as any).hierarchy?.nodes || []);
     
     implicitRL.loadProfile();
     const userProfile = implicitRL.getProfile();
 
-    // 2. APPEL ORCHESTRATEUR CENTRAL (Intégrant la hiérarchie)
     const response = await serverChat({ 
       text: query, 
       history: history.map(msg => ({ 
@@ -89,11 +94,9 @@ export const api = {
       episodicMemory: episodicMemory,
       distilledRules: distilledRules,
       userProfile: userProfile,
-      // On passe les nœuds hiérarchiques à l'orchestrateur (extension ChatInput)
       hierarchyNodes: allHierarchyNodes
     } as any);
 
-    // 3. PHASE 4: APPRENDRE
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -112,6 +115,38 @@ export const api = {
       ...response, 
       answer: continuousLearning.applyRules(response.answer) 
     };
+  },
+
+  async revectorizeDocument(docId: string): Promise<any> {
+    const fs = loadLocalFS();
+    const doc = fs.find(f => f.id === docId);
+    if (!doc || doc.type !== 'file') throw new Error("Document introuvable.");
+
+    const memory = loadMemory();
+    
+    // Extraire les apprentissages liés à ce document
+    const relatedEpisodes = memory.filter(e => 
+      e.content.toLowerCase().includes(doc.name.toLowerCase()) || 
+      (doc.tags && doc.tags.some(t => e.content.toLowerCase().includes(t.toLowerCase())))
+    );
+
+    const { enhancedContent } = await enrichDocumentContent(doc.content || "", {
+      corrections: [], // Pourrait être récupéré de ContinuousLearning
+      relatedQueries: relatedEpisodes.map(e => e.context),
+      lessons: relatedEpisodes.map(e => e.content)
+    });
+
+    await revectorizeContent(enhancedContent);
+
+    const updatedFs = fs.map(f => f.id === docId ? {
+      ...f,
+      enhancedContent,
+      version: (f.version || 1) + 1,
+      lastRevectorized: new Date().toISOString()
+    } : f);
+
+    saveLocalFS(updatedFs);
+    return { success: true, version: (doc.version || 1) + 1 };
   },
 
   async deleteItem(id: string): Promise<any> {
