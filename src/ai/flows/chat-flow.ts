@@ -10,9 +10,9 @@ import { selfConsistencyReasoner } from '@/ai/reasoning/self-consistency';
 import { latentTree } from '@/ai/reasoning/latent-tree';
 import { analogicalReasoner, type SolvedProblem } from '@/ai/reasoning/analogical';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
-import { counterfactualReasoner } from '@/ai/reasoning/counterfactual';
 import { modularReasoner } from '@/ai/reasoning/modular';
 import { collaborativeReasoner } from '@/ai/reasoning/collaborative';
+import { toolformer } from '@/ai/actions/toolformer-local';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -30,56 +30,53 @@ const ChatOutputSchema = z.object({
   isAnalogical: z.boolean().optional(),
   disclaimer: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
+  actionTaken: z.any().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
-/**
- * Chat Intelligent intégrant les 16 Innovations Élite.
- * Version avec Pipeline de Raisonnement Avancé (Méta-cognition Prioritaire).
- */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     const q = input.text.toLowerCase();
-    const docContext = input.documentContext || "";
+    let docContext = input.documentContext || "";
 
-    // Fonction de génération standard utilisée par la méta-cognition
+    // 1. Toolformer Local (Innovation 17) - Décision d'action avant génération
+    const action = await toolformer.decideAction(input.text, docContext);
+    let actionInfo = null;
+
+    if (action.type === 'use_tool') {
+      console.log(`[AI][ACTION] Activation de l'outil : ${action.tool}`);
+      actionInfo = { tool: action.tool, params: action.params };
+      // Simulation de l'enrichissement du contexte par l'outil
+      docContext += `\n[ACTION REQUISE: ${action.tool}] Résultat simulé de l'outil pour aider à la réponse.`;
+    }
+
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
-      // 1. Raisonnement Analogique (Innovation 12)
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
 
-      // 2. Sélection du mode de raisonnement dynamique
-      
-      // CAS A : Raisonnement Collaboratif (Innovation 16 - Bonus)
-      // Activé pour les questions extrêmement complexes ou multi-facettes
       if (q.match(/analyse complète|expertise|synthèse technique|consensus|débat/i) || query.length > 150) {
         return await collaborativeReasoner.reason(query, ctx);
       }
 
-      // CAS B : Arbre de Décision Latent (Innovation 11)
       if (q.match(/dois-je|devrais-je|choisir|décider|investissement|choix/i) && ctx.length > 50) {
         return await latentTree.reason(query, ctx);
       }
 
-      // CAS C : Raisonnement par Contraste (Innovation 9)
       if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // CAS D : Raisonnement Modulaire (Innovation 15)
       if (q.match(/impact|conséquence|calcul|période/i) && ctx.length > 100) {
         return await modularReasoner.reason(query, ctx);
       }
 
-      // CAS E : Chaîne de Pensée Dynamique (Innovation 6)
       if (q.match(/comment|pourquoi|panne|maintenance/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
 
-      // 3. Routage standard (Innovation 1)
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
 
@@ -93,7 +90,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return response.text || "Désolé, je n'ai pas pu formuler de réponse technique.";
     };
 
-    // 4. Application Prioritaire de la Méta-cognition (Étape 1 & 3 du plan)
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
@@ -101,11 +97,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
       suggestions: metaResult.suggestions,
+      actionTaken: actionInfo,
       isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0)
     };
   };
 
-  // 5. Utilisation du cache sémantique intelligent (Innovation 2)
   const result = await semanticCache.getOrCompute(input.text, async () => {
     const res = await computeAnswer();
     return JSON.stringify(res);
@@ -118,6 +114,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       confidence: parsed.confidence,
       disclaimer: parsed.disclaimer,
       suggestions: parsed.suggestions,
+      actionTaken: parsed.actionTaken,
       isAnalogical: parsed.isAnalogical || false,
       sources: []
     };
