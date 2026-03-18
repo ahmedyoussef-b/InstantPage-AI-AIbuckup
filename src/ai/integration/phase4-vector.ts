@@ -2,7 +2,6 @@
 /**
  * @fileOverview Phase4VectorIntegration - Innovation Elite 32.
  * Gère la mémorisation et la vectorisation des apprentissages après chaque interaction.
- * Version stabilisée pour Next.js 15.
  */
 
 import { ai } from '@/ai/genkit';
@@ -46,7 +45,7 @@ async function extractLessons(query: string, answer: string): Promise<Lesson[]> 
   try {
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un Extracteur de Savoir Technique. Ton rôle est d'identifier une leçon ou un fait technique clé issu de l'interaction.",
+      system: "Tu es un Extracteur de Savoir Technique. Identifie une leçon technique clé issue de l'interaction.",
       prompt: `Question: ${query}\nRéponse: ${answer}\n\nFormat JSON STRICT: [{"content": "fait technique appris", "importance": 0.X}]`,
     });
 

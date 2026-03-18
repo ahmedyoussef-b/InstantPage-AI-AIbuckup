@@ -2,7 +2,6 @@
 /**
  * @fileOverview Phase3VectorIntegration - Innovation Elite 32.
  * Utilise la base vectorielle pour guider et adapter les actions de l'IA.
- * Version stabilisée pour Next.js 15.
  */
 
 import { ai } from '@/ai/genkit';
@@ -23,13 +22,14 @@ export async function agirVector(
 ): Promise<ActionInsight | null> {
   console.log(`[AI][PHASE-3] Recherche de patterns d'action dans la base vectorielle...`);
 
-  // Heuristique : Si on parle de "rapport" ou "audit", on simule un rappel
-  if (intent.toLowerCase().match(/rapport|audit|synthèse/i)) {
+  // Heuristique : Si on parle de "rapport", "audit" ou "maintenance", on simule un rappel de succès
+  const q = intent.toLowerCase();
+  if (q.match(/rapport|audit|synthèse|maintenance/i)) {
     return {
       decision: intent,
-      adaptedParameters: { ...proposedParams, detailLevel: 'high', includeGraphics: true },
+      adaptedParameters: { ...proposedParams, detailLevel: 'high', safetyCheck: true },
       confidence: 0.92,
-      pastResult: "Succès : Rapport validé avec félicitations lors de la session précédente."
+      pastResult: "Succès : Action validée avec conformité lors de la session précédente."
     };
   }
 

@@ -4,12 +4,12 @@
  */
 
 export type VectorCollectionType = 
-  | 'DOCUMENTS'   // Contenu technique brut
-  | 'CONCEPTS'    // Règles distillées et terminologie
-  | 'LESSONS'     // Apprentissages issus des interactions
-  | 'PATTERNS'    // Préférences et styles utilisateur
-  | 'ACTIONS'     // Historique des schémas d'exécution réussis
-  | 'REASONINGS'; // Chaînes de réflexion par analogie
+  | 'DOCUMENTS'   // Contenu technique brut des fichiers
+  | 'CONCEPTS'    // Règles distillées et terminologie extraite
+  | 'LESSONS'     // Apprentissages issus des interactions passées
+  | 'PATTERNS'    // Profilage des préférences utilisateur
+  | 'ACTIONS'     // Historique des schémas d'exécution d'outils
+  | 'REASONINGS'; // Modèles de réflexion par analogie
 
 export interface CollectionDefinition {
   id: VectorCollectionType;
@@ -41,7 +41,7 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
   
   LESSONS: {
     id: 'LESSONS',
-    description: "Faits techniques et corrections mémorisés dynamiquement.",
+    description: "Faits techniques et corrections mémorisés dynamiquement après chaque interaction.",
     fields: ['content', 'context', 'confidence', 'timestamp', 'verification_count'],
     updateFrequency: 'real_time',
     retentionPolicy: 'rolling'
@@ -49,7 +49,7 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
   
   PATTERNS: {
     id: 'PATTERNS',
-    description: "Profilage des préférences utilisateur (concision, technicité).",
+    description: "Profilage sémantique des préférences utilisateur (concision, technicité).",
     fields: ['userId', 'preference_type', 'score', 'last_used', 'model_version'],
     updateFrequency: 'real_time',
     retentionPolicy: 'permanent'
@@ -57,7 +57,7 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
   
   ACTIONS: {
     id: 'ACTIONS',
-    description: "Bibliothèque de patterns d'exécution d'outils réussis.",
+    description: "Bibliothèque de patterns d'exécution d'outils réussis par le passé.",
     fields: ['intent', 'tool', 'params', 'outcome', 'success_rate'],
     updateFrequency: 'after_success',
     retentionPolicy: 'permanent'
@@ -65,7 +65,7 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
   
   REASONINGS: {
     id: 'REASONINGS',
-    description: "Modèles de réflexion par analogie pour les problèmes complexes.",
+    description: "Modèles de réflexion par analogie pour les problèmes techniques complexes.",
     fields: ['query', 'logic_steps', 'conclusion', 'embedding', 'performance_score'],
     updateFrequency: 'after_success',
     retentionPolicy: 'distillable'
@@ -73,19 +73,9 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
 };
 
 /**
- * Utilitaire de formatage pour l'injection dans les prompts.
+ * Utilitaire de formatage pour l'injection dans les prompts système.
  */
 export function getCollectionPromptMetadata(type: VectorCollectionType): string {
   const schema = VectorArchitecture[type];
   return `[STRATE VECTORIELLE: ${schema.id}] - ${schema.description}`;
-}
-
-/**
- * Exemple de structure d'indexation multidimensionnelle.
- */
-export interface IndexedInsight {
-  collection: VectorCollectionType;
-  vector: number[];
-  metadata: Record<string, any>;
-  content: string;
 }

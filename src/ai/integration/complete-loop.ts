@@ -2,7 +2,6 @@
 /**
  * @fileOverview CompleteLearningLoop - Innovation Elite 32.
  * Orchestration unifiée de la boucle cognitive liée à la base vectorielle.
- * Next.js 15 Compliant: Uniquement des fonctions asynchrones exportées.
  */
 
 import { comprendreVector, formatVectorContext } from './phase1-vector';
@@ -35,7 +34,7 @@ export interface LoopResult {
  * Comprendre (Phase 1) -> Raisonner (Phase 2) -> Agir (Phase 3) -> Apprendre (Phase 4).
  */
 export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
-  console.log(`[AI][ELITE-LOOP] Traitement de l'interaction pour l'utilisateur : ${interaction.userId}`);
+  console.log(`[AI][ELITE-LOOP] Traitement de l'interaction pour : ${interaction.userId}`);
 
   // 1. PHASE 1: COMPRENDRE (Contexte Vectoriel Multi-Strates)
   const vectorInsights = await comprendreVector(interaction.query, {
@@ -58,7 +57,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     interaction.query, 
     enrichedContext, 
     async (q, ctx) => {
-      // Tentative de raisonnement par analogie vectorielle
+      // Raisonnement par analogie vectorielle
       const analogy = await raisonnerVector(q, ctx, []); 
       if (analogy) return analogy;
       

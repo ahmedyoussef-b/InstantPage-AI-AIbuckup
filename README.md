@@ -44,12 +44,5 @@ AGENTIC est un assistant intelligent de nouvelle génération conçu pour une ex
 31. **Méta-Apprentissage (Learning to Learn)** : Auto-optimisation du processus de réflexion.
 32. **Écosystème Collaboratif Privé** : Partage de patterns universels sans fuite de données.
 
-## 🛠️ Stack Technique
-
-- **Frontend** : Next.js 15 (App Router), React 19, Tailwind CSS, ShadCN UI.
-- **AI Engine** : Genkit 1.x, Ollama (Modèles locaux), Embeddings GoogleAI.
-- **Storage** : Virtual File System (VFS) persistant via LocalStorage Browser + Index Vectoriel.
-- **Voice** : STT (WebSpeech/Vosk) & TTS (Piper/Edge local).
-
 ---
 *AGENTIC - Propulsé par l'innovation Elite AI. 100% Local. 100% Privé. 100% Autonome.*
