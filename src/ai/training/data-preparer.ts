@@ -1,5 +1,6 @@
 /**
  * @fileOverview DataPreparer - Nettoyage et formatage des données pour le fine-tuning.
+ * Prépare le dataset final en appliquant des poids aux exemples critiques.
  */
 
 import { RawTrainingData } from './data-collector';
@@ -23,17 +24,25 @@ export class DataPreparer {
   async prepare(rawData: RawTrainingData[]): Promise<PreparedDataset> {
     console.log(`[AI][TRAINING-DATA] Préparation de ${rawData.length} exemples...`);
 
-    // 1. Nettoyage et Formatage
-    const examples: TrainingExample[] = rawData
-      .filter(d => d.output.length > 20) // Supprimer les réponses trop courtes
-      .map(d => this.formatExample(d));
+    // 1. Nettoyage et Filtrage
+    // On retire les exemples trop courts ou sans valeur technique réelle
+    const filtered = rawData.filter(d => 
+      d.output.length > 25 && 
+      d.input.length > 5
+    );
 
-    // 2. Augmentation (Simulation)
+    // 2. Formatage au format Instruction-Tuning
+    const examples: TrainingExample[] = filtered.map(d => this.formatExample(d));
+
+    // 3. Augmentation Sémantique (Simulation)
+    // On renforce les corrections utilisateur pour qu'elles aient plus d'impact
     const augmented = await this.augmentData(examples);
 
-    // 3. Split Train/Test (80/20)
+    // 4. Split Train/Test (85/15) pour la validation locale
     const shuffled = augmented.sort(() => Math.random() - 0.5);
-    const splitIndex = Math.floor(shuffled.length * 0.8);
+    const splitIndex = Math.floor(shuffled.length * 0.85);
+
+    console.log(`[AI][TRAINING-DATA] Dataset prêt : ${splitIndex} train, ${shuffled.length - splitIndex} test.`);
 
     return {
       train: shuffled.slice(0, splitIndex),
@@ -47,17 +56,23 @@ export class DataPreparer {
 
     switch (data.type) {
       case 'correction':
-        instruction = "Corrige l'erreur technique suivante et fournis la réponse exacte.";
-        weight = 2.0; // Donner plus de poids aux corrections
+        instruction = "Tu es un expert technique. Corrige l'erreur suivante et fournis la réponse exacte basée sur les manuels.";
+        weight = 3.0; // Poids très élevé pour les corrections manuelles
         break;
       case 'reasoning':
-        instruction = "Explique le raisonnement technique étape par étape pour cette situation.";
+        instruction = "Décompose ton raisonnement technique étape par étape pour résoudre cette problématique.";
+        weight = 1.5;
         break;
       case 'comprehension':
-        instruction = "Synthétise l'information technique extraite des documents fournis.";
+        instruction = "Synthétise les points critiques de ce document technique de manière précise.";
+        weight = 1.0;
+        break;
+      case 'action':
+        instruction = "Détermine les paramètres d'exécution optimaux pour cet outil technique.";
+        weight = 2.0;
         break;
       default:
-        instruction = "Réponds avec précision à la demande de l'utilisateur.";
+        instruction = "Réponds avec expertise et précision à la demande technique suivante.";
     }
 
     return {
@@ -68,11 +83,25 @@ export class DataPreparer {
     };
   }
 
+  /**
+   * Simule l'augmentation de données par duplication des cas critiques (Oversampling).
+   */
   private async augmentData(examples: TrainingExample[]): Promise<TrainingExample[]> {
-    // Dans un système réel, nous ferions de la paraphrase via LLM
-    // Ici, nous simulons l'augmentation en doublant les exemples de correction
     const augmented = [...examples];
-    examples.filter(e => e.weight > 1.5).forEach(e => augmented.push({ ...e, instruction: "Action corrective : " + e.instruction }));
+    
+    // On duplique les exemples de haute importance (corrections) pour forcer l'apprentissage
+    examples.forEach(e => {
+      if (e.weight >= 2.0) {
+        // Ajout d'une variante avec une instruction légèrement différente
+        augmented.push({
+          ...e,
+          instruction: "Action corrective impérative : " + e.instruction
+        });
+      }
+    });
+
     return augmented;
   }
 }
+
+export const dataPreparer = new DataPreparer();
