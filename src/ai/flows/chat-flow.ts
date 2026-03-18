@@ -19,6 +19,7 @@ import { recall, type Episode } from '@/ai/learning/episodic-memory';
 import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } from '@/ai/learning/curriculum';
 import { distillInteractions, getApplicableRules, type DistilledRule } from '@/ai/learning/knowledge-distillation';
 import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
+import { transferKnowledge, detectTransferNeed, type TransferResult } from '@/ai/learning/transfer-learning';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -52,6 +53,7 @@ const ChatOutputSchema = z.object({
   distillationPerformed: z.boolean().optional(),
   newDistilledRules: z.array(z.any()).optional(),
   reviewQuestion: z.string().optional(),
+  crossDomainTransfer: z.any().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -69,6 +71,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let newDistilledRules: DistilledRule[] | undefined = undefined;
     let proactiveSuggestions: any[] = [];
     let reviewQuestion: string | undefined = undefined;
+    let crossDomainTransferResult: TransferResult | undefined = undefined;
 
     // 0. Innovation 25: Rappel de mémoire épisodique
     const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
@@ -76,18 +79,25 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
 
-    // 0.1 Innovation 28: Application des règles distillées
+    // 0.1 Innovation 30: Détection de besoin de transfert cross-domaine
+    const transferNeed = await detectTransferNeed(input.text);
+    if (transferNeed) {
+      crossDomainTransferResult = await transferKnowledge(transferNeed.concept, transferNeed.source, transferNeed.target);
+      docContext += `\n[TRANSFERT DÉTECTÉ : ${crossDomainTransferResult.adaptedConcept} appliqué à ${crossDomainTransferResult.targetDomain}]`;
+    }
+
+    // 0.2 Innovation 28: Application des règles distillées
     if (input.distilledRules && input.distilledRules.length > 0) {
       const rulesContext = await getApplicableRules(input.text, input.distilledRules as DistilledRule[]);
       if (rulesContext) docContext += ` ${rulesContext}`;
     }
 
-    // 0.2 Innovation 27: Curriculum Adaptatif (ZPD)
+    // 0.3 Innovation 27: Curriculum Adaptatif (ZPD)
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
 
-    // 0.3 Innovation 29: Réactivation Espacée (Génération de question)
+    // 0.4 Innovation 29: Réactivation Espacée (Génération de question)
     if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
       const itemToReview = input.pendingReviews[0] as KnowledgeItem;
       reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
@@ -217,6 +227,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     // Final answer with review question if available
     let finalAnswer = prefixOutput + metaResult.answer;
+    
+    // Add transfer summary if occurred
+    if (crossDomainTransferResult) {
+      finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : Le concept "${crossDomainTransferResult.adaptedConcept}" a été adapté du domaine "${crossDomainTransferResult.sourceDomain}" vers "${crossDomainTransferResult.targetDomain}".\n*Adaptations : ${crossDomainTransferResult.adaptations.join(', ')}*`;
+    }
+
     if (reviewQuestion) {
       finalAnswer += `\n\n---\n💡 **RÉACTIVATION (Innovation 29)** : ${reviewQuestion}`;
     }
@@ -235,7 +251,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       pedagogicalLevel: pedaLevel,
       distillationPerformed,
       newDistilledRules,
-      reviewQuestion
+      reviewQuestion,
+      crossDomainTransfer: crossDomainTransferResult
     };
   };
 
