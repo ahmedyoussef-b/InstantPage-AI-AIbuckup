@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * API Client avec BDD Locale Persistante pour AHMED.
+ * API Client avec BDD Locale Persistante.
  * Utilise le stockage local du navigateur avec synchronisation atomique renforcée.
  */
 import { FileSystemItem, Stats } from '@/types';
@@ -9,10 +9,10 @@ import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
-const STORAGE_KEY = 'AHMED_LOCAL_FS_SECURE_V2';
+const STORAGE_KEY = 'SECURE_VFS_V3';
 
 /**
- * Charge les données depuis le stockage local avec gestion d'erreurs.
+ * Charge les données depuis le stockage local.
  */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -28,23 +28,20 @@ const loadLocalFS = (): FileSystemItem[] => {
 };
 
 /**
- * Sauvegarde les données avec synchronisation atomique et vérification de quota.
+ * Sauvegarde les données avec synchronisation atomique.
  */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     const data = JSON.stringify(fs);
     localStorage.setItem(STORAGE_KEY, data);
-    // Double vérification pour s'assurer que l'écriture a réussi
+    // Vérification de l'écriture
     const check = localStorage.getItem(STORAGE_KEY);
-    if (check !== data) {
-      throw new Error("Échec de la vérification de l'écriture atomique.");
-    }
+    if (check !== data) throw new Error("Échec écriture atomique.");
   } catch (e: any) {
     if (e.name === 'QuotaExceededError') {
-      alert("Attention AHMED : Limite de stockage local atteinte (5MB). Veuillez supprimer des documents anciens.");
+      console.warn("Quota localStorage atteint.");
     }
-    console.error("[API_CLIENT] Erreur de sauvegarde BDD locale:", e);
   }
 };
 
@@ -54,7 +51,7 @@ export const api = {
     
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
-      throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
+      throw new Error(`Le fichier "${file.name}" existe déjà.`);
     }
 
     try {
@@ -76,9 +73,7 @@ export const api = {
         parentId
       };
 
-      const updatedFS = [...fs, newFile];
-      saveLocalFS(updatedFS);
-
+      saveLocalFS([...fs, newFile]);
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
       console.error("[API_CLIENT] Upload failed:", error.message);
@@ -117,10 +112,8 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    let fs = loadLocalFS();
-    const updatedFS = fs.filter(item => item.id !== id);
-    saveLocalFS(updatedFS);
-    
+    const fs = loadLocalFS();
+    saveLocalFS(fs.filter(item => item.id !== id));
     await deleteDocument({ docId: id, fileName: name }).catch(() => {});
     return { success: true, purgedChunks: 1 };
   },
@@ -128,7 +121,6 @@ export const api = {
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
     const fs = loadLocalFS();
     const folderId = Math.random().toString(36).substring(7);
-    
     const newFolder: FileSystemItem = {
       id: folderId,
       name,
@@ -136,39 +128,34 @@ export const api = {
       parentId,
       uploadedAt: new Date().toISOString()
     };
-    
-    const updatedFS = [...fs, newFolder];
-    saveLocalFS(updatedFS);
+    saveLocalFS([...fs, newFolder]);
     return { ...newFolder, children: [] };
   },
 
   async getStats(): Promise<Stats> {
     const fs = loadLocalFS();
-    const stats = { docs: 0, chunks: 0, size: 0 };
-    
+    let docs = 0, chunks = 0, size = 0;
     fs.forEach(i => {
       if (i.type === 'file') {
-        stats.docs++;
-        stats.chunks += (i.chunks || 0);
-        stats.size += (i.size || 0);
+        docs++;
+        chunks += (i.chunks || 0);
+        size += (i.size || 0);
       }
     });
-    
     return {
-      totalDocuments: stats.docs,
-      totalChunks: stats.chunks,
-      totalSize: stats.size,
+      totalDocuments: docs,
+      totalChunks: chunks,
+      totalSize: size,
       diskSpace: { 
         total: "5 MB", 
-        used: `${(stats.size / 1024).toFixed(1)} KB`, 
-        free: `${(5120 - stats.size / 1024).toFixed(1)} KB` 
+        used: `${(size / 1024).toFixed(1)} KB`, 
+        free: `${(5120 - size / 1024).toFixed(1)} KB` 
       }
     };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
     const allItems = loadLocalFS();
-    
     const buildTree = (parentId: string | null): FileSystemItem[] => {
       return allItems
         .filter(item => item.parentId === parentId)
@@ -177,7 +164,6 @@ export const api = {
           children: item.type === 'folder' ? buildTree(item.id) : undefined
         }));
     };
-    
     return buildTree(null);
   },
 
@@ -185,7 +171,6 @@ export const api = {
     const fs = loadLocalFS();
     const file = fs.find(i => i.id === docId);
     if (!file || !file.content) return [];
-    
     const chunks = [];
     const size = 1000;
     for (let i = 0; i < file.content.length; i += size) {
