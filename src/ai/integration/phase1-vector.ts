@@ -2,14 +2,14 @@
 /**
  * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
  * Architecture de recherche vectorielle multidimensionnelle.
- * Intègre désormais l'expansion hiérarchique des concepts.
+ * Intègre désormais l'expansion hiérarchique et les patterns communautaires.
  */
 
 import { ai } from '@/ai/genkit';
 import { expandHierarchicalContext } from '@/ai/learning/concept-hierarchy';
 
 export interface VectorSearchResult {
-  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY';
+  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY' | 'COMMUNITY';
   content: string;
   score: number;
   metadata: any;
@@ -22,13 +22,14 @@ export async function comprendreVector(question: string, context: {
   episodicMemory: any[], 
   distilledRules: any[],
   userProfile?: any,
-  hierarchyNodes?: any[]
+  hierarchyNodes?: any[],
+  communityInsights?: string
 }): Promise<VectorSearchResult[]> {
-  console.log(`[AI][PHASE-1] Fusion Sémantique & Hiérarchique...`);
+  console.log(`[AI][PHASE-1] Fusion Sémantique, Hiérarchique et Collective...`);
 
   const results: VectorSearchResult[] = [];
 
-  // STRATE HIERARCHY : Expansion du contexte via Parent/Enfant (Innovation 32.1)
+  // STRATE HIERARCHY : Expansion via Parent/Enfant (Innovation 32.1)
   if (context.hierarchyNodes) {
     const hierarchyContext = await expandHierarchicalContext(question, context.hierarchyNodes);
     if (hierarchyContext) {
@@ -39,6 +40,16 @@ export async function comprendreVector(question: string, context: {
         metadata: { type: 'taxonomy' }
       });
     }
+  }
+
+  // STRATE COMMUNITY : Sagesse collective (Innovation 32.2)
+  if (context.communityInsights) {
+    results.push({
+      collection: 'COMMUNITY',
+      content: context.communityInsights,
+      score: 0.92,
+      metadata: { source: 'COMMUNITY_PATTERNS' }
+    });
   }
 
   // STRATE CONCEPTS : Règles techniques distillées
@@ -87,7 +98,7 @@ export async function formatVectorContext(results: VectorSearchResult[]): Promis
   
   let output = "\n--- MÉMOIRE SÉMANTIQUE CENTRALE (ELITE 32) ---\n";
   
-  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY')[] = ['HIERARCHY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
+  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY' | 'COMMUNITY')[] = ['HIERARCHY', 'COMMUNITY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
   
   collections.forEach(col => {
     const filtered = results.filter(r => r.collection === col);

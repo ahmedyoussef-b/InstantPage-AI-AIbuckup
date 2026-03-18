@@ -4,12 +4,13 @@
  */
 
 export type VectorCollectionType = 
-  | 'DOCUMENTS'   // Contenu technique brut des fichiers
-  | 'CONCEPTS'    // Règles distillées et terminologie extraite
-  | 'LESSONS'     // Apprentissages issus des interactions passées
-  | 'PATTERNS'    // Profilage des préférences utilisateur
-  | 'ACTIONS'     // Historique des schémas d'exécution d'outils
-  | 'REASONINGS'; // Modèles de réflexion par analogie
+  | 'DOCUMENTS'          // Contenu technique brut des fichiers
+  | 'CONCEPTS'           // Règles distillées et terminologie extraite
+  | 'LESSONS'            // Apprentissages issus des interactions passées
+  | 'PATTERNS'           // Profilage des préférences utilisateur
+  | 'ACTIONS'            // Historique des schémas d'exécution d'outils
+  | 'REASONINGS'         // Modèles de réflexion par analogie
+  | 'COMMUNITY_PATTERNS'; // Innovation 32.2: Patterns collectifs anonymisés
 
 export interface CollectionDefinition {
   id: VectorCollectionType;
@@ -69,6 +70,14 @@ export const VectorArchitecture: Record<VectorCollectionType, CollectionDefiniti
     fields: ['query', 'logic_steps', 'conclusion', 'embedding', 'performance_score'],
     updateFrequency: 'after_success',
     retentionPolicy: 'distillable'
+  },
+
+  COMMUNITY_PATTERNS: {
+    id: 'COMMUNITY_PATTERNS',
+    description: "Sagesse collective : Patterns anonymisés détectés à travers plusieurs instances.",
+    fields: ['description', 'applicability', 'cluster_size', 'domain'],
+    updateFrequency: 'periodic',
+    retentionPolicy: 'permanent'
   }
 };
 

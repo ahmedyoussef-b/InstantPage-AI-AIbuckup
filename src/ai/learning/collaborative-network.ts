@@ -1,12 +1,13 @@
 'use server';
 /**
- * @fileOverview CollaborativeLearningNetwork - Innovation 32 (Bonus).
+ * @fileOverview CollaborativeLearningNetwork - Innovation 32.
  * Permet le partage de connaissances anonymisées entre instances pour une intelligence collective.
- * Implémente le concept de "Federated Learning" pour l'IA industrielle locale.
+ * Intègre désormais les patterns communautaires (Innovation 32.2).
  */
 
 import { ai } from '@/ai/genkit';
 import { DistilledRule } from './knowledge-distillation';
+import { detectCommunityPatterns, formatCommunityContext, type CommunityPattern } from './cross-user-learning';
 
 export interface SharedInsight {
   id: string;
@@ -18,83 +19,68 @@ export interface SharedInsight {
   timestamp: number;
 }
 
-// Pool de connaissances partagé simulé (Dans un système réel, cela serait une DB distribuée ou un relais local)
+// Pool de connaissances partagé simulé
 const globalKnowledgePool: SharedInsight[] = [];
+const communityPatterns: CommunityPattern[] = [];
 
 /**
  * Partage une règle apprise avec le réseau après anonymisation.
  */
 export async function shareKnowledge(instanceId: string, rule: DistilledRule): Promise<boolean> {
-  console.log(`[AI][NETWORK] Tentative de partage de connaissance depuis l'instance: ${instanceId}`);
+  console.log(`[AI][NETWORK] Partage de connaissance depuis : ${instanceId}`);
 
   try {
-    // 1. Anonymisation sémantique via LLM
     const anonymizationResponse = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un Expert en Anonymisation de Données. Ta mission est de supprimer toute information nominative, géographique ou ID spécifique d'une règle technique pour la rendre universelle.",
-      prompt: `Règle originale : "${rule.instruction}" dans le domaine "${rule.domain}".
-      Récris la règle de manière totalement anonyme et universelle.`,
+      system: "Tu es un Expert en Anonymisation. Récris la règle technique de manière universelle sans aucune donnée nominative ou spécifique.",
+      prompt: `Règle : "${rule.instruction}" | Domaine : "${rule.domain}"`,
     });
 
-    const anonymousInstruction = anonymizationResponse.text;
-
-    // 2. Publication dans le pool global (Simulé)
     const insight: SharedInsight = {
       ...rule,
       instanceId,
-      instruction: anonymousInstruction,
+      instruction: anonymizationResponse.text,
       timestamp: Date.now()
     };
 
     globalKnowledgePool.push(insight);
-    console.log(`[AI][NETWORK] Nouvelle connaissance partagée : ${rule.domain}`);
+    
+    // Déclenchement périodique de la détection de patterns (Innovation 32.2)
+    if (globalKnowledgePool.length % 5 === 0) {
+      const newPatterns = await detectCommunityPatterns(globalKnowledgePool.slice(-10));
+      communityPatterns.push(...newPatterns);
+    }
+
     return true;
   } catch (error) {
-    console.error("[AI][NETWORK] Échec du partage :", error);
     return false;
   }
 }
 
 /**
- * Récupère des connaissances pertinentes depuis le réseau pour enrichir une réponse.
+ * Récupère des connaissances et des patterns collectifs pour enrichir une réponse.
  */
 export async function learnFromNetwork(query: string): Promise<string> {
-  if (globalKnowledgePool.length === 0) return "";
-
   const q = query.toLowerCase();
-  
-  // Filtrage simple par domaine sémantique
+  let result = "";
+
+  // 1. Insights directs du réseau
   const relevantInsights = globalKnowledgePool
-    .filter(insight => 
-      q.includes(insight.domain.toLowerCase()) || 
-      q.includes(insight.pattern.toLowerCase())
-    )
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 2);
+    .filter(insight => q.includes(insight.domain.toLowerCase()))
+    .slice(0, 1);
 
-  if (relevantInsights.length === 0) return "";
-
-  try {
-    // Synthèse des connaissances du réseau
-    const synthesisResponse = await ai.generate({
-      model: 'ollama/phi3:mini',
-      system: "Tu es un Synthétiseur d'Intelligence Collective. Fusionne les insights provenant du réseau pour apporter une valeur ajoutée à l'utilisateur.",
-      prompt: `Question utilisateur : "${query}"
-      Insights du réseau : ${relevantInsights.map(i => i.instruction).join(' | ')}
-      
-      Génère une synthèse courte (max 30 mots) des conseils du réseau.`,
-    });
-
-    return `\n[INTELLIGENCE COLLECTIVE (INNOVATION 32)] : ${synthesisResponse.text}`;
-  } catch {
-    return `\n[INTELLIGENCE COLLECTIVE] : Des instances partenaires suggèrent de porter une attention particulière à la conformité du domaine ${relevantInsights[0].domain}.`;
+  if (relevantInsights.length > 0) {
+    result += `\n[RECOMMANDATION RÉSEAU] : ${relevantInsights[0].instruction}`;
   }
-}
 
-/**
- * Simule la synchronisation périodique avec le réseau.
- */
-export async function syncNetwork(): Promise<{ newInsightsCount: number }> {
-  // Dans un prototype, on simule l'arrivée de nouvelles données
-  return { newInsightsCount: Math.floor(Math.random() * 3) };
+  // 2. Patterns communautaires (Innovation 32.2)
+  const relevantPatterns = communityPatterns
+    .filter(p => q.includes(p.domain.toLowerCase()) || p.description.toLowerCase().includes(q))
+    .slice(0, 1);
+
+  if (relevantPatterns.length > 0) {
+    result += await formatCommunityContext(relevantPatterns);
+  }
+
+  return result;
 }
