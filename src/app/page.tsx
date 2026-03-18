@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -83,11 +82,11 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
                 <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
               </div>
-              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Firestore</Badge>
+              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local</Badge>
             </div>
           </>
         ) : (
-          <div className="flex justify-center py-2" title="Mode Sécurisé Firestore">
+          <div className="flex justify-center py-2" title="Mode Sécurisé Local">
             <ShieldCheck className="w-5 h-5 text-green-500" />
           </div>
         )}
@@ -123,7 +122,7 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72">
                 <SheetHeader className="p-6">
-                  <SheetTitle className="text-white font-bold uppercase tracking-widest text-sm">AHMED Pro Assistant</SheetTitle>
+                  <SheetTitle className="sr-only">AHMED Pro Assistant</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>

@@ -47,7 +47,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // Tentative avec TinyLlama local ou fallback textuel
     const url = 'http://localhost:11434/api/generate';
     
     const response = await fetch(url, {
@@ -67,7 +66,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Fallback si Ollama n'est pas lancé
       const greetings = ["bonjour", "bonsoir", "salut", "hello"];
       const lowerText = input.text.toLowerCase();
       if (greetings.some(g => lowerText.includes(g))) {
@@ -88,7 +86,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       sources: [],
     };
   } catch (error: any) {
-    // Fallback d'accueil si pas de connexion
     const lowerText = input.text.toLowerCase();
     if (lowerText.includes("bonjour") || lowerText.includes("salut")) {
       return {
