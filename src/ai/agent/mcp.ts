@@ -2,6 +2,7 @@
 /**
  * @fileOverview Model Context Protocol (MCP) - Innovation Elite 32.
  * Gère l'unification du contexte et l'accès sécurisé aux outils pour l'agent.
+ * Version stabilisée pour l'exécution asynchrone.
  */
 
 import { ai } from '@/ai/genkit';
@@ -10,7 +11,7 @@ export interface AgentContext {
   user: {
     id: string;
     email: string;
-    expertise: string;
+    expertise: 'beginner' | 'intermediate' | 'expert';
   };
   temporal: string;
   documents: string;
@@ -20,7 +21,7 @@ export interface AgentContext {
 }
 
 export interface Intention {
-  type: 'organisation' | 'recherche' | 'action' | 'communication';
+  type: 'organisation' | 'recherche' | 'action' | 'communication' | 'analyse';
   complexity: number;
   description: string;
   subTasks: string[];
@@ -39,15 +40,24 @@ export interface ToolResult {
  * Rassemble tout le contexte nécessaire à la prise de décision de l'agent.
  */
 export async function gatherContext(request: string, userId: string): Promise<AgentContext> {
-  console.log(`[MCP] Collecte du contexte pour : ${userId}`);
+  console.log(`[MCP] Collecte du contexte unifié pour : ${userId}`);
 
-  const temporal = new Date().toLocaleString('fr-FR');
-  const documents = "Contexte documentaire extrait de la base VFS via HybridRAG.";
+  const temporal = new Date().toLocaleString('fr-FR', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  // Simulation de récupération de contexte multi-sources
+  const documents = "Contexte documentaire unifié via HybridRAG (Docs, Graphe, Hiérarchie).";
 
   const user = {
     id: userId,
-    email: "tech@agentic.local",
-    expertise: "expert"
+    email: "tech-elite@agentic.local",
+    expertise: "expert" as const
   };
 
   return {
@@ -55,25 +65,36 @@ export async function gatherContext(request: string, userId: string): Promise<Ag
     temporal,
     documents,
     history: [], 
-    constraints: ["Respecter les normes ISO", "Priorité à la sécurité"],
+    constraints: [
+      "Respecter les normes ISO 9001", 
+      "Priorité absolue à la sécurité industrielle",
+      "Format de réponse technique précis"
+    ],
     request
   };
 }
 
 /**
  * Analyse l'intention de l'utilisateur à l'aide du LLM.
+ * Phase 1 de la boucle Agentic.
  */
 export async function analyzeIntention(request: string, context: AgentContext): Promise<Intention> {
-  const response = await ai.generate({
-    model: 'ollama/phi3:mini',
-    system: "Tu es un Analyste d'Intention MCP. Détermine les besoins réels derrière la demande.",
-    prompt: `Demande: "${request}"\nContexte: ${JSON.stringify(context)}\n\nRéponds en JSON STRICT: { "type": "organisation", "complexity": 5, "description": "...", "subTasks": [], "tools": ["search"], "constraints": [] }`,
-  });
-
   try {
+    const response = await ai.generate({
+      model: 'ollama/phi3:mini',
+      system: "Tu es un Analyste d'Intention MCP expert. Détermine les besoins réels derrière la demande technique.",
+      prompt: `Demande: "${request}"\nContexte unifié: ${JSON.stringify({
+        temporal: context.temporal,
+        userExpertise: context.user.expertise,
+        constraints: context.constraints
+      })}\n\nRéponds en JSON STRICT: { "type": "analyse|action|recherche", "complexity": 1-10, "description": "...", "subTasks": [], "tools": ["search", "calculate", "email", "calendar"], "constraints": [] }`,
+    });
+
     const match = response.text.match(/\{.*\}/s);
     if (match) return JSON.parse(match[0]);
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[MCP] Échec analyse IA, fallback intention directe.");
+  }
 
   return {
     type: 'action',
@@ -87,28 +108,32 @@ export async function analyzeIntention(request: string, context: AgentContext): 
 
 /**
  * Exécute un outil via le protocole MCP.
+ * Supporte la simulation pour le prototype Elite.
  */
 export async function executeMCPTool(toolName: string, params: any): Promise<ToolResult> {
   const startTime = Date.now();
-  console.log(`[MCP][TOOL] Exécution de ${toolName}...`);
+  console.log(`[MCP][TOOL] Exécution de l'outil technique : ${toolName}`);
 
   try {
     let output;
     switch (toolName) {
       case 'search':
-        output = `Résultats de recherche pour ${params.query || params.expression}`;
+        output = `Analyse effectuée pour "${params.query || params.expression}". Points critiques identifiés selon les manuels V3.`;
         break;
       case 'email':
-        output = `Email envoyé à ${params.to || 'destinataire'}`;
+        output = `Rapport technique transmis à l'équipe maintenance (Simulation).`;
         break;
       case 'calendar':
-        output = `Intervention programmée le ${params.date || 'demain'}`;
+        output = `Intervention de maintenance programmée pour demain 09:00.`;
         break;
       case 'calculator':
-        output = `Résultat du calcul : ${params.expression || '0'}`;
+        output = `Calcul de précision effectué. Résultat : ${params.expression || 'Paramètres validés'}.`;
+        break;
+      case 'summarize':
+        output = `Synthèse industrielle générée. Focus sur la conformité et les seuils de sécurité.`;
         break;
       default:
-        throw new Error(`Outil ${toolName} non supporté`);
+        throw new Error(`Outil ${toolName} non supporté par le protocole MCP actuel.`);
     }
     
     return {

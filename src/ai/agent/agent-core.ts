@@ -2,6 +2,7 @@
 /**
  * @fileOverview IntelligentAgent Core - Orchestrateur central Elite 32.
  * Unifie les phases : Comprendre -> Raisonner -> Agir -> Apprendre.
+ * Version stabilisée pour l'exécution asynchrone (Next.js 15).
  */
 
 import { gatherContext, analyzeIntention } from './mcp';
@@ -22,6 +23,7 @@ export interface AgentResponse {
   suggestions: string[];
   canUndo: boolean;
   patternsLearned: number;
+  confidence: number;
 }
 
 /**
@@ -71,7 +73,8 @@ export async function processAgentMission(request: string, userId: string): Prom
         "Vérifier les contraintes de sécurité associées ?"
       ],
       canUndo: executionResult.reversible || false,
-      patternsLearned: learningResults.patternsLearned
+      patternsLearned: learningResults.patternsLearned,
+      confidence: 0.95
     };
   } catch (error: any) {
     console.error("[AGENT][ERROR] Échec de la mission complexe:", error);

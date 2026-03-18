@@ -9,9 +9,6 @@ import { processAgentMission } from '@/ai/agent/agent-core';
 import { getCurrentActiveModel } from '@/ai/training/model-registry';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
-/**
- * Gère les interactions de chat avec détection d'intention et routage intelligent.
- */
 export async function POST(req: NextRequest) {
   try {
     const { prompt, history = [], userId = 'default-user', mode = 'auto' } = await req.json();
@@ -41,7 +38,7 @@ export async function POST(req: NextRequest) {
         suggestions: agentRes.suggestions,
         isAgentMission: true,
         steps: agentRes.steps,
-        confidence: 0.95,
+        confidence: agentRes.confidence,
         patternsLearned: agentRes.patternsLearned
       };
     } else {
@@ -61,7 +58,7 @@ export async function POST(req: NextRequest) {
         answer: chatRes.answer,
         sources: chatRes.sources || [],
         suggestions: chatRes.suggestions || [],
-        confidence: chatRes.confidence,
+        confidence: chatRes.confidence || 0.8,
         isAgentMission: false,
         pedagogicalLevel: chatRes.pedagogicalLevel,
         collaborativeInsight: chatRes.collaborativeInsight,
