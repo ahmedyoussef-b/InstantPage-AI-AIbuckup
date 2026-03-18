@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * StepByStepGuide - Interface de guidage interactif.
+ * StepByStepGuide - Interface de guidage interactif avec protection contre les erreurs JSON.
  */
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,8 @@ export default function StepByStepGuide() {
       const data = await res.json();
       setProcedure(data);
     } catch (err: any) {
-      setError(err.message);
+      console.error("[PROCEDURE] Load error:", err);
+      setError("Impossible de charger le fichier de procédure.");
     } finally {
       setLoading(false);
     }
@@ -66,24 +67,33 @@ export default function StepByStepGuide() {
     if (currentStepIdx + 1 < procedure.procedure.totalSteps) {
       setCurrentStepIdx(currentStepIdx + 1);
     } else {
-      alert("Procédure terminée avec succès.");
+      alert("Félicitations ! La procédure de démarrage est terminée.");
     }
   };
 
   const askHelp = async () => {
     setIsAskingHelp(true);
+    setHelpResponse(null);
     try {
       const response = await fetch('/api/procedure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'help', problem: 'Besoin de précisions techniques', sessionId: 'PRO_SESSION' })
+        body: JSON.stringify({ 
+          action: 'help', 
+          problem: 'Besoin de précisions techniques supplémentaires', 
+          sessionId: 'STABLE_PROCEDURE_SESSION' 
+        })
       });
       
-      if (!response.ok) throw new Error("Erreur serveur");
+      if (!response.ok) {
+        throw new Error(`Erreur serveur (${response.status})`);
+      }
+      
       const data = await response.json();
-      setHelpResponse(data.help || "Aucune aide disponible.");
-    } catch {
-      setHelpResponse("Désolé, je n'ai pas pu contacter l'assistant technique.");
+      setHelpResponse(data.help || "Désolé, aucune aide spécifique n'est disponible pour le moment.");
+    } catch (e: any) {
+      console.error("[PROCEDURE] Help API error:", e);
+      setHelpResponse("Désolé, je n'ai pas pu contacter l'assistant technique local.");
     } finally {
       setIsAskingHelp(false);
     }
@@ -92,11 +102,11 @@ export default function StepByStepGuide() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-white uppercase tracking-tight">{procedure.procedure.title}</h2>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Session de guidage</p>
+        <div className="min-w-0">
+          <h2 className="text-xl font-black text-white uppercase tracking-tight truncate">{procedure.procedure.title}</h2>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Guidage Professionnel</p>
         </div>
-        <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/20">Étape {etape.number}</Badge>
+        <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/20 shrink-0">Étape {etape.number}</Badge>
       </div>
 
       <div className="space-y-2">
@@ -113,19 +123,19 @@ export default function StepByStepGuide() {
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg">
               {etape.number}
             </div>
-            <div className="space-y-4 flex-1">
+            <div className="space-y-4 flex-1 min-w-0">
               <h3 className="text-lg md:text-xl font-black text-white leading-tight">{etape.title}</h3>
               <div className="p-4 bg-white/5 rounded-xl border-l-4 border-blue-500">
                 <p className="text-sm md:text-base text-gray-200 leading-relaxed italic">"{etape.instruction}"</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-3 bg-green-500/5 rounded-xl border border-green-500/10">
-                  <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-1">Cible</p>
+                  <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-1">Valeur attendue</p>
                   <p className="text-sm font-bold text-white">{etape.expectedValue}</p>
                 </div>
                 <div className="p-3 bg-purple-500/5 rounded-xl border border-purple-500/10">
-                  <p className="text-[9px] font-black text-purple-500 uppercase tracking-widest mb-1">Vérification</p>
+                  <p className="text-[9px] font-black text-purple-500 uppercase tracking-widest mb-1">Méthode de vérification</p>
                   <p className="text-sm font-bold text-white">{etape.verificationMethod}</p>
                 </div>
               </div>
@@ -148,7 +158,7 @@ export default function StepByStepGuide() {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-500 text-white font-black h-12 rounded-xl flex-1 uppercase tracking-tighter">
-              <CheckCircle className="w-4 h-4 mr-2" /> Étape Effectuée
+              <CheckCircle className="w-4 h-4 mr-2" /> Étape Validée
             </Button>
             <Button 
               variant="outline" 
@@ -157,7 +167,7 @@ export default function StepByStepGuide() {
               className="border-white/10 hover:bg-white/5 h-12 rounded-xl text-gray-400 font-bold uppercase tracking-tighter"
             >
               {isAskingHelp ? <Loader2 className="animate-spin w-4 h-4" /> : <HelpCircle className="w-4 h-4 mr-2" />}
-              Aide Technique
+              Besoin d'aide ?
             </Button>
           </div>
         </CardContent>

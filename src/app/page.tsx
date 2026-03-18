@@ -120,7 +120,7 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
-                  <SheetTitle className="sr-only">Menu de Navigation</SheetTitle>
+                  <SheetTitle className="sr-only">Menu de Navigation de l'Assistant</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>

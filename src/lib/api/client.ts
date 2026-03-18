@@ -2,14 +2,14 @@
 
 /**
  * API Client avec BDD Locale Persistante et Atomique.
- * Gère le stockage VFS (Virtual File System) dans le localStorage.
+ * Gère le stockage VFS (Virtual File System) dans le localStorage avec protection contre l'évaporation.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V2';
 
 /**
  * Charge les données depuis le stockage local avec validation de structure.
@@ -22,27 +22,30 @@ const loadLocalFS = (): FileSystemItem[] => {
     const parsed = JSON.parse(stored);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("[API_CLIENT] Erreur lecture VFS:", e);
+    console.error("[API_CLIENT] Erreur lecture VFS locale:", e);
     return [];
   }
 };
 
 /**
- * Sauvegarde les données avec synchronisation atomique forcée.
+ * Sauvegarde les données avec synchronisation atomique forcée et vérification d'intégrité.
  */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     const data = JSON.stringify(fs);
     localStorage.setItem(STORAGE_KEY, data);
-    // Vérification immédiate pour prévenir l'évaporation
+    
+    // Vérification immédiate pour prévenir la perte silencieuse (QuotaExceeded ou autre)
     const verify = localStorage.getItem(STORAGE_KEY);
     if (verify !== data) {
-      console.error("[API_CLIENT] Échec de la persistance atomique !");
+      throw new Error("Échec de la persistance atomique : les données n'ont pas été écrites correctement.");
     }
   } catch (e: any) {
     if (e.name === 'QuotaExceededError') {
-      console.warn("[API_CLIENT] Quota de stockage local atteint.");
+      console.error("[API_CLIENT] Quota de stockage local atteint (5MB). Impossible de sauvegarder.");
+    } else {
+      console.error("[API_CLIENT] Erreur lors de la sauvegarde VFS:", e.message);
     }
   }
 };
@@ -51,7 +54,7 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
-    // Vérification des doublons
+    // Vérification des doublons pour éviter la corruption
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
       throw new Error(`Le fichier "${file.name}" est déjà présent dans ce dossier.`);
@@ -79,6 +82,7 @@ export const api = {
       saveLocalFS([...fs, newFile]);
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
+      console.error("[API_CLIENT] Upload failed:", error.message);
       throw error;
     }
   },
@@ -99,7 +103,7 @@ export const api = {
         documentContext: allContent
       });
     } catch (error) {
-      console.error("[API_CLIENT] Échec du chat:", error);
+      console.error("[API_CLIENT] Échec du chat intelligent:", error);
       throw error;
     }
   },
@@ -108,7 +112,10 @@ export const api = {
     const fs = loadLocalFS();
     const newFs = fs.filter(item => item.id !== id);
     saveLocalFS(newFs);
-    await deleteDocument({ docId: id, fileName: name }).catch(() => {});
+    
+    // Nettoyage asynchrone des segments (silencieux si échec)
+    deleteDocument({ docId: id, fileName: name }).catch(() => {});
+    
     return { success: true, purgedChunks: 1 };
   },
 
@@ -170,6 +177,7 @@ export const api = {
     const fs = loadLocalFS();
     const file = fs.find(i => i.id === docId);
     if (!file || !file.content) return [];
+    
     const chunks = [];
     const size = 1000;
     for (let i = 0; i < file.content.length; i += size) {

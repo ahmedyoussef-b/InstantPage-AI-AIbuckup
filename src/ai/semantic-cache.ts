@@ -22,7 +22,10 @@ export class SemanticCache {
     try {
       // 1. Générer l'embedding de la question actuelle
       const qEmbedding = await this.getEmbedding(question);
-      if (!qEmbedding) return computeFn();
+      if (!qEmbedding) {
+        console.warn("[AI][CACHE] Embedding impossible, bypass cache.");
+        return computeFn();
+      }
 
       // 2. Chercher une question similaire dans le cache
       const similar = await this.findSimilar(qEmbedding);
@@ -40,7 +43,7 @@ export class SemanticCache {
 
       return answer;
     } catch (error) {
-      console.warn("[AI][CACHE] Erreur cache, repli sur génération standard.");
+      console.warn("[AI][CACHE] Erreur critique cache, repli sur génération standard.");
       return computeFn();
     }
   }
@@ -52,7 +55,8 @@ export class SemanticCache {
         content: text,
       });
       return result;
-    } catch {
+    } catch (e) {
+      console.error("[AI][CACHE] Erreur Embedding:", e);
       return null;
     }
   }
@@ -81,27 +85,32 @@ export class SemanticCache {
       normA += vecA[i] * vecA[i];
       normB += vecB[i] * vecB[i];
     }
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    return isNaN(similarity) ? 0 : similarity;
   }
 
   private async adaptResponse(answer: string, newQ: string, oldQ: string): Promise<string> {
     // Si la question est identique, pas d'adaptation nécessaire
     if (newQ.toLowerCase() === oldQ.toLowerCase()) return answer;
 
-    // Utilisation d'un prompt ultra-rapide pour l'adaptation
-    const response = await ai.generate({
-      model: 'ollama/tinyllama:latest',
-      system: "Tu es un adaptateur de réponse. Ta mission est d'ajuster légèrement une réponse existante pour qu'elle réponde parfaitement à une nouvelle question très similaire, sans changer les faits.",
-      prompt: `Question originale: "${oldQ}"\nRéponse originale: "${answer}"\nNouvelle question: "${newQ}"\nRéponse adaptée :`,
-    });
-
-    return response.text;
+    try {
+      // Utilisation d'un prompt ultra-rapide pour l'adaptation contextuelle
+      const response = await ai.generate({
+        model: 'ollama/tinyllama:latest',
+        system: "Tu es un adaptateur de réponse professionnel. Ta mission est d'ajuster légèrement une réponse existante pour qu'elle réponde parfaitement à une nouvelle question très similaire, sans changer les faits techniques.",
+        prompt: `Question originale: "${oldQ}"\nRéponse originale: "${answer}"\nNouvelle question: "${newQ}"\nRéponse adaptée :`,
+      });
+      return response.text;
+    } catch (e) {
+      console.warn("[AI][CACHE] Échec adaptation, retour réponse originale.");
+      return answer;
+    }
   }
 
   private addToCache(question: string, answer: string, embedding: number[]) {
     if (this.cache.size >= this.maxEntries) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) this.cache.delete(firstKey);
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
     }
     this.cache.set(question, {
       answer,
