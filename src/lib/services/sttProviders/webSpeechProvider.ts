@@ -1,8 +1,50 @@
 // lib/services/sttProviders/webSpeechProvider.ts
 import { STTOptions, STTResult } from '@/types/voice';
 
+// 🔧 DÉCLARATION DES TYPES POUR WEB SPEECH API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResult[];
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionError extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionError) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+// 🔧 EXTENSION DE L'INTERFACE WINDOW
+declare global {
+  interface Window {
+    webkitSpeechRecognition: new () => SpeechRecognition;
+    SpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 class WebSpeechProvider {
-  private recognition: any = null;
+  private recognition: SpeechRecognition | null = null;
   private isListeningFlag: boolean = false;
   private finalTranscript: string = '';
 
@@ -37,7 +79,6 @@ class WebSpeechProvider {
 
   /**
    * Démarrer l'écoute (côté client uniquement)
-   * Cette fonction sera appelée depuis le navigateur
    */
   async startListening(
     options: STTOptions,
@@ -67,7 +108,7 @@ class WebSpeechProvider {
       this.finalTranscript = '';
 
       // Gestion des résultats
-      this.recognition.onresult = (event: any) => {
+      this.recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interimTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -90,7 +131,7 @@ class WebSpeechProvider {
       };
 
       // Gestion des erreurs
-      this.recognition.onerror = (event: any) => {
+      this.recognition.onerror = (event: SpeechRecognitionError) => {
         onError(event.error);
       };
 

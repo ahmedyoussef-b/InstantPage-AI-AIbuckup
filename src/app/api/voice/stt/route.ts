@@ -9,8 +9,17 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File | null;
-    const model = formData.get('model') as string || 'vosk';
+    
+    // ✅ CORRECTION: Typer correctement le modèle
+    const modelParam = formData.get('model') as string | null;
     const language = formData.get('language') as string || 'fr-FR';
+
+    // ✅ Conversion sécurisée vers le type attendu
+    let model: 'vosk' | 'webspeech' | 'whisper' | undefined = 'vosk';
+    
+    if (modelParam === 'vosk' || modelParam === 'webspeech' || modelParam === 'whisper') {
+      model = modelParam;
+    }
 
     if (!audioFile) {
       return NextResponse.json(
@@ -30,8 +39,11 @@ export async function POST(request: NextRequest) {
     await fs.writeFile(tempFile, buffer);
 
     try {
-      // Transcrire l'audio
-      const text = await sttService.transcribeFile(buffer, { model, language });
+      // Transcrire l'audio avec le modèle typé correctement
+      const text = await sttService.transcribeFile(buffer, { 
+        model, 
+        language 
+      });
       
       return NextResponse.json({ text });
       

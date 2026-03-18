@@ -11,10 +11,17 @@ import { VoiceOptions, VoiceResponse, VoiceInfo } from '@/types/voice';
 
 const execAsync = promisify(exec);
 
+// 🔧 INTERFACE POUR LES PROVIDERS TTS
+interface TTSProvider {
+  synthesize: (text: string, options: any) => Promise<Buffer>;
+  checkHealth: () => Promise<boolean>;
+  getVoices?: () => Promise<string[]>;
+}
+
 class TTSService {
-  private providers: Record<string, any>;
-  private defaultProvider: string;
-  private fallbackProvider: string;
+  private providers: Record<string, TTSProvider>;
+  private defaultProvider: 'piper' | 'edge';
+  private fallbackProvider: 'piper' | 'edge';
   private cache: typeof ttsCache;
   private voices: Record<string, any>;
 
@@ -24,7 +31,7 @@ class TTSService {
       edge: edgeProvider
     };
     
-    this.defaultProvider = process.env.TTS_DEFAULT_PROVIDER || 'piper';
+    this.defaultProvider = (process.env.TTS_DEFAULT_PROVIDER as 'piper' | 'edge') || 'piper';
     this.fallbackProvider = 'edge';
     this.cache = ttsCache;
     
@@ -74,17 +81,25 @@ class TTSService {
     } = options;
 
     try {
+      // ✅ Conversion sécurisée du type provider
+      const selectedProvider = (provider || this.defaultProvider) as 'piper' | 'edge';
+      
       // Sélectionner le provider
-      const ttsProvider = this.providers[provider] || this.providers[this.defaultProvider];
+      const ttsProvider = this.providers[selectedProvider];
       if (!ttsProvider) {
-        throw new Error(`Provider TTS non trouvé: ${provider}`);
+        throw new Error(`Provider TTS non trouvé: ${selectedProvider}`);
       }
 
       // Format attendu selon le provider
-      const format = provider === 'piper' ? 'wav' : 'mp3';
+      const format = selectedProvider === 'piper' ? 'wav' : 'mp3';
 
       // Vérifier le cache
-      const cacheKey = this.generateCacheKey(text, { provider, voice, language, speed }) + '.' + format;
+      const cacheKey = this.generateCacheKey(text, { 
+        provider: selectedProvider, 
+        voice, 
+        language, 
+        speed 
+      }) + '.' + format;
       
       if (cache) {
         const cachedAudio = await this.cache.get(cacheKey);
@@ -100,8 +115,8 @@ class TTSService {
       }
 
       // Obtenir le modèle de voix
-      const voiceModel = this.getVoiceModel(language, provider, voice);
-      console.log(`🔄 Provider: ${provider}, Voix: ${voiceModel}`);
+      const voiceModel = this.getVoiceModel(language, selectedProvider, voice);
+      console.log(`🔄 Provider: ${selectedProvider}, Voix: ${voiceModel}`);
       
       // Synthétiser
       const audioBuffer = await ttsProvider.synthesize(text, {
@@ -127,17 +142,20 @@ class TTSService {
     } catch (error: any) {
       console.error('❌ Erreur synthèse:', error.message);
       
-      // Fallback automatique vers Edge si Piper échoue (souvent dû aux binaires manquants)
+      // Fallback automatique
       if (provider !== this.fallbackProvider) {
         console.log(`🔄 Tentative de fallback vers ${this.fallbackProvider}...`);
-        return this.synthesize({ ...options, provider: this.fallbackProvider });
+        return this.synthesize({ 
+          ...options, 
+          provider: this.fallbackProvider 
+        });
       }
       
       throw error;
     }
   }
 
-  private getVoiceModel(language: string, provider: string, voiceType: string): string {
+  private getVoiceModel(language: string, provider: 'piper' | 'edge', voiceType: string): string {
     return this.voices[language]?.[provider]?.[voiceType] || 
            this.voices[language]?.[provider]?.default ||
            this.voices['fr-FR']?.[provider]?.default ||
@@ -156,16 +174,17 @@ class TTSService {
 
   async listVoices(): Promise<VoiceInfo[]> {
     const voices: VoiceInfo[] = [];
+    
     for (const [lang, langData] of Object.entries(this.voices)) {
-      for (const [provider, providerVoices] of Object.entries(langData as any)) {
-        for (const [voiceId, modelName] of Object.entries(providerVoices)) {
+      for (const [provider, providerVoices] of Object.entries(langData as Record<string, any>)) {
+        for (const [voiceId, modelName] of Object.entries(providerVoices as Record<string, string>)) {
           if (voiceId !== 'default') {
             voices.push({
               id: `${provider}-${lang}-${voiceId}`,
               name: modelName as string,
               language: lang,
               gender: voiceId.includes('female') ? 'female' : 'male',
-              provider
+              provider: provider as 'piper' | 'edge'
             });
           }
         }

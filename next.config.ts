@@ -1,4 +1,4 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -29,6 +29,46 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  // ✅ AJOUT: Configuration pour servir les fichiers statiques
+  async headers() {
+    return [
+      {
+        source: '/data/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+          {
+            key: 'Content-Type',
+            value: 'application/json',
+          },
+        ],
+      },
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+        ],
+      },
+    ];
+  },
+  // ✅ AJOUT: Configuration pour les rewrites (optionnel)
+  async rewrites() {
+    return [
+      {
+        source: '/api/procedures/:path*',
+        destination: '/data/procedures/:path*',
+      },
+    ];
   },
 };
 

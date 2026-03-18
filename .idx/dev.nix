@@ -7,6 +7,8 @@
   packages = [
     pkgs.nodejs_22
     pkgs.zulu
+        pkgs.ollama
+
   ];
   # Sets environment variables in the workspace
   env = {};

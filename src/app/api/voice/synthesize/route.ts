@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Nettoyage systématique du texte avant synthèse pour éviter de lire le Markdown
+    // AHMED: On nettoie systématiquement le texte pour enlever le Markdown
     const cleanText = cleanTextForTTS(text);
 
     const result = await ttsService.synthesize({

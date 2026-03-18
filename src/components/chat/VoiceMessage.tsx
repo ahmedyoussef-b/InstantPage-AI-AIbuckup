@@ -18,6 +18,20 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
   const [isPlaying, setIsPlaying] = useState(false);
   const { play, pause, stop, isPlaying: globalPlaying, currentText } = useVoice();
 
+   // ✅ Extraire le texte si c'est un objet JSON
+   const displayText = (() => {
+    if (typeof text === 'string') {
+      try {
+        // Essayer de parser si c'est du JSON
+        const parsed = JSON.parse(text);
+        return parsed.answer || parsed.text || text;
+      } catch {
+        // Pas du JSON, retourner tel quel
+        return text;
+      }
+    }
+    return String(text);
+  })();
   // Auto-play pour les messages AI
   useEffect(() => {
     if (autoPlay && role === 'ai' && !globalPlaying) {
@@ -64,13 +78,13 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
             : 'bg-white/10 text-white'
           }
         `}>
-          {/* Contenu du message */}
+          {/* ✅ Afficher le texte extrait avec ReactMarkdown */}
           {role === 'ai' ? (
             <ReactMarkdown className="prose prose-invert max-w-none text-sm">
-              {text}
+              {displayText}
             </ReactMarkdown>
           ) : (
-            <p className="text-sm whitespace-pre-wrap">{text}</p>
+            <p className="text-sm whitespace-pre-wrap">{displayText}</p>
           )}
 
           {/* Boutons de contrôle vocal (visibles au hover) */}

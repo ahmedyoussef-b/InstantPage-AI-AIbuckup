@@ -1,13 +1,13 @@
 // lib/services/sttProviders/voskProvider.ts
 import { promises as fs } from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import * as vosk from 'vosk';
-import { Readable } from 'stream';
 import { STTOptions, STTResult } from '@/types/voice';
 
-const execAsync = promisify(exec);
+// Interface étendue pour inclure grammar
+interface ExtendedSTTOptions extends STTOptions {
+  grammar?: string[];
+}
 
 class VoskProvider {
   private model: any = null;
@@ -21,8 +21,10 @@ class VoskProvider {
     // Chemin du modèle Vosk
     this.modelPath = path.join(process.cwd(), 'public/models/vosk-model-small-fr-0.22');
     
-    // Configuration Vosk
-    vosk.setLogLevel(-1); // Désactiver les logs Vosk
+    // Configuration Vosk (vérifier que vosk est disponible)
+    if (vosk.setLogLevel) {
+      vosk.setLogLevel(-1); // Désactiver les logs Vosk
+    }
   }
 
   /**
@@ -91,19 +93,25 @@ class VoskProvider {
 
       // Configuration du recognizer
       const sampleRate = 16000;
-      this.recognizer = new vosk.Recognizer({ 
+      
+      // Étendre les options pour inclure grammar
+      const extendedOptions = options as ExtendedSTTOptions;
+      
+      const recognizerConfig: any = { 
         model: this.model, 
-        sampleRate,
-        grammar: options.grammar || []
-      });
+        sampleRate
+      };
+      
+      // Ajouter grammar si présent
+      if (extendedOptions.grammar && extendedOptions.grammar.length > 0) {
+        recognizerConfig.grammar = extendedOptions.grammar;
+      }
+      
+      this.recognizer = new vosk.Recognizer(recognizerConfig);
 
       this.isListeningFlag = true;
 
-      // Simuler l'écoute (en réalité, on recevra l'audio du navigateur)
       console.log('🎤 Écoute Vosk démarrée');
-
-      // Note: L'audio est capturé côté client et envoyé via WebSocket
-      // Cette fonction sera appelée avec des chunks audio
 
     } catch (error) {
       this.isListeningFlag = false;
@@ -125,7 +133,7 @@ class VoskProvider {
 
       // Accepter le chunk audio
       if (this.recognizer.acceptWaveform(chunk)) {
-        const result = JSON.parse(this.recognizer.result());
+        const result = this.recognizer.result();
         
         if (result.text) {
           return {
@@ -136,11 +144,10 @@ class VoskProvider {
         }
       } else {
         const partial = this.recognizer.partialResult();
-        const partialObj = JSON.parse(partial);
         
-        if (partialObj.partial) {
+        if (partial.partial) {
           return {
-            text: partialObj.partial,
+            text: partial.partial,
             isFinal: false
           };
         }
@@ -159,7 +166,7 @@ class VoskProvider {
     this.isListeningFlag = false;
     
     if (this.recognizer) {
-      const finalResult = JSON.parse(this.recognizer.finalResult());
+      const finalResult = this.recognizer.finalResult();
       this.recognizer.free();
       this.recognizer = null;
       this.currentVolume = 0;
@@ -191,7 +198,7 @@ class VoskProvider {
       const chunk = audioBuffer.slice(i, i + chunkSize);
       
       if (recognizer.acceptWaveform(chunk)) {
-        const result = JSON.parse(recognizer.result());
+        const result = recognizer.result();
         if (result.text) {
           fullText += (fullText ? ' ' : '') + result.text;
         }
@@ -199,7 +206,7 @@ class VoskProvider {
     }
 
     // Résultat final
-    const finalResult = JSON.parse(recognizer.finalResult());
+    const finalResult = recognizer.finalResult();
     if (finalResult.text) {
       fullText += (fullText ? ' ' : '') + finalResult.text;
     }

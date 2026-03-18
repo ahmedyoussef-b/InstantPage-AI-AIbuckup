@@ -3,10 +3,22 @@ import voskProvider from './sttProviders/voskProvider';
 import webSpeechProvider from './sttProviders/webSpeechProvider';
 import { STTOptions, STTResult } from '@/types/voice';
 
+// 🔧 INTERFACE POUR LES PROVIDERS
+interface STTProvider {
+  initialize: () => Promise<boolean>;
+  isInitialized: () => Promise<boolean>;
+  isListening: () => Promise<boolean>;
+  startListening: (options: STTOptions, onResult: (result: STTResult) => void, onError: (error: string) => void) => Promise<void>;
+  stopListening: () => Promise<string>;
+  transcribeFile: (audioBuffer: Buffer, options: STTOptions) => Promise<string>;
+  isAvailable: () => Promise<boolean>;
+  getCurrentVolume?: () => number;
+}
+
 class STTService {
-  private providers: Record<string, any>;
-  private defaultProvider: string;
-  private fallbackProvider: string;
+  private providers: Record<string, STTProvider>;
+  private defaultProvider: 'vosk' | 'webspeech';
+  private fallbackProvider: 'vosk' | 'webspeech';
 
   constructor() {
     this.providers = {
@@ -23,7 +35,7 @@ class STTService {
   /**
    * Initialiser la reconnaissance vocale
    */
-  async initialize(provider: string = this.defaultProvider): Promise<boolean> {
+  async initialize(provider: 'vosk' | 'webspeech' = this.defaultProvider): Promise<boolean> {
     try {
       const sttProvider = this.providers[provider];
       if (!sttProvider) {
@@ -45,7 +57,8 @@ class STTService {
     onResult: (result: STTResult) => void,
     onError: (error: string) => void
   ): Promise<void> {
-    const provider = options.model || this.defaultProvider;
+    // ✅ Conversion sécurisée du type
+    const provider = (options.model || this.defaultProvider) as 'vosk' | 'webspeech';
     
     try {
       const sttProvider = this.providers[provider];
@@ -99,7 +112,8 @@ class STTService {
    * Transcrire un fichier audio (mode batch)
    */
   async transcribeFile(audioBuffer: Buffer, options: STTOptions = {}): Promise<string> {
-    const provider = options.model || this.defaultProvider;
+    // ✅ Conversion sécurisée du type
+    const provider = (options.model || this.defaultProvider) as 'vosk' | 'webspeech';
     
     try {
       const sttProvider = this.providers[provider];

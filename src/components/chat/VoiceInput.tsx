@@ -1,8 +1,8 @@
 // components/chat/VoiceInput.tsx
 'use client';
 
+import { useVoiceEnhanced } from '@/hooks/useVoiceEnhanced';
 import { useState, useEffect } from 'react';
-import { useVoiceEnhanced } from '@/lib/hooks/useVoice';
 
 interface VoiceInputProps {
   onSendMessage?: (text: string) => Promise<void>;

@@ -1,3 +1,4 @@
+// src/lib/api/client.ts
 'use client';
 
 import { FileSystemItem, Stats, ChunkMetadata } from '@/types';
@@ -8,7 +9,7 @@ import { deleteDocument } from '@/ai/flows/delete-document-flow';
 /**
  * Persistance locale pour éviter le reset au redémarrage.
  */
-const STORAGE_KEY = 'agentic_assistant_db_v2';
+const STORAGE_KEY = 'agentic_assistant_db_v3';
 
 const getInitialFileSystem = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -20,7 +21,6 @@ const getInitialFileSystem = (): FileSystemItem[] => {
       console.error("[API_CLIENT] Erreur lecture storage:", e);
     }
   }
-  // État par défaut si vide
   const defaultFS: FileSystemItem[] = [
     {
       id: "root-1",
@@ -42,7 +42,6 @@ const saveToStorage = () => {
   }
 };
 
-// Helper pour extraire tous les noms de fichiers
 const getAllFileNames = (items: FileSystemItem[]): string[] => {
   let names: string[] = [];
   items.forEach(item => {
@@ -52,55 +51,48 @@ const getAllFileNames = (items: FileSystemItem[]): string[] => {
   return names;
 };
 
-// Helper pour extraire tout le contenu textuel pour le RAG
 const getAllFileContents = (items: FileSystemItem[]): string => {
   let context = "";
   items.forEach(item => {
     if (item.type === 'file' && item.content) {
-      context += `--- DÉBUT FICHIER: ${item.name} ---\n${item.content}\n--- FIN FICHIER: ${item.name} ---\n\n`;
+      context += `--- FICHIER: ${item.name} ---\n${item.content}\n\n`;
     }
     if (item.children) context += getAllFileContents(item.children);
   });
   return context;
 };
 
-// Trouve tous les fichiers dans un élément (récursif)
 const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystemItem[] => {
   let files: FileSystemItem[] = [];
-  
   const search = (currentItems: FileSystemItem[], parentMatched: boolean) => {
     currentItems.forEach(item => {
       const isMatch = item.id === targetId || parentMatched;
       if (isMatch && item.type === 'file') {
         files.push(item);
       }
-      if (item.children) {
-        search(item.children, isMatch);
-      }
+      if (item.children) search(item.children, isMatch);
     });
   };
-  
   search(items, false);
   return files;
 };
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
-    try {
-      // --- DÉTECTION DES DOUBLONS ---
-      const findInList = (list: FileSystemItem[]): boolean => {
-        for (const item of list) {
-          if (item.type === 'file' && item.name === file.name && item.parentId === parentId) return true;
-          if (item.children && findInList(item.children)) return true;
-        }
-        return false;
-      };
-
-      if (findInList(mockFileSystem)) {
-        throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
+    // Vérification des doublons avant l'ingestion
+    const checkDuplicate = (items: FileSystemItem[]): boolean => {
+      for (const item of items) {
+        if (item.type === 'file' && item.name === file.name && item.parentId === parentId) return true;
+        if (item.children && checkDuplicate(item.children)) return true;
       }
-      // -------------------------------
+      return false;
+    };
 
+    if (checkDuplicate(mockFileSystem)) {
+      throw new Error(`Désolé AHMED, le fichier "${file.name}" est déjà présent dans ce dossier.`);
+    }
+
+    try {
       const text = await file.text();
       const result = await ingestDocument({
         fileName: file.name,
@@ -134,7 +126,7 @@ export const api = {
       saveToStorage();
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
-      console.error("[API_CLIENT] Upload failed:", error.message);
+      console.error("[API_CLIENT] Erreur Upload:", error.message);
       throw error;
     }
   },
@@ -145,8 +137,8 @@ export const api = {
       const allContent = getAllFileContents(mockFileSystem);
       
       const genkitHistory = history.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model' as const,
-        content: [{ text: msg.text }]
+        role: msg.role === 'user' ? 'user' : 'model',
+        content: [{ text: msg.text || '' }]
       }));
       
       const result = await serverChat({ 
@@ -155,6 +147,7 @@ export const api = {
         availableFiles: fileNames,
         documentContext: allContent
       });
+      
       return { answer: result.answer, sources: result.sources || [] };
     } catch (error) {
       console.error("[API_CLIENT] Chat failed:", error);
@@ -163,44 +156,36 @@ export const api = {
   },
 
   async clearAll(): Promise<boolean> {
-    const keepFoldersOnly = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items
-        .filter(item => item.type === 'folder')
-        .map(f => ({ ...f, children: f.children ? keepFoldersOnly(f.children) : [] }));
-    };
-    mockFileSystem = keepFoldersOnly(mockFileSystem);
+    mockFileSystem = [
+      {
+        id: "root-1",
+        name: "Projets 2024",
+        type: "folder",
+        parentId: null,
+        children: []
+      }
+    ];
     saveToStorage();
     return true;
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    let totalPurged = 0;
     const filesToPurge = findFilesToPurge(mockFileSystem, id);
-    
     for (const file of filesToPurge) {
-      try {
-        const purgeResult = await deleteDocument({ docId: file.id, fileName: file.name }).catch(() => {
-          return { purgedChunks: file.chunks || 0 };
-        });
-        totalPurged += purgeResult.purgedChunks;
-      } catch (e) {
-        totalPurged += (file.chunks || 0);
-      }
+      await deleteDocument({ docId: file.id, fileName: file.name }).catch(() => {});
     }
     
     const removeItemFromTree = (items: FileSystemItem[]): FileSystemItem[] => {
       return items.filter(item => {
         if (item.id === id) return false;
-        if (item.children) {
-          item.children = removeItemFromTree(item.children);
-        }
+        if (item.children) item.children = removeItemFromTree(item.children);
         return true;
       });
     };
     
     mockFileSystem = removeItemFromTree(mockFileSystem);
     saveToStorage();
-    return { success: true, purgedChunks: totalPurged };
+    return { success: true, purgedChunks: filesToPurge.length };
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
@@ -245,36 +230,11 @@ export const api = {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "Persistant (LocalStorage)", used: `${(stats.size / 1024 / 1024).toFixed(2)} MB`, free: "N/A" }
+      diskSpace: { total: "LocalStorage", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "5 MB" }
     };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
     return [...mockFileSystem];
-  },
-
-  async getDocChunks(docId: string): Promise<ChunkMetadata[]> {
-    const findFileInTree = (items: FileSystemItem[]): FileSystemItem | null => {
-      for (const item of items) {
-        if (item.id === docId) return item;
-        if (item.children) {
-          const found = findFileInTree(item.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const file = findFileInTree(mockFileSystem);
-    if (!file || !file.content) return [];
-
-    const segments = file.content.match(/.{1,1000}/g) || [];
-    return segments.map((text, i) => ({
-      id: `chunk-${docId}-${i}`,
-      docId: docId,
-      index: i + 1,
-      text: text,
-      size: text.length
-    }));
   }
 };

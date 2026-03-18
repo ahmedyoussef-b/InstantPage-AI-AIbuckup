@@ -1,4 +1,4 @@
-// src/components/chat/Chat.tsx
+// src/components/chat/Chat.tsx (extrait corrigé)
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -58,9 +58,27 @@ export default function Chat() {
     try {
       const data = await api.chat(trimmed, messages);
       const aiMsgId = Math.random().toString(36).substring(7);
+      
+      // ✅ CORRECTION: Utiliser data.answer au lieu de data.text
+      let answerText = '';
+      
+      if (typeof data === 'string') {
+        try {
+          const parsed = JSON.parse(data);
+          answerText = parsed.answer || data;
+        } catch {
+          answerText = data;
+        }
+      } else if (data && typeof data === 'object') {
+        // ✅ Ici data a la structure { answer: string, sources: string[] }
+        answerText = data.answer || JSON.stringify(data);
+      } else {
+        answerText = String(data);
+      }
+      
       setMessages(prev => [...prev, { 
         role: 'ai', 
-        text: data.answer,
+        text: answerText,
         sources: data.sources,
         id: aiMsgId
       }]);
