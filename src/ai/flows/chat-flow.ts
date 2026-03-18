@@ -23,22 +23,21 @@ export type ChatOutput = z.infer<typeof ChatOutputSchema>;
  * Gère le contexte RAG et les interactions personnelles.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Query for AHMED: "${input.text}"`);
+  console.log(`[BACKEND][FLOW:chat] Requête pour AHMED : "${input.text}"`);
 
   const contextPrompt = input.documentContext 
     ? `Voici le contenu des documents disponibles pour t'aider :\n\n${input.documentContext}`
     : "Aucun document n'est chargé pour le moment.";
 
-  // Prompt système personnalisé pour AHMED
   const systemPrompt = `Tu es l'Assistant Personnel Intelligent de AHMED.
     
-    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, efficace et le saluer personnellement.
+    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, expert en maintenance industrielle et le saluer personnellement.
     
     INSTRUCTIONS :
-    - Si l'utilisateur dit "Bonjour", "Bonsoir", "Salut", réponds toujours en mentionnant son nom : "Bonjour AHMED", "Bonsoir AHMED".
+    - Si AHMED te dit "Bonjour", "Bonsoir", "Salut", réponds toujours en mentionnant son nom : "Bonjour AHMED", "Bonsoir AHMED".
     - Réponds TOUJOURS en français.
     - Utilise le contexte des documents fournis ci-dessous pour répondre précisément.
-    - Si la réponse ne se trouve pas dans les documents, admets-le poliment en t'adressant à AHMED.
+    - Sois concis et technique si nécessaire.
     
     CONTEXTE DOCUMENTS :
     ${contextPrompt}`;
@@ -47,13 +46,14 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
+    // Utilisation d'Ollama local par défaut
     const url = 'http://localhost:11434/api/generate';
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'tinyllama:latest',
+        model: 'phi3:mini', // Modèle performant et léger
         prompt: `${systemPrompt}\n\nQuestion de AHMED: ${input.text}\n\nRéponse personnalisée en français:`,
         stream: false,
         options: {
@@ -66,16 +66,15 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const greetings = ["bonjour", "bonsoir", "salut", "hello"];
       const lowerText = input.text.toLowerCase();
-      if (greetings.some(g => lowerText.includes(g))) {
+      if (["bonjour", "bonsoir", "salut"].some(g => lowerText.includes(g))) {
         return {
-          answer: `Bonjour AHMED ! Je suis votre assistant. Ollama semble indisponible, mais je suis là pour vous aider avec vos documents.`,
+          answer: `Bonjour AHMED ! Ravi de vous voir. Le service IA local est momentanément hors ligne, mais je suis là pour vos documents.`,
           sources: []
         };
       }
       return {
-        answer: "Désolé AHMED, le moteur de réponse est indisponible (Ollama).",
+        answer: "Désolé AHMED, le moteur IA local (Ollama) ne répond pas.",
         sources: [],
       };
     }
@@ -87,14 +86,14 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     };
   } catch (error: any) {
     const lowerText = input.text.toLowerCase();
-    if (lowerText.includes("bonjour") || lowerText.includes("salut")) {
+    if (["bonjour", "salut", "bonsoir"].some(g => lowerText.includes(g))) {
       return {
         answer: "Bonjour AHMED ! Ravi de vous voir. Comment puis-je vous aider aujourd'hui ?",
         sources: []
       };
     }
     return {
-      answer: "Désolé AHMED, une erreur technique empêche la connexion à Ollama.",
+      answer: "Désolé AHMED, une erreur technique empêche la connexion à l'IA locale.",
       sources: [],
     };
   }

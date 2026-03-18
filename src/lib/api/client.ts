@@ -1,36 +1,53 @@
 'use client';
 
 /**
- * API Client avec Persistance Locale Robuste pour AHMED.
- * Utilise le stockage local du navigateur avec synchronisation atomique.
+ * API Client avec BDD Locale Persistante pour AHMED.
+ * Utilise le stockage local du navigateur avec synchronisation atomique renforcée.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
-const STORAGE_KEY = 'AHMED_LOCAL_FS';
+const STORAGE_KEY = 'AHMED_LOCAL_FS_SECURE';
 
-// Helper pour charger/sauvegarder les données locales
+/**
+ * Charge les données depuis le stockage local avec gestion d'erreurs.
+ */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    console.error("[API_CLIENT] Erreur de lecture BDD locale:", e);
+    return [];
+  }
 };
 
+/**
+ * Sauvegarde les données avec synchronisation atomique et vérification de quota.
+ */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
+  } catch (e: any) {
+    if (e.name === 'QuotaExceededError') {
+      alert("Attention AHMED : Limite de stockage local atteinte. Veuillez supprimer des documents anciens.");
+    }
+    console.error("[API_CLIENT] Erreur de sauvegarde BDD locale:", e);
+  }
 };
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
-    // Vérifier les doublons
+    // Vérification de doublon par nom dans le même dossier
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
-      throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
+      throw new Error(`Le fichier "${file.name}" est déjà présent.`);
     }
 
     try {
@@ -134,7 +151,7 @@ export const api = {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "5 MB (Browser)", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "Local" }
+      diskSpace: { total: "5 MB", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "Local" }
     };
   },
 
@@ -151,6 +168,27 @@ export const api = {
     };
     
     return buildTree(null);
+  },
+
+  async getDocChunks(docId: string) {
+    // Dans le mode local, on simule l'extraction des chunks depuis le contenu stocké
+    const fs = loadLocalFS();
+    const file = fs.find(i => i.id === docId);
+    if (!file || !file.content) return [];
+    
+    // Simuler le découpage pour l'inspection
+    const chunks = [];
+    const size = 1000;
+    for (let i = 0; i < file.content.length; i += size) {
+      chunks.push({
+        id: `${docId}-${i}`,
+        docId: docId,
+        index: chunks.length + 1,
+        text: file.content.substring(i, i + size),
+        size: Math.min(size, file.content.length - i)
+      });
+    }
+    return chunks;
   },
 
   private getAllFileNames(items: FileSystemItem[]): string[] {
