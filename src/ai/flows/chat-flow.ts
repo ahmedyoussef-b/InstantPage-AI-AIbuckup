@@ -21,6 +21,7 @@ import { distillInteractions, getApplicableRules, type DistilledRule } from '@/a
 import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
 import { transferKnowledge, detectTransferNeed, type TransferResult } from '@/ai/learning/transfer-learning';
 import { extractTaskFeatures, selectOptimalStrategy, getMetaLearningDirective } from '@/ai/learning/meta-learning';
+import { learnFromNetwork } from '@/ai/learning/collaborative-network';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -56,6 +57,7 @@ const ChatOutputSchema = z.object({
   reviewQuestion: z.string().optional(),
   crossDomainTransfer: z.any().optional(),
   metaStrategy: z.string().optional(),
+  collaborativeInsight: z.string().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -75,39 +77,46 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let reviewQuestion: string | undefined = undefined;
     let crossDomainTransferResult: TransferResult | undefined = undefined;
     let activeMetaStrategy: string = "";
+    let collaborativeInsight: string = "";
 
-    // 0. Innovation 31: Méta-Apprentissage (Sélection de la stratégie optimale)
+    // 0. Innovation 31: Méta-Apprentissage
     const taskFeatures = await extractTaskFeatures(input.text, docContext);
     const metaStrategy = await selectOptimalStrategy(taskFeatures);
     activeMetaStrategy = metaStrategy.name;
     const metaDirective = await getMetaLearningDirective(metaStrategy);
     docContext += ` ${metaDirective}`;
 
-    // 0.1 Innovation 25: Rappel de mémoire épisodique
+    // 0.1 Innovation 32: Intelligence Collective (Consultation du réseau)
+    collaborativeInsight = await learnFromNetwork(input.text);
+    if (collaborativeInsight) {
+      docContext += `\n[NOTE RÉSEAU : ${collaborativeInsight}]`;
+    }
+
+    // 0.2 Innovation 25: Rappel de mémoire épisodique
     const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
     if (memory.summary) {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
 
-    // 0.2 Innovation 30: Détection de besoin de transfert cross-domaine
+    // 0.3 Innovation 30: Détection de besoin de transfert cross-domaine
     const transferNeed = await detectTransferNeed(input.text);
     if (transferNeed) {
       crossDomainTransferResult = await transferKnowledge(transferNeed.concept, transferNeed.source, transferNeed.target);
       docContext += `\n[TRANSFERT DÉTECTÉ : ${crossDomainTransferResult.adaptedConcept} appliqué à ${crossDomainTransferResult.targetDomain}]`;
     }
 
-    // 0.3 Innovation 28: Application des règles distillées
+    // 0.4 Innovation 28: Application des règles distillées
     if (input.distilledRules && input.distilledRules.length > 0) {
       const rulesContext = await getApplicableRules(input.text, input.distilledRules as DistilledRule[]);
       if (rulesContext) docContext += ` ${rulesContext}`;
     }
 
-    // 0.4 Innovation 27: Curriculum Adaptatif (ZPD)
+    // 0.5 Innovation 27: Curriculum Adaptatif
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
 
-    // 0.5 Innovation 29: Réactivation Espacée (Génération de question)
+    // 0.6 Innovation 29: Réactivation Espacée
     if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
       const itemToReview = input.pendingReviews[0] as KnowledgeItem;
       reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
@@ -147,7 +156,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       proactiveSuggestions = await predictNextActions(history, input.text + " " + docContext);
     }
 
-    // 4. Innovation 20: Orchestration Multi-Agents Spécialisés
+    // 4. Innovation 20: Orchestration Multi-Agents
     if (q.length > 300 || q.includes('audit technique complet') || q.includes('analyse multi-agents')) {
       const orchestration = await orchestrateMultiAgents(input.text, docContext);
       multiAgentActive = true;
@@ -157,7 +166,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         multiAgentActive: true,
         proactiveSuggestions,
         pedagogicalLevel: pedaLevel,
-        metaStrategy: activeMetaStrategy
+        metaStrategy: activeMetaStrategy,
+        collaborativeInsight
       };
     }
 
@@ -192,16 +202,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     // 6. Génération avec Méta-cognition (Innovation 13)
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
-      // 6.1 Raisonnement par Analogie (Innovation 12)
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
       
-      // 6.2 Raisonnement par Contraste (Innovation 9)
       if (query.match(/différence|versus|vs|comparer/i)) return await contrastiveReasoning.reason(query, ctx);
 
-      // 6.3 Routage Sémantique (Innovation 1) & Prompting Dynamique (Innovation 5)
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
       
@@ -246,6 +253,10 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : Le concept "${crossDomainTransferResult.adaptedConcept}" a été adapté du domaine "${crossDomainTransferResult.sourceDomain}" vers "${crossDomainTransferResult.targetDomain}".`;
     }
 
+    if (collaborativeInsight) {
+      finalAnswer += `\n\n---\n🌐 **RÉSEAU (Innovation 32)** : ${collaborativeInsight}`;
+    }
+
     if (reviewQuestion) {
       finalAnswer += `\n\n---\n💡 **RÉACTIVATION (Innovation 29)** : ${reviewQuestion}`;
     }
@@ -266,11 +277,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       newDistilledRules,
       reviewQuestion,
       crossDomainTransfer: crossDomainTransferResult,
-      metaStrategy: activeMetaStrategy
+      metaStrategy: activeMetaStrategy,
+      collaborativeInsight
     };
   };
 
-  // Cache Sémantique Intelligent (Innovation 2)
   const cached = await semanticCache.getOrCompute(input.text, async () => {
     const res = await computeAnswer();
     return JSON.stringify(res);

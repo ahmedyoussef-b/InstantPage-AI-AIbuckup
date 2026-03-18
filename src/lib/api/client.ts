@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais la Réactivation Espacée (Innovation 29).
+ * Intègre désormais l'Intelligence Collective (Innovation 32).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -11,12 +11,18 @@ import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 import { getPendingReviews, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
+import { shareKnowledge } from '@/ai/learning/collaborative-network';
 
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
 const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
 const REPETITION_KEY = 'AGENTIC_SPACED_REP_V1';
+const INSTANCE_ID = typeof window !== 'undefined' ? (localStorage.getItem('AGENTIC_INSTANCE_ID') || `inst-${Math.random().toString(36).substring(7)}`) : 'server-node';
+
+if (typeof window !== 'undefined' && !localStorage.getItem('AGENTIC_INSTANCE_ID')) {
+  localStorage.setItem('AGENTIC_INSTANCE_ID', INSTANCE_ID);
+}
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -79,14 +85,6 @@ const loadDemonstrations = (): any[] => {
   } catch { return []; }
 };
 
-const saveDemonstration = (demo: any) => {
-  if (typeof window === 'undefined') return;
-  const current = loadDemonstrations();
-  const updated = [demo, ...current].slice(0, 20);
-  localStorage.setItem(DEMO_KEY, JSON.stringify(updated));
-};
-
-// Variable pour la détection de répétition/reformulation
 let lastQueryTime = 0;
 let lastQueryText = '';
 
@@ -120,18 +118,13 @@ export const api = {
     const episodicMemory = loadMemory();
     const distilledRules = loadDistilledRules();
     const repetitionItems = loadRepetitionItems();
-    
-    // Innovation 29: Détection des révisions en attente
     const pendingReviews = await getPendingReviews(repetitionItems);
     
-    // --- INNOVATION 26: SIGNAUX IMPLICITES ---
     implicitRL.loadProfile();
     const now = Date.now();
     
-    // 1. Détection de Reformulation
     if (lastQueryText && query.length > 5 && now - lastQueryTime < 30000) {
-      const similarity = query.toLowerCase().includes(lastQueryText.toLowerCase().substring(0, 10)) ? 0.8 : 0;
-      if (similarity > 0.5) {
+      if (query.toLowerCase().includes(lastQueryText.toLowerCase().substring(0, 10))) {
         await implicitRL.processSignal('REFORMULATION', { isLong: false });
       }
     }
@@ -158,13 +151,17 @@ export const api = {
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
-    // 2. Innovation 28: Sauvegarde des nouvelles règles distillées
+    // Innovation 28 & 32: Sauvegarde et Partage des règles distillées
     if (response.distillationPerformed && response.newDistilledRules) {
       const mergedRules = [...response.newDistilledRules, ...distilledRules].slice(0, 30);
       saveDistilledRules(mergedRules);
+      
+      // Partager les nouvelles règles avec le réseau (Innovation 32)
+      for (const rule of response.newDistilledRules) {
+        shareKnowledge(INSTANCE_ID, rule).catch(() => {});
+      }
     }
 
-    // 3. Mémorisation épisodique
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -173,7 +170,6 @@ export const api = {
       }, ...episodicMemory];
       saveMemory(updatedMemory);
       
-      // 4. Innovation 29: Créer un item de révision pour les points importants
       if (response.confidence > 0.85 && response.newMemoryEpisode.content.length > 50) {
         const newItem: KnowledgeItem = {
           id: `rep-${Math.random().toString(36).substring(7)}`,
