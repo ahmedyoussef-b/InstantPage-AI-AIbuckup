@@ -1,7 +1,8 @@
 'use server';
 /**
  * @fileOverview CompleteLearningLoop - Innovation Elite 32.
- * Orchestration unifiée de la boucle cognitive liée à la base vectorielle.
+ * Orchestration unifiée de la boucle cognitive liée à la base vectorielle centrale.
+ * Comprendre (Phase 1) -> Anticiper (Phase 3) -> Raisonner (Phase 2) -> Apprendre (Phase 4).
  */
 
 import { comprendreVector, formatVectorContext } from './phase1-vector';
@@ -31,12 +32,13 @@ export interface LoopResult {
 
 /**
  * Exécute la boucle cognitive complète Elite 32.
- * Comprendre (Phase 1) -> Raisonner (Phase 2) -> Agir (Phase 3) -> Apprendre (Phase 4).
+ * Cette fonction lie dynamiquement l'apprentissage passé à la génération actuelle.
  */
 export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
-  console.log(`[AI][ELITE-LOOP] Traitement de l'interaction pour : ${interaction.userId}`);
+  console.log(`[AI][ELITE-LOOP] Traitement sémantique évolutif pour : ${interaction.userId}`);
 
-  // 1. PHASE 1: COMPRENDRE (Contexte Vectoriel Multi-Strates)
+  // 1. PHASE 1: COMPRENDRE (Recherche Multi-Strates dans la Base Vectorielle)
+  // On récupère les documents, mais aussi les leçons et patterns appris au fil du temps
   const vectorInsights = await comprendreVector(interaction.query, {
     episodicMemory: interaction.episodicMemory,
     distilledRules: interaction.distilledRules,
@@ -46,38 +48,41 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
   let enrichedContext = interaction.documentContext;
   enrichedContext += await formatVectorContext(vectorInsights);
 
-  // 2. PHASE 3: AGIR (Anticipation basée sur patterns vectoriels d'action)
+  // 2. PHASE 3: AGIR (Anticipation & Pattern Matching d'actions)
+  // Avant de raisonner, on vérifie si un schéma d'exécution réussi existe déjà
   const actionInsight = await agirVector(interaction.query, { mode: 'standard' });
   if (actionInsight) {
     enrichedContext += await formatActionInsight(actionInsight);
   }
 
-  // 3. PHASE 2: RAISONNER (Méta-cognition guidée par analogies)
+  // 3. PHASE 2: RAISONNER (Méta-cognition & Analogie structurelle)
+  // On utilise les succès de réflexion passés (Innovation 12) pour guider la nouvelle réponse
   const metaResult = await metacognitiveReasoner.reason(
     interaction.query, 
     enrichedContext, 
     async (q, ctx) => {
-      // Raisonnement par analogie vectorielle
+      // Tentative de raisonnement par analogie vectorielle
       const analogy = await raisonnerVector(q, ctx, []); 
       if (analogy) return analogy;
       
-      // Fallback vers raisonnement modulaire standard
+      // Fallback vers le moteur modulaire si aucune analogie n'est assez forte
       const { modularReasoner } = await import('@/ai/reasoning/modular');
       return await modularReasoner.reason(q, ctx);
     }
   );
 
-  // 4. PHASE 4: APPRENDRE (Extraction et Vectorisation dynamique)
+  // 4. PHASE 4: APPRENDRE (Extraction et Vectorisation immédiate)
+  // L'IA apprend de sa propre réponse et la mémorise pour le futur
   const lessons = await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
 
-  // Préparation du nouvel épisode de mémoire pour persistance client
+  // Préparation du nouvel épisode de mémoire pour persistence VFS
   const newMemoryEpisode = {
     type: 'interaction',
-    content: metaResult.answer.substring(0, 300),
+    content: metaResult.answer.substring(0, 500),
     context: interaction.query,
     importance: metaResult.confidence,
     timestamp: Date.now(),
-    tags: lessons.map(l => l.content.substring(0, 15))
+    tags: lessons.map(l => l.content.substring(0, 20))
   };
 
   return {

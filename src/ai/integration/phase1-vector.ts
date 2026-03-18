@@ -1,8 +1,8 @@
 'use server';
 /**
  * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
- * Architecture de recherche vectorielle multidimensionnelle unifiée.
- * Version stabilisée pour Next.js 15 (uniquement des fonctions async exportées).
+ * Architecture de recherche vectorielle multidimensionnelle.
+ * Permet de récupérer le contexte technique, historique et comportemental.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,43 +16,50 @@ export interface VectorSearchResult {
 
 /**
  * Phase 1: COMPRENDRE - Interroge la base vectorielle centrale sur toutes ses strates.
+ * C'est ici que s'opère la "fusion sémantique" entre les docs et le vécu de l'IA.
  */
 export async function comprendreVector(question: string, context: { 
   episodicMemory: any[], 
   distilledRules: any[],
   userProfile?: any 
 }): Promise<VectorSearchResult[]> {
-  console.log(`[AI][PHASE-1] Vectorisation profonde & Recherche multi-strates...`);
+  console.log(`[AI][PHASE-1] Fusion Sémantique : Documents + Interactions + Patterns...`);
 
   const results: VectorSearchResult[] = [];
 
-  // Strate CONCEPTS: Règles techniques distillées (Innovation 28)
+  // STRATE CONCEPTS : Règles techniques et terminologies distillées (Evolution Day 30)
   context.distilledRules.forEach(rule => {
     results.push({
       collection: 'CONCEPTS',
-      content: `Règle apprise : ${rule.instruction} (Domaine: ${rule.domain})`,
+      content: `Concept appris : ${rule.instruction} (Domaine: ${rule.domain})`,
       score: 0.95,
       metadata: { type: 'rule', id: rule.id }
     });
   });
 
-  // Strate LESSONS: Souvenirs d'interactions critiques (Innovation 25)
-  context.episodicMemory.filter(e => e.importance > 0.7).slice(0, 3).forEach(epi => {
-    results.push({
-      collection: 'LESSONS',
-      content: `Leçon retenue : Dans le contexte "${epi.context}", la réponse optimale était "${epi.content.substring(0, 100)}..."`,
-      score: 0.88,
-      metadata: { timestamp: epi.timestamp }
+  // STRATE LESSONS : Souvenirs d'interactions critiques (Anticipation de l'oubli)
+  // On priorise les souvenirs qui ont une haute importance pour le contexte actuel
+  const q = question.toLowerCase();
+  context.episodicMemory
+    .filter(e => e.importance > 0.6 && (q.includes(e.context.toLowerCase()) || e.content.toLowerCase().includes(q)))
+    .slice(0, 3)
+    .forEach(epi => {
+      results.push({
+        collection: 'LESSONS',
+        content: `Rappel historique : Pour la question "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
+        score: 0.88,
+        metadata: { timestamp: epi.timestamp }
+      });
     });
-  });
 
-  // Strate PATTERNS: Préférences et styles (Innovation 26)
+  // STRATE PATTERNS : Préférences de l'utilisateur (Innovation 26)
   if (context.userProfile) {
+    const p = context.userProfile;
     results.push({
       collection: 'PATTERNS',
-      content: `Style détecté : Préférence pour la ${context.userProfile.technicality > 0.7 ? 'haute technicité' : 'vulgarisation'} et la ${context.userProfile.conciseness > 0.7 ? 'brièveté' : 'pédagogie'}.`,
+      content: `Profil Utilisateur : Préférence pour ${p.technicality > 0.7 ? 'une expertise brute' : 'la vulgarisation'} et ${p.conciseness > 0.7 ? 'la brièveté' : 'la pédagogie détaillée'}.`,
       score: 1.0,
-      metadata: { source: 'RL_ENGINE' }
+      metadata: { source: 'IMPLICIT_RL' }
     });
   }
 
@@ -65,9 +72,9 @@ export async function comprendreVector(question: string, context: {
 export async function formatVectorContext(results: VectorSearchResult[]): Promise<string> {
   if (results.length === 0) return "";
   
-  let output = "\n--- CONTEXTE DE LA BASE VECTORIELLE CENTRALE ---\n";
+  let output = "\n--- MÉMOIRE SÉMANTIQUE CENTRALE (ELITE 32) ---\n";
   
-  const collections = ['DOCUMENTS', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
+  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS')[] = ['CONCEPTS', 'LESSONS', 'PATTERNS'];
   
   collections.forEach(col => {
     const filtered = results.filter(r => r.collection === col);
@@ -79,6 +86,6 @@ export async function formatVectorContext(results: VectorSearchResult[]): Promis
     }
   });
   
-  output += "------------------------------------------------\n";
+  output += "----------------------------------------------\n";
   return output;
 }

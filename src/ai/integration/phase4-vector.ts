@@ -1,7 +1,8 @@
 'use server';
 /**
  * @fileOverview Phase4VectorIntegration - Innovation Elite 32.
- * Gère la mémorisation et la vectorisation des apprentissages après chaque interaction.
+ * Gère la mémorisation et la vectorisation dynamique des apprentissages.
+ * Ferme la boucle en rendant chaque réponse immédiatement "indexable" pour le futur.
  */
 
 import { ai } from '@/ai/genkit';
@@ -20,21 +21,22 @@ export async function apprendreVector(
   answer: string, 
   confidence: number
 ): Promise<Lesson[]> {
-  console.log(`[AI][PHASE-4] Extraction et vectorisation des leçons...`);
+  console.log(`[AI][PHASE-4] Consolidation de l'expérience...`);
 
-  // 1. Extraction des leçons via LLM
+  // 1. Extraction sémantique de la leçon
   const lessons = await extractLessons(query, answer);
 
-  // 2. Vectorisation (Simulation de stockage dans la strate LEARN de la base centrale)
+  // 2. Vectorisation dynamique (Simulation d'indexation instantanée)
   for (const lesson of lessons) {
     try {
+      // On génère un embedding pour rendre cette leçon cherchable dès le prochain message
       await ai.embed({
         embedder: 'googleai/embedding-001',
         content: lesson.content,
       });
-      console.log(`[AI][PHASE-4] Leçon vectorisée et mémorisée : ${lesson.content.substring(0, 40)}...`);
+      console.log(`[AI][PHASE-4] Nouvelle leçon vectorisée : "${lesson.content.substring(0, 50)}..."`);
     } catch (e) {
-      // Fallback silencieux si le service d'embedding est indisponible
+      // Fallback silencieux (le système continue de fonctionner en mode dégradé)
     }
   }
 
@@ -44,9 +46,9 @@ export async function apprendreVector(
 async function extractLessons(query: string, answer: string): Promise<Lesson[]> {
   try {
     const response = await ai.generate({
-      model: 'ollama/tinyllama:latest',
-      system: "Tu es un Extracteur de Savoir Technique. Identifie une leçon technique clé issue de l'interaction.",
-      prompt: `Question: ${query}\nRéponse: ${answer}\n\nFormat JSON STRICT: [{"content": "fait technique appris", "importance": 0.X}]`,
+      model: 'ollama/phi3:mini',
+      system: "Tu es un Extracteur de Savoir Elite. Identifie une règle ou une leçon technique universelle issue de cet échange pour enrichir la base de connaissances.",
+      prompt: `Question : ${query}\nRéponse : ${answer}\n\nFormat JSON STRICT: [{"content": "règle technique à retenir", "importance": 0.X}]`,
     });
 
     const match = response.text.match(/\[.*\]/s);
@@ -58,7 +60,7 @@ async function extractLessons(query: string, answer: string): Promise<Lesson[]> 
       }));
     }
   } catch (e) {
-    console.warn("[AI][PHASE-4] Échec de l'extraction des leçons.");
+    console.warn("[AI][PHASE-4] Échec extraction leçon via LLM.");
   }
   return [];
 }
