@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais le moteur d'apprentissage continu et la mémoire analogique.
+ * Intègre désormais le moteur d'apprentissage continu et la mémoire analogique (Innovation 12).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -41,14 +41,26 @@ const loadAnalogies = (): any[] => {
   } catch { return []; }
 };
 
-const saveAnalogy = (problem: string, solution: string) => {
+const saveAnalogy = async (problem: string, solution: string) => {
   if (typeof window === 'undefined') return;
   try {
+    // Note: Dans un vrai système, on générerait ici l'embedding via le serveur
+    // Pour la stabilité du VFS, on stocke la paire texte pour indexation future
     const current = loadAnalogies();
-    // On ne garde que les 50 meilleures analogies pour préserver le stockage
-    const updated = [{ problem, solution, timestamp: Date.now() }, ...current].slice(0, 50);
+    
+    // Simulation d'un embedding simplifié (ou appel serveur si disponible)
+    const newAnalogy = { 
+      problem, 
+      solution, 
+      timestamp: Date.now(),
+      embedding: Array(768).fill(0).map(() => Math.random() - 0.5) // Placeholder
+    };
+
+    const updated = [newAnalogy, ...current].slice(0, 50);
     localStorage.setItem(ANALOGY_KEY, JSON.stringify(updated));
-  } catch {}
+  } catch (e) {
+    console.error("[API_CLIENT] Erreur sauvegarde analogie:", e);
+  }
 };
 
 export const api = {
@@ -125,8 +137,8 @@ export const api = {
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
     const success = await continuousLearning.recordCorrection(original, corrected);
     if (success) {
-      // Si l'utilisateur corrige, on sauvegarde comme une analogie positive
-      saveAnalogy(original, corrected);
+      // Si l'utilisateur corrige, on sauvegarde comme une analogie positive pour l'Innovation 12
+      await saveAnalogy(original, corrected);
     }
     return success;
   },

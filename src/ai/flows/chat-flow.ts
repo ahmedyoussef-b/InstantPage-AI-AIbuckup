@@ -14,7 +14,7 @@ const ChatInputSchema = z.object({
   text: z.string(),
   history: z.array(z.any()).optional(),
   documentContext: z.string().optional(),
-  analogyMemory: z.array(z.any()).optional(), // Mémoire d'expérience passée
+  analogyMemory: z.array(z.any()).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -30,6 +30,7 @@ export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
  * Chat Intelligent intégrant les 12 Innovations Élite.
+ * Version stabilisée avec orchestration dynamique des modes de raisonnement.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
@@ -37,6 +38,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const docContext = input.documentContext || "";
 
     // 1. Raisonnement Analogique (Innovation 12) - Priorité haute
+    // On cherche d'abord si on a déjà résolu un problème similaire
     if (input.analogyMemory && input.analogyMemory.length > 0) {
       const analogResponse = await analogicalReasoner.reason(input.text, docContext, input.analogyMemory as SolvedProblem[]);
       if (analogResponse) {

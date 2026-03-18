@@ -1,6 +1,6 @@
 # AGENTIC - Assistant IA Professionnel Hybrid RAG
 
-AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données.
+AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 12 innovations majeures.
 
 ## 🚀 Les 12 Innovations Majeures
 
@@ -14,22 +14,22 @@ Réduction de 40% de la charge processeur grâce à la détection sémantique de
 Fusion de trois sources de contexte pour une précision inégalée.
 
 ### 4. Knowledge Graph Local Automatique
-Extraction automatique des relations thématiques pour construire un graphe de connaissances local.
+Extraction automatique des relations thématiques pour construire un graphe de connaissances local persistant.
 
 ### 5. Prompt Engineering Dynamique Adaptatif
-Ajustement en temps réel des instructions système selon le type de requête.
+Ajustement en temps réel des instructions système selon le type de requête (procédure, définition, comparaison).
 
 ### 6. Chaîne de Pensée (CoT) Dynamique
-Décomposition automatique des problèmes complexes en étapes de réflexion logiques.
+Décomposition automatique des problèmes complexes en étapes de réflexion logiques adaptées à la difficulté.
 
 ### 7. Support de Modèles Quantifiés Spécialisés
-Optimisé pour le chargement de modèles ultra-légers (q4_k_m, ~350MB) via Ollama.
+Optimisé pour le chargement de modèles ultra-légers (q4_k_m, ~350MB) via Ollama pour vos documents spécifiques.
 
 ### 8. Apprentissage Continu Ultra-Léger
-L'IA apprend de vos corrections manuelles pour s'auto-corriger.
+L'IA apprend de vos corrections manuelles pour s'auto-corriger sans ré-entraînement lourd.
 
 ### 9. Raisonnement par Contraste (Contrastive Reasoning)
-Clarification des concepts en explorant systématiquement ce qu'ils ne sont pas.
+Clarification des concepts complexes en explorant systématiquement ce qu'ils ne sont pas.
 
 ### 10. Vérification Auto-Consistante (Self-Consistency)
 Résistance aux hallucinations par génération de multiples chemins de raisonnement et vote majoritaire.
@@ -38,13 +38,14 @@ Résistance aux hallucinations par génération de multiples chemins de raisonne
 Exploration exhaustive des bifurcations logiques pour les choix et stratégies complexes.
 
 ### 12. Raisonnement Analogique (Analogical Reasoning)
-Transfert de solutions basées sur l'expérience passée et les problèmes similaires résolus.
+Transfert de solutions basées sur l'expérience passée et les problèmes similaires résolus avec succès.
 
 ## 🛠️ Stack Technique
 
 - **Frontend** : Next.js 15 (App Router), React 19, Tailwind CSS.
-- **AI Engine** : Genkit, Ollama (Modèles locaux).
-- **Storage** : Virtual File System (VFS) persistant via LocalStorage.
+- **AI Engine** : Genkit 1.x, Ollama (Modèles locaux).
+- **Storage** : Virtual File System (VFS) persistant atomique via LocalStorage.
+- **Voice** : STT (WebSpeech) & TTS (Piper/Edge local).
 
 ---
 *AGENTIC - Propulsé par l'innovation Elite AI.*
