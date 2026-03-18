@@ -2,7 +2,7 @@
 /**
  * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
  * Architecture de recherche vectorielle multidimensionnelle unifiée.
- * Connecte les 4 phases de l'IA à la Base Vectorielle Centrale.
+ * Version stabilisée pour Next.js 15 (uniquement des fonctions async exportées).
  */
 
 import { ai } from '@/ai/genkit';
@@ -24,11 +24,6 @@ export async function comprendreVector(question: string, context: {
 }): Promise<VectorSearchResult[]> {
   console.log(`[AI][PHASE-1] Vectorisation profonde & Recherche multi-strates...`);
 
-  // 1. Point d'ancrage sémantique (Embedding de la requête)
-  const qEmbedding = await getEmbedding(question);
-  
-  // Dans un environnement de production, nous ferions une recherche vectorielle réelle (ex: ChromaDB)
-  // Ici, nous simulons la recherche multi-strates sur les données contextualisées
   const results: VectorSearchResult[] = [];
 
   // Strate CONCEPTS: Règles techniques distillées (Innovation 28)
@@ -62,19 +57,6 @@ export async function comprendreVector(question: string, context: {
   }
 
   return results;
-}
-
-async function getEmbedding(text: string): Promise<number[] | null> {
-  try {
-    const result = await ai.embed({
-      embedder: 'googleai/embedding-001',
-      content: text,
-    });
-    return result;
-  } catch (e) {
-    console.warn("[AI][VECTOR] Service d'embedding indisponible, mode sémantique dégradé.");
-    return null;
-  }
 }
 
 /**

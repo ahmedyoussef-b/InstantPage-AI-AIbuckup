@@ -8,6 +8,7 @@ import { z } from 'genkit';
 import { comprendreVector, formatVectorContext } from '@/ai/integration/phase1-vector';
 import { raisonnerVector } from '@/ai/integration/phase2-vector';
 import { agirVector, formatActionInsight } from '@/ai/integration/phase3-vector';
+import { apprendreVector } from '@/ai/integration/phase4-vector';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
 import { modularReasoner } from '@/ai/reasoning/modular';
 import { latentTree } from '@/ai/reasoning/latent-tree';
@@ -43,6 +44,7 @@ const ChatOutputSchema = z.object({
   metaStrategy: z.string().optional(),
   asyncTaskId: z.string().optional(),
   collaborativeInsight: z.string().optional(),
+  vectorLearnings: z.array(z.any()).optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -107,7 +109,9 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
-    // --- PHASE 4: APPRENDRE (Learn) ---
+    // --- PHASE 4: APPRENDRE (Learn) - Vectorisation Dynamique ---
+    const vectorLearnings = await apprendreVector(input.text, metaResult.answer, metaResult.confidence);
+
     const newMemoryEpisode = {
       type: 'interaction',
       content: metaResult.answer.substring(0, 300),
@@ -124,7 +128,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       newMemoryEpisode,
       pedagogicalLevel: pedaLevel,
       metaStrategy: metaStrategy.name,
-      collaborativeInsight
+      collaborativeInsight,
+      vectorLearnings
     };
   };
 

@@ -2,7 +2,7 @@
 /**
  * @fileOverview Phase3VectorIntegration - Innovation Elite 32.
  * Utilise la base vectorielle pour guider et adapter les actions de l'IA.
- * Permet de s'appuyer sur les succès passés pour optimiser les outils et workflows.
+ * Version stabilisée pour Next.js 15.
  */
 
 import { ai } from '@/ai/genkit';
@@ -23,13 +23,6 @@ export async function agirVector(
 ): Promise<ActionInsight | null> {
   console.log(`[AI][PHASE-3] Recherche de patterns d'action dans la base vectorielle...`);
 
-  // 1. Vectoriser l'intention pour recherche analogique
-  const embedding = await getEmbedding(intent);
-  if (!embedding) return null;
-
-  // Dans un prototype, nous simulons la récupération d'une action réussie 
-  // basée sur la similarité vectorielle (strate ACTIONS de la base centrale)
-  
   // Heuristique : Si on parle de "rapport" ou "audit", on simule un rappel
   if (intent.toLowerCase().match(/rapport|audit|synthèse/i)) {
     return {
@@ -41,30 +34,6 @@ export async function agirVector(
   }
 
   return null;
-}
-
-/**
- * Enregistre une action réussie pour enrichir la base vectorielle.
- */
-export async function recordSuccessfulAction(
-  decision: string, 
-  params: any, 
-  result: string
-): Promise<void> {
-  console.log(`[AI][PHASE-3] Vectorisation et stockage d'une action réussie.`);
-  // Logique de stockage dans la strate ACTIONS du VFS
-}
-
-async function getEmbedding(text: string): Promise<number[] | null> {
-  try {
-    const result = await ai.embed({
-      embedder: 'googleai/embedding-001',
-      content: text,
-    });
-    return result;
-  } catch (e) {
-    return null;
-  }
 }
 
 /**

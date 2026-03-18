@@ -2,16 +2,11 @@
 /**
  * @fileOverview Phase2VectorIntegration - Innovation Elite 32.
  * Utilise la base vectorielle pour guider le raisonnement par analogie.
+ * Version stabilisée pour Next.js 15.
  */
 
 import { ai } from '@/ai/genkit';
 import { analogicalReasoner, type SolvedProblem } from '@/ai/reasoning/analogical';
-
-export interface ReasoningInsight {
-  originalProblem: string;
-  solutionPattern: string;
-  relevance: number;
-}
 
 /**
  * Phase 2: RAISONNER - Utilise des analogies vectorielles pour structurer la réflexion.
@@ -24,7 +19,6 @@ export async function raisonnerVector(
   console.log(`[AI][PHASE-2] Recherche d'analogies dans la base vectorielle...`);
 
   // 1. Recherche d'analogies structurelles via le moteur dédié
-  // Le moteur compare l'embedding de la question aux raisonnements passés réussis
   const analogyResult = await analogicalReasoner.reason(question, context, pastReasonings);
 
   if (analogyResult) {
