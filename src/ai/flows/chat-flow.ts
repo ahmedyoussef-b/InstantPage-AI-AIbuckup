@@ -18,6 +18,7 @@ import { predictNextActions } from '@/ai/actions/predictive-engine';
 import { recall, remember, type Episode } from '@/ai/learning/episodic-memory';
 import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } from '@/ai/learning/curriculum';
 import { distillInteractions, getApplicableRules, type DistilledRule } from '@/ai/learning/knowledge-distillation';
+import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -27,6 +28,7 @@ const ChatInputSchema = z.object({
   demonstrationHistory: z.array(z.any()).optional(),
   episodicMemory: z.array(z.any()).optional(),
   distilledRules: z.array(z.any()).optional(),
+  pendingReviews: z.array(z.any()).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -49,6 +51,7 @@ const ChatOutputSchema = z.object({
   pedagogicalLevel: z.string().optional(),
   distillationPerformed: z.boolean().optional(),
   newDistilledRules: z.array(z.any()).optional(),
+  reviewQuestion: z.string().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -65,6 +68,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let distillationPerformed = false;
     let newDistilledRules: DistilledRule[] | undefined = undefined;
     let proactiveSuggestions: any[] = [];
+    let reviewQuestion: string | undefined = undefined;
 
     // 0. Innovation 25: Rappel de mémoire épisodique
     const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
@@ -82,6 +86,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
+
+    // 0.3 Innovation 29: Génération d'une question de réactivation si besoin
+    if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
+      const itemToReview = input.pendingReviews[0] as KnowledgeItem;
+      reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
+    }
 
     // 1. Innovation 23: Workflow Asynchrone
     if (q.match(/audit complet|analyse massive|traitement profond|longue tâche/i)) {
@@ -205,8 +215,14 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);
 
+    // Final answer with review question if available
+    let finalAnswer = prefixOutput + metaResult.answer;
+    if (reviewQuestion) {
+      finalAnswer += `\n\n---\n💡 **RÉACTIVATION (Innovation 29)** : ${reviewQuestion}`;
+    }
+
     return {
-      answer: prefixOutput + metaResult.answer,
+      answer: finalAnswer,
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
       suggestions: finalSuggestions,
@@ -218,7 +234,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       newMemoryEpisode,
       pedagogicalLevel: pedaLevel,
       distillationPerformed,
-      newDistilledRules
+      newDistilledRules,
+      reviewQuestion
     };
   };
 

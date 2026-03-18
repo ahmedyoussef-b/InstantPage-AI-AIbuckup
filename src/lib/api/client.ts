@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais la Distillation des Connaissances (Innovation 28).
+ * Intègre désormais la Réactivation Espacée (Innovation 29).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -10,11 +10,13 @@ import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
+import { getPendingReviews, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
 
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
 const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
+const REPETITION_KEY = 'AGENTIC_SPACED_REP_V1';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -54,6 +56,19 @@ const loadDistilledRules = (): any[] => {
 const saveDistilledRules = (rules: any[]) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(RULES_KEY, JSON.stringify(rules));
+};
+
+const loadRepetitionItems = (): KnowledgeItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(REPETITION_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+};
+
+const saveRepetitionItems = (items: KnowledgeItem[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(REPETITION_KEY, JSON.stringify(items));
 };
 
 const loadDemonstrations = (): any[] => {
@@ -104,6 +119,10 @@ export const api = {
     const demonstrations = loadDemonstrations();
     const episodicMemory = loadMemory();
     const distilledRules = loadDistilledRules();
+    const repetitionItems = loadRepetitionItems();
+    
+    // Innovation 29: Détection des révisions en attente
+    const pendingReviews = await getPendingReviews(repetitionItems);
     
     // --- INNOVATION 26: SIGNAUX IMPLICITES ---
     implicitRL.loadProfile();
@@ -152,9 +171,28 @@ export const api = {
         timestamp: Date.now()
       }, ...episodicMemory];
       saveMemory(updatedMemory);
+      
+      // Innovation 29: Créer un item de révision pour les points importants
+      if (response.confidence > 0.85) {
+        const newItem: KnowledgeItem = {
+          id: `rep-${Math.random().toString(36).substring(7)}`,
+          content: response.newMemoryEpisode.content,
+          concept: response.newMemoryEpisode.tags[0] || 'Général',
+          stability: 1,
+          difficulty: 0.3,
+          lastReview: Date.now(),
+          nextReview: Date.now() + (24 * 60 * 60 * 1000),
+          reviewsCount: 0
+        };
+        saveRepetitionItems([...repetitionItems, newItem]);
+      }
     }
 
-    return { ...response, answer: correctedAnswer };
+    return { 
+      ...response, 
+      answer: correctedAnswer,
+      pendingReviews: pendingReviews.length > 0 ? pendingReviews : undefined
+    };
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
