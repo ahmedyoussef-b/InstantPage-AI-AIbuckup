@@ -90,10 +90,10 @@ export async function POST(request: NextRequest) {
         
         try {
           const helpResult = await getProcedureHelp({
-            userName: 'AHMED',
+            userName: 'Opérateur',
             stepTitle: step.title,
             instruction: step.instruction,
-            problem: problem || 'Besoin de précisions sur cette étape',
+            problem: problem || 'Besoin de précisions techniques',
             expectedValue: step.expectedValue
           });
           
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         } catch (genkitError) {
           console.error('[API][PROCEDURE] Genkit Help Error:', genkitError);
           return NextResponse.json({ 
-            help: "Désolé AHMED, je n'arrive pas à analyser ce problème pour le moment. Référez-vous au manuel technique.",
+            help: "Désolé, je n'arrive pas à analyser ce problème pour le moment. Référez-vous au manuel technique.",
             step: step 
           });
         }

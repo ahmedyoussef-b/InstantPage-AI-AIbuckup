@@ -20,10 +20,10 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent personnalisé pour AHMED avec Routage Sémantique.
+ * Chat Intelligent avec Routage Sémantique pour une assistance professionnelle.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Requête pour AHMED : "${input.text}"`);
+  console.log(`[BACKEND][FLOW:chat] Requête reçue : "${input.text}"`);
 
   // 1. Déterminer le modèle optimal via le Routeur Sémantique
   const targetModel = await semanticRouter.route(input.text);
@@ -32,15 +32,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     ? `Voici le contenu des documents disponibles pour t'aider :\n\n${input.documentContext}`
     : "Aucun document n'est chargé pour le moment.";
 
-  const systemPrompt = `Tu es l'Assistant Personnel Intelligent de AHMED.
-    
-    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, expert technique et le saluer personnellement.
+  const systemPrompt = `Tu es un Assistant Personnel Intelligent expert technique.
     
     INSTRUCTIONS :
-    - Si AHMED te salue ("Bonjour", "Salut", "Bonsoir"), réponds TOUJOURS : "Bonjour AHMED", "Bonsoir AHMED" ou "Salut AHMED".
+    - Réponds de manière professionnelle et concise.
     - Réponds TOUJOURS en français.
     - Utilise le contexte des documents fournis ci-dessous pour répondre précisément.
-    - Sois concis et technique si nécessaire.
+    - Cite tes sources si l'information provient d'un document.
     
     CONTEXTE DOCUMENTS :
     ${contextPrompt}`;
@@ -56,7 +54,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: targetModel, 
-        prompt: `${systemPrompt}\n\nQuestion de AHMED: ${input.text}\n\nRéponse personnalisée en français:`,
+        prompt: `${systemPrompt}\n\nQuestion : ${input.text}\n\nRéponse en français :`,
         stream: false,
         options: {
           temperature: 0.7,
@@ -68,35 +66,20 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Fallback amical si Ollama est hors ligne
-      const lowerText = input.text.toLowerCase();
-      if (["bonjour", "bonsoir", "salut"].some(g => lowerText.includes(g))) {
-        return {
-          answer: `Bonjour AHMED ! Ravi de vous voir. Le service IA local est momentanément indisponible, mais je reste à votre disposition pour vos documents.`,
-          sources: []
-        };
-      }
       return {
-        answer: "Désolé AHMED, le moteur IA local ne répond pas actuellement.",
+        answer: "Désolé, le service IA local est momentanément indisponible.",
         sources: [],
       };
     }
 
     const data = await response.json();
     return {
-      answer: data.response || "Désolé AHMED, je n'ai pas pu formuler de réponse.",
+      answer: data.response || "Désolé, je n'ai pas pu formuler de réponse.",
       sources: [],
     };
   } catch (error: any) {
-    const lowerText = input.text.toLowerCase();
-    if (["bonjour", "salut", "bonsoir"].some(g => lowerText.includes(g))) {
-      return {
-        answer: `Bonjour AHMED ! Comment puis-je vous aider aujourd'hui ?`,
-        sources: []
-      };
-    }
     return {
-      answer: "Désolé AHMED, une erreur technique empêche la connexion à l'IA locale.",
+      answer: "Désolé, une erreur technique empêche la connexion à l'IA locale.",
       sources: [],
     };
   }

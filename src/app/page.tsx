@@ -5,10 +5,8 @@ import Chat from '@/components/chat/Chat';
 import Upload from '@/components/upload/Upload';
 import { 
   Bot, 
-  Settings, 
   MessageSquare, 
   ShieldCheck, 
-  HelpCircle, 
   HardDrive, 
   Menu, 
   ChevronLeft, 
@@ -21,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
- * Main entry point for the Agentic Personal Assistant for AHMED.
+ * Interface principale de l'Assistant Intelligent.
  */
 export default function HomePage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -38,7 +36,7 @@ export default function HomePage() {
         {!collapsed && (
           <div className="animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="font-bold text-white tracking-tighter text-lg leading-none">AGENTIC</div>
-            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">AHMED Pro Assistant</div>
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Pro Assistant</div>
           </div>
         )}
       </Link>
@@ -122,12 +120,12 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
-                  <SheetTitle className="sr-only">AHMED Pro Assistant Navigation</SheetTitle>
+                  <SheetTitle className="sr-only">Navigation Assistant</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="font-bold text-white text-sm uppercase tracking-widest">Agentic AHMED</h1>
+            <h1 className="font-bold text-white text-sm uppercase tracking-widest">Agentic Assistant</h1>
           </div>
         </header>
         

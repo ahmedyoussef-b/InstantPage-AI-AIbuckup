@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * StepByStepGuide - Interface de guidage interactif pour AHMED.
- * Protégé contre les erreurs de JSON vide.
+ * StepByStepGuide - Interface de guidage interactif.
  */
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -67,7 +66,7 @@ export default function StepByStepGuide() {
     if (currentStepIdx + 1 < procedure.procedure.totalSteps) {
       setCurrentStepIdx(currentStepIdx + 1);
     } else {
-      alert("Félicitations AHMED, procédure terminée !");
+      alert("Procédure terminée avec succès.");
     }
   };
 
@@ -77,14 +76,14 @@ export default function StepByStepGuide() {
       const response = await fetch('/api/procedure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'help', problem: 'Besoin de précisions', sessionId: 'AHMED_PRO' })
+        body: JSON.stringify({ action: 'help', problem: 'Besoin de précisions techniques', sessionId: 'PRO_SESSION' })
       });
       
       if (!response.ok) throw new Error("Erreur serveur");
       const data = await response.json();
       setHelpResponse(data.help || "Aucune aide disponible.");
     } catch {
-      setHelpResponse("Désolé AHMED, je n'ai pas pu contacter l'assistant.");
+      setHelpResponse("Désolé, je n'ai pas pu contacter l'assistant technique.");
     } finally {
       setIsAskingHelp(false);
     }
@@ -95,7 +94,7 @@ export default function StepByStepGuide() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-white uppercase tracking-tight">{procedure.procedure.title}</h2>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Session pour AHMED</p>
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Session de guidage</p>
         </div>
         <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/20">Étape {etape.number}</Badge>
       </div>
@@ -158,7 +157,7 @@ export default function StepByStepGuide() {
               className="border-white/10 hover:bg-white/5 h-12 rounded-xl text-gray-400 font-bold uppercase tracking-tighter"
             >
               {isAskingHelp ? <Loader2 className="animate-spin w-4 h-4" /> : <HelpCircle className="w-4 h-4 mr-2" />}
-              Aide AHMED
+              Aide Technique
             </Button>
           </div>
         </CardContent>
