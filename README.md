@@ -2,7 +2,7 @@
 
 AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données.
 
-## 🚀 Les 11 Innovations Majeures
+## 🚀 Les 12 Innovations Majeures
 
 ### 1. Architecture Multi-Modèles & Routeur Sémantique
 Le système dirige chaque question vers le modèle le plus adapté (Phi-3 pour la technique, Llama-3 pour le légal, etc.).
@@ -36,6 +36,9 @@ Résistance aux hallucinations par génération de multiples chemins de raisonne
 
 ### 11. Arbre de Décision Latent (Latent Decision Tree)
 Exploration exhaustive des bifurcations logiques pour les choix et stratégies complexes.
+
+### 12. Raisonnement Analogique (Analogical Reasoning)
+Transfert de solutions basées sur l'expérience passée et les problèmes similaires résolus.
 
 ## 🛠️ Stack Technique
 

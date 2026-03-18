@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais le moteur d'apprentissage continu pour le post-traitement.
+ * Intègre désormais le moteur d'apprentissage continu et la mémoire analogique.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -10,6 +10,7 @@ import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V12';
+const ANALOGY_KEY = 'AGENTIC_ANALOGIES_V1';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -30,6 +31,24 @@ const saveLocalFS = (fs: FileSystemItem[]) => {
   } catch (e: any) {
     console.error("[API_CLIENT] Quota localStorage dépassé ou erreur critique :", e.message);
   }
+};
+
+const loadAnalogies = (): any[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(ANALOGY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+};
+
+const saveAnalogy = (problem: string, solution: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = loadAnalogies();
+    // On ne garde que les 50 meilleures analogies pour préserver le stockage
+    const updated = [{ problem, solution, timestamp: Date.now() }, ...current].slice(0, 50);
+    localStorage.setItem(ANALOGY_KEY, JSON.stringify(updated));
+  } catch {}
 };
 
 export const api = {
@@ -72,11 +91,12 @@ export const api = {
     }
   },
 
-  async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
+  async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[]; isAnalogical?: boolean }> {
     try {
       const fs = loadLocalFS();
       const files = fs.filter(i => i.type === 'file');
       const context = await hybridRAG.retrieve(query, files);
+      const analogies = loadAnalogies();
       
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
@@ -86,10 +106,10 @@ export const api = {
       const response = await serverChat({ 
         text: query, 
         history: genkitHistory,
-        documentContext: context
+        documentContext: context,
+        analogyMemory: analogies
       });
 
-      // Innovation : Application des règles d'apprentissage continu (Post-traitement)
       const correctedAnswer = continuousLearning.applyRules(response.answer);
       
       return {
@@ -103,7 +123,12 @@ export const api = {
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
-    return await continuousLearning.recordCorrection(original, corrected);
+    const success = await continuousLearning.recordCorrection(original, corrected);
+    if (success) {
+      // Si l'utilisateur corrige, on sauvegarde comme une analogie positive
+      saveAnalogy(original, corrected);
+    }
+    return success;
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
@@ -130,11 +155,13 @@ export const api = {
 
   async clearAll(): Promise<boolean> {
     saveLocalFS([]);
+    localStorage.removeItem(ANALOGY_KEY);
     return true;
   },
 
-  async getStats(): Promise<Stats & { rulesCount: number }> {
+  async getStats(): Promise<Stats & { rulesCount: number; analogiesCount: number }> {
     const fs = loadLocalFS();
+    const analogies = loadAnalogies();
     let docs = 0, chunks = 0, size = 0;
     fs.forEach(i => {
       if (i.type === 'file') {
@@ -152,7 +179,8 @@ export const api = {
         used: `${(size / 1024).toFixed(1)} KB`, 
         free: "Stable" 
       },
-      rulesCount: continuousLearning.getRulesCount()
+      rulesCount: continuousLearning.getRulesCount(),
+      analogiesCount: analogies.length
     };
   },
 
