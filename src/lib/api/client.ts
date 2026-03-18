@@ -1,6 +1,6 @@
 /**
- * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais l'Intelligence Collective (Innovation 32).
+ * @fileOverview API Client Elite - Orchestration des 32 innovations côté client.
+ * Gère la persistence atomique du VFS et la boucle d'apprentissage continue.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -10,10 +10,10 @@ import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
-import { getPendingReviews, type KnowledgeItem } from '@/ai/learning/spaced-repetition';
+import { getPendingReviews, type KnowledgeItem, calculateNextReview } from '@/ai/learning/spaced-repetition';
 import { shareKnowledge } from '@/ai/learning/collaborative-network';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
+const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
 const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
@@ -77,14 +77,6 @@ const saveRepetitionItems = (items: KnowledgeItem[]) => {
   localStorage.setItem(REPETITION_KEY, JSON.stringify(items));
 };
 
-const loadDemonstrations = (): any[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(DEMO_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch { return []; }
-};
-
 let lastQueryTime = 0;
 let lastQueryText = '';
 
@@ -103,8 +95,9 @@ export const api = {
       content: text,
       uploadedAt: new Date().toISOString(),
       parentId,
-      tags: result.concepts
-    };
+      tags: result.concepts,
+      graphNodes: result.graphData?.nodes
+    } as any;
 
     saveLocalFS([...fs, newFile]);
     return { success: true, chunks: result.chunks, docId: result.docId };
@@ -113,8 +106,9 @@ export const api = {
   async chat(query: string, history: any[] = []): Promise<any> {
     const fs = loadLocalFS();
     const files = fs.filter(i => i.type === 'file');
+    
+    // Phase 1: Comprendre (Context Retrieval)
     const context = await hybridRAG.retrieve(query, files);
-    const demonstrations = loadDemonstrations();
     const episodicMemory = loadMemory();
     const distilledRules = loadDistilledRules();
     const repetitionItems = loadRepetitionItems();
@@ -123,7 +117,8 @@ export const api = {
     implicitRL.loadProfile();
     const now = Date.now();
     
-    if (lastQueryText && query.length > 5 && now - lastQueryTime < 30000) {
+    // Innovation 26: Signal de reformulation (Hesitation/Correction)
+    if (lastQueryText && now - lastQueryTime < 30000) {
       if (query.toLowerCase().includes(lastQueryText.toLowerCase().substring(0, 10))) {
         await implicitRL.processSignal('REFORMULATION', { isLong: false });
       }
@@ -133,48 +128,49 @@ export const api = {
     lastQueryText = query;
 
     const rlDirective = implicitRL.getSystemDirective();
-    
     const genkitHistory = history.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       content: [{ text: msg.text || '' }]
     }));
     
+    // Appel au Cerveau Central (Server Action)
     const response = await serverChat({ 
       text: query + (rlDirective ? ` ${rlDirective}` : ""), 
       history: genkitHistory,
       documentContext: context,
-      demonstrationHistory: demonstrations,
       episodicMemory: episodicMemory,
       distilledRules: distilledRules,
       pendingReviews: pendingReviews
     });
 
+    // Innovation 8: Post-traitement Apprentissage Continu
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
-    // Innovation 28 & 32: Sauvegarde et Partage des règles distillées
+    // Innovation 28 & 32: Sauvegarde et Partage des connaissances
     if (response.distillationPerformed && response.newDistilledRules) {
-      const mergedRules = [...response.newDistilledRules, ...distilledRules].slice(0, 30);
+      const mergedRules = [...response.newDistilledRules, ...distilledRules].slice(0, 50);
       saveDistilledRules(mergedRules);
       
-      // Partager les nouvelles règles avec le réseau (Innovation 32)
       for (const rule of response.newDistilledRules) {
         shareKnowledge(INSTANCE_ID, rule).catch(() => {});
       }
     }
 
+    // Phase 4: Apprendre (Update Memory & Spaced Repetition)
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
         id: `epi-${Math.random().toString(36).substring(7)}`,
         timestamp: Date.now()
       }, ...episodicMemory];
-      saveMemory(updatedMemory);
+      await saveMemory(updatedMemory);
       
-      if (response.confidence > 0.85 && response.newMemoryEpisode.content.length > 50) {
+      // Auto-création item de révision si importance élevée
+      if (response.confidence > 0.8 && response.newMemoryEpisode.content.length > 40) {
         const newItem: KnowledgeItem = {
           id: `rep-${Math.random().toString(36).substring(7)}`,
           content: response.newMemoryEpisode.content,
-          concept: response.newMemoryEpisode.tags[0] || 'Général',
+          concept: response.newMemoryEpisode.tags[0] || 'Technique',
           stability: 1,
           difficulty: 0.3,
           lastReview: Date.now(),
@@ -185,10 +181,7 @@ export const api = {
       }
     }
 
-    return { 
-      ...response, 
-      answer: correctedAnswer
-    };
+    return { ...response, answer: correctedAnswer };
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
@@ -211,11 +204,16 @@ export const api = {
     return { ...newFolder, children: [] };
   },
 
-  async getStats(): Promise<any> {
+  async getStats(): Promise<Stats> {
     const fs = loadLocalFS();
     let size = 0;
     fs.forEach(i => { if (i.type === 'file') size += (i.size || 0); });
-    return { totalDocuments: fs.filter(i => i.type === 'file').length, totalSize: size };
+    return { 
+      totalDocuments: fs.filter(i => i.type === 'file').length, 
+      totalChunks: fs.reduce((acc, curr) => acc + (curr.chunks || 0), 0),
+      totalSize: size,
+      diskSpace: { used: `${(size / (1024*1024)).toFixed(2)} MB`, total: '500 MB', free: '...' }
+    };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
@@ -233,6 +231,7 @@ export const api = {
     const fs = loadLocalFS();
     const file = fs.find(i => i.id === docId);
     if (!file || !file.content) return [];
-    return [{ id: '1', text: file.content.substring(0, 1000), index: 1 }];
+    // Simulation découpage segments
+    return [{ id: 'c1', docId, index: 1, text: file.content.substring(0, 1000), size: 1000 }];
   }
 };

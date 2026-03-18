@@ -1,110 +1,54 @@
-# AGENTIC - Assistant IA Professionnel Hybrid RAG (Elite 32)
+# AGENTIC - Assistant IA Professionnel Elite 32 (Full cognitive loop)
 
-AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 32 innovations majeures consolidées.
+AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à **32 innovations majeures** consolidées en 4 phases cognitives.
 
-## 🚀 Les 32 Innovations Majeures (Elite Architecture)
+## 🚀 L'Architecture Elite 32 (AI Complete)
 
-### 1. Architecture Multi-Modèles & Routeur Sémantique
-Le système dirige chaque question vers le modèle le plus adapté (Llama 3, Phi-3, TinyLlama) pour une précision maximale.
+### PHASE 1 : COMPRENDRE (Understand)
+1. **RAG Hybride (Vectoriel + Graphe + Temporel)** : Fusion sémantique pour un contexte optimal.
+2. **Architecture Multi-Modèles & Routeur Sémantique** : Dirige chaque tâche vers le modèle optimal.
+3. **Cache Sémantique Intelligent** : Réduction de la latence par détection de similarité.
+4. **Knowledge Graph Local Automatique** : Extraction des relations techniques entre documents.
+5. **Prompt Engineering Dynamique Adaptatif** : Ajustement des instructions selon l'intention.
+6. **Support de Modèles Quantifiés Spécialisés** : Optimisation pour l'exécution fluide (~350MB).
+7. **Intelligence Collective (Innovation 32)** : Apprentissage collaboratif anonymisé entre instances.
+8. **Analyse de Tâches Multi-Dimensionnelle** : Détection de complexité, nouveauté et ambiguïté.
 
-### 2. Cache Sémantique Intelligent
-Réduction drastique de la latence grâce à la détection sémantique des questions similaires via embeddings.
+### PHASE 2 : RAISONNER (Reason)
+9. **Chaîne de Pensée (CoT) Dynamique** : Décomposition logique adaptée à la difficulté.
+10. **Vérification Auto-Consistante (Self-Consistency)** : Résistance aux hallucinations par vote majoritaire.
+11. **Arbre de Décision Latent (Latent Decision Tree)** : Exploration des bifurcations logiques complexes.
+12. **Raisonnement Analogique & Transfert** : Utilisation de solutions passées pour de nouveaux problèmes.
+13. **Méta-cognition (Self-Awareness)** : L'IA évalue sa propre confiance et admet son ignorance.
+14. **Raisonnement Contrefactuel** : Analyse des causes racines via scénarios "Et si".
+15. **Raisonnement Modulaire** : Collaboration de modules (Logique, Causal, Mathématique).
+16. **Raisonnement par Contraste (Contrastive Reasoning)** : Clarification via exploration des opposés.
 
-### 3. RAG Hybride (Vectoriel + Graphe + Temporel)
-Fusion de trois sources de contexte : recherche vectorielle, graphe de relations et fraîcheur temporelle des documents.
+### PHASE 3 : AGIR (Act)
+17. **Toolformer Local** : Utilisation autonome d'outils (Calcul, Recherche, Shell).
+18. **Planification Hiérarchique** : Structuration des missions en plans atomiques.
+19. **Exécution Réversible (Undo/Snapshot)** : Sécurisation des actions par snapshots.
+20. **Orchestration Multi-Agents Spécialisés** : Déploiement d'une équipe d'experts IA synchronisés.
+21. **Validation Contextuelle avant Exécution** : Pare-feu de sécurité analysant les risques.
+22. **Apprentissage par Démonstration** : L'IA reproduit vos workflows complexes.
+23. **Workflow Asynchrone Non-Bloquant** : Traitement des tâches lourdes en arrière-plan.
+24. **Actions Prédictives Proactives** : Suggestion de l'action suivante avant la demande.
 
-### 4. Knowledge Graph Local Automatique
-Extraction automatique des relations thématiques pour construire un graphe de connaissances local persistant.
-
-### 5. Prompt Engineering Dynamique Adaptatif
-Ajustement en temps réel des instructions système (Expert, Analyste, Modérateur) selon l'intention détectée.
-
-### 6. Chaîne de Pensée (CoT) Dynamique
-Décomposition des problèmes complexes en étapes logiques dont la profondeur s'adapte à la difficulté détectée.
-
-### 7. Support de Modèles Quantifiés Spécialisés
-Optimisé pour le chargement de modèles ultra-légers (q4_k_m, ~350MB) garantissant une exécution fluide sur matériel modeste.
-
-### 8. Apprentissage Continu Ultra-Léger
-L'IA apprend de vos corrections manuelles pour s'auto-corriger localement via un système de règles persistantes.
-
-### 9. Raisonnement par Contraste (Contrastive Reasoning)
-Clarification des concepts techniques complexes en explorant systématiquement ce qu'ils ne sont pas.
-
-### 10. Vérification Auto-Consistante (Self-Consistency)
-Résistance aux hallucinations par génération de multiples chemins de raisonnement indépendants et vote majoritaire.
-
-### 11. Arbre de Décision Latent (Latent Decision Tree)
-Exploration exhaustive des bifurcations logiques pour les choix stratégiques complexes sans construction explicite.
-
-### 12. Raisonnement Analogique (Analogical Reasoning)
-Transfert de solutions basées sur l'expérience passée et les problèmes similaires résolus et mémorisés.
-
-### 13. Méta-cognition (Self-Awareness)
-L'IA évalue sa propre compréhension et son niveau de confiance avant de répondre, admettant son ignorance si nécessaire.
-
-### 14. Raisonnement Contrefactuel (Counterfactual Reasoning)
-Exploration des scénarios "Et si" pour identifier les causes racines profondes des pannes ou retards.
-
-### 15. Raisonnement Modulaire (Modular Reasoning)
-Décomposition des questions en modules spécialisés (Logique, Causal, Mathématique) collaborant en parallèle.
-
-### 16. Raisonnement Collaboratif (Collaborative Reasoning)
-Dialogue interne entre plusieurs instances d'IA qui se critiquent et s'améliorent mutuellement sur plusieurs cycles.
-
-### 17. Toolformer Local - Auto-apprentissage d'outils
-L'IA décide d'utiliser des outils (Calcul, Search, Shell) de manière autonome avec cycle de prédiction-vérification.
-
-### 18. Planification Hiérarchique (Hierarchical Planning)
-Décomposition des tâches complexes en sous-actions atomiques avec validation multi-niveaux.
-
-### 19. Exécution Réversible (Reversible Actions)
-Sécurisation des actions de l'IA par snapshots et historique complet permettant l'annulation (Undo) instantanée.
-
-### 20. Orchestration Multi-Agents Spécialisés
-Déploiement d'une équipe d'experts IA (Analyste, Technicien, Sécurité) collaborant en temps réel pour une précision d'élite.
-
-### 21. Validation Contextuelle avant Exécution
-Pare-feu de sécurité analysant la pertinence et le risque de chaque action par rapport au contexte avant toute exécution réelle.
-
-### 22. Apprentissage par Démonstration (Learning from Demonstration)
-L'IA observe les actions de l'utilisateur et apprend à reproduire des workflows complexes pour automatiser les tâches répétitives.
-
-### 23. Workflow Asynchrone Non-Bloquant
-Exécution des tâches lourdes en arrière-plan avec suivi de progression, permettant une utilisation fluide du chat en parallèle.
-
-### 24. Actions Prédictives Proactives
-Analyse des patterns temporels et contextuels pour suggérer la prochaine action pertinente avant même qu'elle ne soit demandée.
-
-### 25. Mémoire Épisodique Multi-Niveaux (Cognition Temporelle)
-Gestion de la mémoire à horizons temporels (Travail, Court terme, Long terme) avec oubli sémantique intelligent.
-
-### 26. Apprentissage par Renforcement Implicite (Implicit RL)
-L'IA déduit des signaux de récompense à partir de vos comportements (reformulations, hésitations) pour ajuster ses politiques.
-
-### 27. Curriculum Learning Adaptatif
-Organisation pédagogique de l'apprentissage (ZPD) adaptée dynamiquement au niveau de maîtrise détecté de l'utilisateur.
-
-### 28. Distillation Continue des Connaissances
-Synthèse périodique des interactions et souvenirs en règles compactes et modèles par domaine pour une efficacité maximale.
-
-### 29. Réactivation Espacée Optimisée (Spaced Repetition)
-Planification de révisions périodiques des concepts techniques critiques pour optimiser la rétention à long terme.
-
-### 30. Transfert Cross-Domaine Intelligent
-Capacité à extraire l'essence d'un concept appris dans un domaine pour l'adapter et l'appliquer à un nouveau contexte.
-
-### 31. Méta-Apprentissage (Learning to Learn)
-Auto-optimisation du processus d'apprentissage de l'IA, sélectionnant la meilleure stratégie de raisonnement selon la tâche.
-
-### 32. Écosystème d'Apprentissage Collaboratif
-Partage sécurisé de connaissances anonymisées entre instances locales pour une intelligence collective sans fuite de données.
+### PHASE 4 : APPRENDRE (Learn)
+25. **Mémoire Épisodique Multi-Niveaux** : Gestion temporelle (Travail, Court terme, Long terme).
+26. **Apprentissage par Renforcement Implicite (Implicit RL)** : Adaptation via vos signaux naturels.
+27. **Curriculum Learning Adaptatif (ZPD)** : Progression pédagogique du simple au complexe.
+28. **Distillation Continue des Connaissances** : Synthèse des logs en règles compactes.
+29. **Réactivation Espacée (Spaced Repetition)** : Révisions périodiques des concepts critiques.
+30. **Transfert Cross-Domaine Intelligent** : Application du savoir d'un domaine à un autre.
+31. **Méta-Apprentissage (Learning to Learn)** : Auto-optimisation du processus de réflexion.
+32. **Écosystème Collaboratif Privé** : Partage de patterns universels sans fuite de données.
 
 ## 🛠️ Stack Technique
 
 - **Frontend** : Next.js 15 (App Router), React 19, Tailwind CSS, ShadCN UI.
 - **AI Engine** : Genkit 1.x, Ollama (Modèles locaux), Embeddings GoogleAI.
-- **Storage** : Virtual File System (VFS) persistant atomique via LocalStorage Browser.
+- **Storage** : Virtual File System (VFS) persistant via LocalStorage Browser.
 - **Voice** : STT (WebSpeech/Vosk) & TTS (Piper/Edge local).
 
 ---

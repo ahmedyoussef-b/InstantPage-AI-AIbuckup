@@ -1,4 +1,8 @@
 'use server';
+/**
+ * @fileOverview Elite 32 Orchestrator - Le cerveau central d'AGENTIC.
+ * Coordonne les 32 innovations à travers les 4 phases : Comprendre, Raisonner, Agir, Apprendre.
+ */
 
 import { z } from 'genkit';
 import { semanticRouter } from '@/ai/router';
@@ -22,6 +26,8 @@ import { generateReviewQuestion, type KnowledgeItem } from '@/ai/learning/spaced
 import { transferKnowledge, detectTransferNeed, type TransferResult } from '@/ai/learning/transfer-learning';
 import { extractTaskFeatures, selectOptimalStrategy, getMetaLearningDirective } from '@/ai/learning/meta-learning';
 import { learnFromNetwork } from '@/ai/learning/collaborative-network';
+import { modularReasoner } from '@/ai/reasoning/modular';
+import { latentTree } from '@/ai/reasoning/latent-tree';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -62,6 +68,9 @@ const ChatOutputSchema = z.object({
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
+/**
+ * Point d'entrée principal de l'IA Elite 32.
+ */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     const q = input.text.toLowerCase();
@@ -79,50 +88,50 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let activeMetaStrategy: string = "";
     let collaborativeInsight: string = "";
 
-    // 0. Innovation 31: Méta-Apprentissage
+    // --- PHASE 1: COMPRENDRE (Understand) ---
+    
+    // Innovation 31: Méta-Apprentissage (Analyse pré-générative)
     const taskFeatures = await extractTaskFeatures(input.text, docContext);
     const metaStrategy = await selectOptimalStrategy(taskFeatures);
     activeMetaStrategy = metaStrategy.name;
     const metaDirective = await getMetaLearningDirective(metaStrategy);
     docContext += ` ${metaDirective}`;
 
-    // 0.1 Innovation 32: Intelligence Collective (Consultation du réseau)
+    // Innovation 32: Intelligence Collective
     collaborativeInsight = await learnFromNetwork(input.text);
-    if (collaborativeInsight) {
-      docContext += `\n[NOTE RÉSEAU : ${collaborativeInsight}]`;
-    }
+    if (collaborativeInsight) docContext += `\n[NETWORK_KNOWLEDGE: ${collaborativeInsight}]`;
 
-    // 0.2 Innovation 25: Rappel de mémoire épisodique
+    // Innovation 25: Rappel Épisodique
     const memory = await recall(input.text, (input.episodicMemory || []) as Episode[]);
-    if (memory.summary) {
-      docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
-    }
+    if (memory.summary) docContext += `\n[MEMORY_CONTEXT: ${memory.summary}]`;
 
-    // 0.3 Innovation 30: Détection de besoin de transfert cross-domaine
+    // Innovation 30: Transfert Cross-Domaine
     const transferNeed = await detectTransferNeed(input.text);
     if (transferNeed) {
       crossDomainTransferResult = await transferKnowledge(transferNeed.concept, transferNeed.source, transferNeed.target);
-      docContext += `\n[TRANSFERT DÉTECTÉ : ${crossDomainTransferResult.adaptedConcept} appliqué à ${crossDomainTransferResult.targetDomain}]`;
+      docContext += `\n[TRANSFER_KNOWLEDGE: ${crossDomainTransferResult.adaptedConcept}]`;
     }
 
-    // 0.4 Innovation 28: Application des règles distillées
+    // Innovation 28: Règles Distillées
     if (input.distilledRules && input.distilledRules.length > 0) {
       const rulesContext = await getApplicableRules(input.text, input.distilledRules as DistilledRule[]);
       if (rulesContext) docContext += ` ${rulesContext}`;
     }
 
-    // 0.5 Innovation 27: Curriculum Adaptatif
+    // Innovation 27: Curriculum
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
 
-    // 0.6 Innovation 29: Réactivation Espacée
-    if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.6) {
+    // Innovation 29: Réactivation (Préparation question)
+    if (input.pendingReviews && input.pendingReviews.length > 0 && Math.random() > 0.7) {
       const itemToReview = input.pendingReviews[0] as KnowledgeItem;
       reviewQuestion = await generateReviewQuestion(itemToReview.content, itemToReview.concept);
     }
 
-    // 1. Innovation 23: Workflow Asynchrone
+    // --- PHASE 3: AGIR (Act) - Prévue avant raisonnement car peut court-circuiter ---
+    
+    // Innovation 23: Workflow Asynchrone
     if (q.match(/audit complet|analyse massive|traitement profond|longue tâche/i)) {
       const taskId = await submitWorkflow('ANALYSIS_HEAVY', input.text);
       return {
@@ -133,58 +142,46 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 2. Innovation 19: Réversibilité
+    // Innovation 19: Réversibilité
     if (q.match(/annuler|undo|effacer dernière action/i)) {
       const undoResult = await undoLastAction();
-      return {
-        answer: undoResult.message,
-        confidence: 1.0,
-        undoAvailable: false,
-        metaStrategy: activeMetaStrategy
-      };
+      return { answer: undoResult.message, confidence: 1.0, undoAvailable: false, metaStrategy: activeMetaStrategy };
     }
 
-    // 3. Innovation 22 & 24: Apprentissage par démonstration & Prédiction proactive
+    // Innovation 22 & 24: Démonstration & Prédiction
     const history = (input.demonstrationHistory || []) as Demonstration[];
     if (history.length > 0) {
       const policies = await extractPoliciesFromHistory(history);
       const suggestedAction = await suggestActionFromPolicy(input.text, docContext, policies);
       if (suggestedAction) {
         demoPolicyApplied = true;
-        docContext += `\n[ACTION APPRISE DÉTECTÉE: ${suggestedAction.type}]`;
+        docContext += `\n[POLICY_ACTION: ${suggestedAction.type}]`;
       }
       proactiveSuggestions = await predictNextActions(history, input.text + " " + docContext);
     }
 
-    // 4. Innovation 20: Orchestration Multi-Agents
+    // Innovation 20: Orchestration Multi-Agents
     if (q.length > 300 || q.includes('audit technique complet') || q.includes('analyse multi-agents')) {
       const orchestration = await orchestrateMultiAgents(input.text, docContext);
-      multiAgentActive = true;
       return {
         answer: orchestration.finalAnswer,
         confidence: orchestration.consensusScore,
         multiAgentActive: true,
         proactiveSuggestions,
         pedagogicalLevel: pedaLevel,
-        metaStrategy: activeMetaStrategy,
-        collaborativeInsight
+        metaStrategy: activeMetaStrategy
       };
     }
 
-    // 5. Innovation 17 & 18: Toolformer & Planification Hiérarchique
+    // Innovation 17 & 18: Toolformer & Planification
     const actionDecision = await toolformer.decideAction(input.text, docContext);
-    
-    if (q.match(/préparer|planifier|organiser|décomposer/i) || q.length > 150) {
+    if (q.match(/préparer|planifier|organiser|décomposer/i) || taskFeatures.complexity > 0.8) {
       const plan = await getHierarchicalPlan(input.text, docContext);
       const validation = await validateAction({ type: 'PLANIFICATION', task: input.text }, docContext);
       
       if (!validation.valid) {
-        const alternative = await suggestAlternative({ type: 'PLANIFICATION', task: input.text }, validation.reason || "");
-        return { 
-          answer: `⚠️ **Sécurité**: ${validation.reason}\n\n${alternative ? `Alternative sécurisée suggérée : ${JSON.stringify(alternative)}` : ""}`, 
-          confidence: 0.1,
-          metaStrategy: activeMetaStrategy
-        };
+        const alt = await suggestAlternative({ type: 'PLANIFICATION', task: input.text }, validation.reason || "");
+        return { answer: `⚠️ **Sécurité**: ${validation.reason}\n\n${alt ? `Alternative : ${JSON.stringify(alt)}` : ""}`, confidence: 0.1 };
       }
 
       prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
@@ -192,38 +189,38 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       await recordAction('PLANIFICATION', { task: input.text }, docContext);
       undoAvailable = true;
     } else if (actionDecision.type === 'use_tool') {
-      const validation = await validateAction(actionDecision, docContext);
-      if (validation.valid) {
+      const val = await validateAction(actionDecision, docContext);
+      if (val.valid) {
         await recordAction(actionDecision.tool || 'tool', actionDecision.params, docContext);
         undoAvailable = true;
         prefixOutput = `🔧 **Action Toolformer** : \`${actionDecision.tool}\` (${actionDecision.expectedOutcome})\n\n`;
       }
     }
 
-    // 6. Génération avec Méta-cognition (Innovation 13)
+    // --- PHASE 2: RAISONNER (Reason) ---
+    
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
+      // Innovation 12: Analogie
       if (input.analogyMemory && input.analogyMemory.length > 0) {
-        const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
-        if (analogResponse) return analogResponse;
+        const analogRes = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
+        if (analogRes) return analogRes;
       }
       
+      // Innovation 9: Contraste
       if (query.match(/différence|versus|vs|comparer/i)) return await contrastiveReasoning.reason(query, ctx);
 
-      const targetModel = await semanticRouter.route(query, ctx.length > 100);
-      const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
-      
-      const { ai } = await import('@/ai/genkit');
-      const response = await ai.generate({ 
-        model: `ollama/${targetModel}`, 
-        prompt: optimizedPrompt, 
-        config: { temperature: 0.4 } 
-      });
-      return response.text;
+      // Innovation 11: Arbre Latent (si ambiguïté élevée)
+      if (taskFeatures.ambiguity > 0.7) return await latentTree.reason(query, ctx);
+
+      // Innovation 15: Raisonnement Modulaire (Default Elite)
+      return await modularReasoner.reason(query, ctx);
     };
 
+    // Innovation 13: Méta-cognition (Auto-évaluation)
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
-    // 7. Innovation 25: Préparation de l'épisode de mémoire
+    // --- PHASE 4: APPRENDRE (Learn) ---
+    
     const newMemoryEpisode = {
       type: 'interaction',
       content: metaResult.answer.substring(0, 250),
@@ -232,8 +229,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       tags: [metaResult.confidence > 0.8 ? 'important' : 'routine', pedaLevel.toLowerCase()]
     };
 
-    // 8. Innovation 28: Déclenchement périodique de la distillation
-    if (input.episodicMemory && input.episodicMemory.length > 15 && Math.random() > 0.7) {
+    if (input.episodicMemory && input.episodicMemory.length > 15 && Math.random() > 0.8) {
       const distillation = await distillInteractions(input.episodicMemory as Episode[]);
       if (distillation.rules.length > 0) {
         distillationPerformed = true;
@@ -241,25 +237,14 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       }
     }
 
-    // 9. Innovation 27: Suggestion de la prochaine thématique
     const nextStep = await suggestNextTopic(input.text + " " + metaResult.answer);
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);
 
-    // Final answer formatting
+    // Final Formatting
     let finalAnswer = prefixOutput + metaResult.answer;
-    
-    if (crossDomainTransferResult) {
-      finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : Le concept "${crossDomainTransferResult.adaptedConcept}" a été adapté du domaine "${crossDomainTransferResult.sourceDomain}" vers "${crossDomainTransferResult.targetDomain}".`;
-    }
-
-    if (collaborativeInsight) {
-      finalAnswer += `\n\n---\n🌐 **RÉSEAU (Innovation 32)** : ${collaborativeInsight}`;
-    }
-
-    if (reviewQuestion) {
-      finalAnswer += `\n\n---\n💡 **RÉACTIVATION (Innovation 29)** : ${reviewQuestion}`;
-    }
+    if (crossDomainTransferResult) finalAnswer += `\n\n---\n🔀 **TRANSFERT (Innovation 30)** : ${crossDomainTransferResult.adaptedConcept} (Adapté de ${crossDomainTransferResult.sourceDomain})`;
+    if (reviewQuestion) finalAnswer += `\n\n---\n💡 **RÉACTIVATION (Innovation 29)** : ${reviewQuestion}`;
 
     return {
       answer: finalAnswer,
@@ -276,7 +261,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       distillationPerformed,
       newDistilledRules,
       reviewQuestion,
-      crossDomainTransfer: crossDomainTransferResult,
       metaStrategy: activeMetaStrategy,
       collaborativeInsight
     };
