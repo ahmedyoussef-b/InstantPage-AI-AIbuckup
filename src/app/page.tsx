@@ -72,10 +72,10 @@ export default function HomePage() {
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
              <div className="flex items-center gap-2">
                <Cpu className="w-4 h-4 text-yellow-400" />
-               <span className="text-[10px] font-black text-white uppercase tracking-widest">Modèle Spécialisé</span>
+               <span className="text-[10px] font-black text-white uppercase tracking-widest">Innovation AI</span>
              </div>
              <p className="text-[9px] text-gray-500 leading-relaxed">
-               Quantification 4-bit activée pour une précision maximale sur vos documents.
+               Le RAG Hybride combine sémantique et graphe de relations pour une précision maximale.
              </p>
           </div>
         )}
@@ -125,7 +125,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-white">
+                <Button variant="ghost" size="icon" className="text-white" aria-label="Ouvrir le menu">
                   <Menu className="w-6 h-6" />
                 </Button>
               </SheetTrigger>
@@ -136,7 +136,7 @@ export default function HomePage() {
                 <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="font-bold text-white text-sm uppercase tracking-widest text-center flex-1">Assistant AI</h1>
+            <h1 className="font-bold text-white text-sm uppercase tracking-widest text-center flex-1">Assistant Professionnel</h1>
           </div>
         </header>
         

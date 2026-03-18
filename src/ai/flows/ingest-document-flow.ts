@@ -1,6 +1,7 @@
 'use server';
 /**
  * @fileOverview Flux d'ingestion et de construction du graphe de connaissances (Logique Serveur).
+ * Implémente un fallback automatique si les modèles spécialisés (NER ONNX) sont absents.
  */
 
 import { ai } from '@/ai/genkit';
@@ -25,15 +26,16 @@ export type IngestOutput = z.infer<typeof IngestOutputSchema>;
 
 /**
  * Extrait les concepts et entités d'un texte via LLM.
- * Cette fonction s'exécute uniquement côté serveur.
+ * Résilience : Bascule sur un mode simplifié en cas d'erreur de modèle.
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
-    // Utilisation d'un modèle léger pour l'extraction de graphe
+    // Tentative d'extraction structurée via le modèle Ollama configuré
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 concepts les plus importants.",
-      prompt: `Extrait les concepts clés de ce texte (max 3) et présente-les sous la forme "Concept -> Relation -> Sujet" : "${text.substring(0, 800)}"`,
+      system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 relations les plus importantes entre les concepts.",
+      prompt: `Analyse ce document technique et extrait au maximum 3 relations clés sous le format "Sujet -> Relation -> Objet".
+      Contenu : "${text.substring(0, 1000)}"`,
     });
 
     const lines = response.text.split('\n').filter(l => l.includes('->'));
@@ -49,24 +51,24 @@ async function extractKnowledgeFromText(docId: string, text: string) {
 
         nodes.push({ id: subId, label: subject, type: 'concept' });
         nodes.push({ id: objId, label: object, type: 'entity' });
-        relations.push({ from: docId, to: subId, predicate: 'discute' });
+        relations.push({ from: docId, to: subId, predicate: 'décrit' });
         relations.push({ from: subId, to: objId, predicate: predicate });
       }
     });
 
-    // Fallback si aucune ligne structurée n'est retournée
+    // Fallback si l'IA n'a pas retourné de format structuré exploitable
     if (nodes.length === 1) {
-      nodes.push({ id: 'general_tech', label: 'Maintenance Technique', type: 'concept' });
-      relations.push({ from: docId, to: 'general_tech', predicate: 'concerne' });
+      nodes.push({ id: 'technical_base', label: 'Connaissances Techniques', type: 'concept' });
+      relations.push({ from: docId, to: 'technical_base', predicate: 'concerne' });
     }
 
     return { nodes, relations };
   } catch (e) {
-    console.warn("[AI][KNOWLEDGE-GRAPH] Échec de l'extraction IA, passage en mode simplifié.");
+    console.warn("[AI][INGEST] Échec de l'extraction IA (Modèle indisponible ?), passage en mode structurel.");
     return { 
       nodes: [
         { id: docId, label: 'Document', type: 'document' },
-        { id: 'auto_concept', label: 'Informations Techniques', type: 'concept' }
+        { id: 'base_info', label: 'Information Générale', type: 'concept' }
       ], 
       relations: [] 
     };
@@ -93,15 +95,15 @@ const ingestDocumentFlow = ai.defineFlow(
     outputSchema: IngestOutputSchema,
   },
   async (input) => {
-    console.log(`[SERVER][INGEST] Traitement de : ${input.fileName}`);
+    console.log(`[SERVER][INGEST] Traitement robuste de : ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
     const docId = Math.random().toString(36).substring(7);
 
-    // Construction du Graphe de Connaissances Automatique via LLM
+    // Construction du Graphe de Connaissances avec fallback automatique
     const { nodes, relations } = await extractKnowledgeFromText(docId, input.fileContent);
 
-    // Génération des Embeddings (Limité aux premiers segments pour la performance)
+    // Génération des Embeddings (Limité pour la performance locale)
     if (chunks.length > 0) {
       try {
         await ai.embedMany({
@@ -109,7 +111,7 @@ const ingestDocumentFlow = ai.defineFlow(
           content: chunks.slice(0, 3),
         });
       } catch (e) {
-        console.error(`[SERVER][INGEST] Erreur lors de la génération des embeddings :`, e);
+        console.warn(`[SERVER][INGEST] Service d'embedding indisponible, indexation vectorielle limitée.`);
       }
     }
 
