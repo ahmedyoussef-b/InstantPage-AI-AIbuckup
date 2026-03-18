@@ -5,6 +5,7 @@ import { semanticRouter } from '@/ai/router';
 import { semanticCache } from '@/ai/semantic-cache';
 import { dynamicPromptEngine } from '@/ai/dynamic-prompt';
 import { dynamicCoT } from '@/ai/reasoning/dynamic-cot';
+import { contrastiveReasoning } from '@/ai/reasoning/contrastive';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -22,24 +23,33 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat avec CoT Dynamique, Routage Sémantique et Cache Intelligent.
+ * Chat avec Raisonnement Avancé (CoT & Contrastif), Routage Sémantique et Cache.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  // Fonction de calcul de réponse (exécutée uniquement en cas de cache miss)
   const computeAnswer = async () => {
-    // 1. Analyse du besoin de raisonnement approfondi (Innovation 6: CoT Dynamique)
-    // On active le CoT pour les questions techniques longues ou les mots-clés critiques
-    const isTechnical = input.text.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|pression|dysfonctionnement|réparer/i);
-    
-    if (isTechnical && input.text.length > 25) {
-      console.log("[AI][CHAT] Activation de la Chaîne de Pensée Dynamique (Innovation 6)...");
-      return await dynamicCoT.reason(input.text, input.documentContext || "");
+    const q = input.text.toLowerCase();
+    const docContext = input.documentContext || "";
+
+    // 1. Analyse du type de raisonnement requis (Innovation 6 & 9)
+    const isDefinition = q.includes('qu\'est-ce que') || q.includes('définition') || q.includes('signifie');
+    const isComparison = q.includes('différence') || q.includes('comparer') || q.includes(' vs ');
+    const isTechnicalProblem = q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|pression|dysfonctionnement|réparer/i);
+
+    // Cas A : Raisonnement par Contraste (Innovation 9) pour les définitions et comparaisons
+    if ((isDefinition || isComparison) && docContext.length > 200) {
+      return await contrastiveReasoning.reason(input.text, docContext);
     }
 
-    // 2. Routage standard si CoT non requis
-    const hasContext = !!input.documentContext && input.documentContext.length > 100;
+    // Cas B : Chaîne de Pensée Dynamique (Innovation 6) pour les problèmes techniques complexes
+    if (isTechnicalProblem && input.text.length > 25) {
+      console.log("[AI][CHAT] Activation de la Chaîne de Pensée Dynamique (Innovation 6)...");
+      return await dynamicCoT.reason(input.text, docContext);
+    }
+
+    // 2. Routage standard si aucun mode spécial n'est requis
+    const hasContext = docContext.length > 100;
     const targetModel = await semanticRouter.route(input.text, hasContext);
-    const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, input.documentContext || "");
+    const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, docContext);
 
     try {
       const { ai } = await import('@/ai/genkit');
