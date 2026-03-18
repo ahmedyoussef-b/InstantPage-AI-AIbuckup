@@ -89,6 +89,7 @@ export default function HomePage() {
 
   return (
     <main className="h-screen flex bg-[#171717] overflow-hidden selection:bg-blue-500/30">
+      {/* Desktop Sidebar */}
       <aside className={cn(
         "flex-col hidden lg:flex border-r border-white/5 bg-[#171717] transition-all duration-300 relative z-30",
         isCollapsed ? "w-20" : "w-72"
@@ -104,7 +105,9 @@ export default function HomePage() {
         <SidebarContent collapsed={isCollapsed} />
       </aside>
 
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
+        {/* Mobile Header */}
         <header className="h-16 border-b border-white/5 flex items-center px-4 justify-between lg:hidden bg-[#171717] sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <Sheet>
@@ -115,6 +118,7 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
+                  {/* Accessiblity Fix: Added SheetTitle */}
                   <SheetTitle className="sr-only">Menu de Navigation</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
@@ -124,10 +128,12 @@ export default function HomePage() {
           </div>
         </header>
         
+        {/* Chat Interface */}
         <div className="flex-1 overflow-hidden relative">
           <Chat />
         </div>
         
+        {/* Document Ingestion Bar */}
         <Upload />
       </div>
     </main>

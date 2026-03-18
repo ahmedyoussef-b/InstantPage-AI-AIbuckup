@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Flux d'ingestion et de construction du graphe de connaissances.
+ * @fileOverview Flux d'ingestion et de construction du graphe de connaissances (Logique Serveur).
  */
 
 import { ai } from '@/ai/genkit';
@@ -24,18 +24,20 @@ const IngestOutputSchema = z.object({
 export type IngestOutput = z.infer<typeof IngestOutputSchema>;
 
 /**
- * Extrait les concepts et entités d'un texte (Logique serveur uniquement).
+ * Extrait les concepts et entités d'un texte via LLM.
+ * Cette fonction s'exécute uniquement côté serveur.
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
+    // Utilisation d'un modèle léger pour l'extraction de graphe
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un extracteur de graphe de connaissances. Identifie les 3 concepts clés et leurs relations.",
-      prompt: `Analyse ce texte et extrait les relations importantes au format "Sujet -> Relation -> Objet" : "${text.substring(0, 500)}"`,
+      system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 concepts les plus importants.",
+      prompt: `Extrait les concepts clés de ce texte (max 3) et présente-les sous la forme "Concept -> Relation -> Sujet" : "${text.substring(0, 800)}"`,
     });
 
     const lines = response.text.split('\n').filter(l => l.includes('->'));
-    const nodes: any[] = [{ id: docId, label: 'Document', type: 'document' }];
+    const nodes: any[] = [{ id: docId, label: 'Document Principal', type: 'document' }];
     const relations: any[] = [];
 
     lines.forEach(line => {
@@ -52,13 +54,22 @@ async function extractKnowledgeFromText(docId: string, text: string) {
       }
     });
 
-    return { 
-      nodes: nodes.length > 1 ? nodes : [{ id: docId, label: 'Document', type: 'document' }], 
-      relations 
-    };
+    // Fallback si aucune ligne structurée n'est retournée
+    if (nodes.length === 1) {
+      nodes.push({ id: 'general_tech', label: 'Maintenance Technique', type: 'concept' });
+      relations.push({ from: docId, to: 'general_tech', predicate: 'concerne' });
+    }
+
+    return { nodes, relations };
   } catch (e) {
-    console.warn("[AI][KNOWLEDGE-GRAPH] Échec extraction, mode dégradé.");
-    return { nodes: [{ id: docId, label: 'Document', type: 'document' }], relations: [] };
+    console.warn("[AI][KNOWLEDGE-GRAPH] Échec de l'extraction IA, passage en mode simplifié.");
+    return { 
+      nodes: [
+        { id: docId, label: 'Document', type: 'document' },
+        { id: 'auto_concept', label: 'Informations Techniques', type: 'concept' }
+      ], 
+      relations: [] 
+    };
   }
 }
 
@@ -82,15 +93,15 @@ const ingestDocumentFlow = ai.defineFlow(
     outputSchema: IngestOutputSchema,
   },
   async (input) => {
-    console.log(`[BACKEND][INGEST] Démarrage ingestion & graphe : ${input.fileName}`);
+    console.log(`[SERVER][INGEST] Traitement de : ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
     const docId = Math.random().toString(36).substring(7);
 
-    // Construction du Graphe de Connaissances Automatique
+    // Construction du Graphe de Connaissances Automatique via LLM
     const { nodes, relations } = await extractKnowledgeFromText(docId, input.fileContent);
 
-    // Génération des Embeddings (Limité)
+    // Génération des Embeddings (Limité aux premiers segments pour la performance)
     if (chunks.length > 0) {
       try {
         await ai.embedMany({
@@ -98,7 +109,7 @@ const ingestDocumentFlow = ai.defineFlow(
           content: chunks.slice(0, 3),
         });
       } catch (e) {
-        console.error(`[BACKEND][INGEST] Erreur embeddings:`, e);
+        console.error(`[SERVER][INGEST] Erreur lors de la génération des embeddings :`, e);
       }
     }
 

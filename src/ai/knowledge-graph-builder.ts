@@ -1,6 +1,6 @@
 /**
  * @fileOverview KnowledgeGraphBuilder - Consultation du graphe de connaissances local.
- * Les fonctions d'extraction lourdes ont été déplacées dans les flux serveurs.
+ * Les fonctions d'extraction lourdes (Genkit) sont isolées dans les flux serveurs.
  */
 
 export interface GraphNode {
@@ -17,7 +17,7 @@ export interface GraphRelation {
 
 /**
  * Recherche dans le graphe pour enrichir le contexte.
- * Utilisable côté client car ne dépend pas de Genkit.
+ * Utilisable côté client car ne dépend d'aucune librairie Node.js ou Genkit.
  */
 export async function queryKnowledgeGraph(query: string, availableNodes: any[]): Promise<string> {
   if (!availableNodes || availableNodes.length === 0) return "";
@@ -29,5 +29,6 @@ export async function queryKnowledgeGraph(query: string, availableNodes: any[]):
 
   if (relevantNodes.length === 0) return "";
 
-  return `CONNAISSANCES LIÉES (Graphe) : ${relevantNodes.map(n => n.label).join(', ')}.`;
+  const concepts = relevantNodes.map(n => n.label).join(', ');
+  return `CONNAISSANCES LIÉES (Graphe) : Cette question touche aux concepts suivants : ${concepts}.`;
 }
