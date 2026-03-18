@@ -9,7 +9,7 @@ import { detectCommunityPatterns } from '@/ai/learning/cross-user-learning';
 import { extractHierarchicalConcepts } from '@/ai/learning/concept-hierarchy';
 import { distillInteractions } from '@/ai/learning/knowledge-distillation';
 import { extractTaskFeatures, selectOptimalStrategy } from '@/ai/learning/meta-learning';
-import { runFullTrainingCycle } from '@/ai/training/training-pipeline';
+import { runDailyLearningCycle } from '@/ai/training/daily-learning-cycle';
 
 export interface ImprovementResult {
   consolidatedDocs: number;
@@ -35,7 +35,7 @@ export async function runNighttimeImprovement(context: {
   let newRulesCount = 0;
   let communityPatternsCount = 0;
 
-  // 1. Re-vectorisation et enrichissement des documents
+  // 1. Re-vectorisation et enrichissement des documents (Phase 5.3)
   for (const doc of context.documents) {
     if (doc.type === 'file') {
       const relatedMemory = context.memory.filter(e => 
@@ -54,26 +54,27 @@ export async function runNighttimeImprovement(context: {
     }
   }
 
-  // 2. Détection de patterns collectifs
+  // 2. Détection de patterns collectifs (Phase 32.2)
   const newPatterns = await detectCommunityPatterns(context.memory);
   communityPatternsCount = newPatterns.length;
 
-  // 3. Mise à jour de la hiérarchie pour les nouveaux docs
+  // 3. Mise à jour de la hiérarchie (Phase 32.1)
   for (const doc of context.documents.slice(0, 3)) {
     await extractHierarchicalConcepts(doc.content);
   }
 
-  // 4. Distillation globale des interactions
+  // 4. Distillation globale des interactions (Phase 28)
   const distillation = await distillInteractions(context.memory);
   newRulesCount = distillation.rules.length;
 
-  // 5. CYCLE D'ENTRAÎNEMENT ML LOCAL (Fine-Tuning)
-  const mlCycleResult = await runFullTrainingCycle({
+  // 5. CYCLE D'ENTRAÎNEMENT ML LOCAL (Fine-Tuning LoRA)
+  // Utilisation du cycle quotidien avec seuils de sécurité
+  const mlCycleResult = await runDailyLearningCycle({
     memory: context.memory,
     documents: context.documents
   });
 
-  // 6. Méta-optimisation de la stratégie
+  // 6. Méta-optimisation de la stratégie (Phase 31)
   if (context.memory.length > 0) {
     const lastTask = context.memory[0];
     const features = await extractTaskFeatures(lastTask.context, lastTask.content);
