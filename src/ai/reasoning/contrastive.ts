@@ -1,6 +1,5 @@
 /**
  * @fileOverview ContrastiveReasoning - Innovation 9 pour le raisonnement par opposition.
- * Aide l'IA à définir des concepts complexes en les comparant à ce qu'ils ne sont pas.
  */
 
 export class ContrastiveReasoning {
@@ -14,25 +13,24 @@ export class ContrastiveReasoning {
       // 1. Identifier le concept central
       const concept = await this.extractMainConcept(question);
       
-      // 2. Générer des contre-exemples pertinents basés sur le contexte
+      // 2. Générer des contre-exemples pertinents
       const counterExamples = await this.generateCounterExamples(concept, context);
       
-      if (counterExamples.length === 0) {
-        return this.directGenerate(question, context);
-      }
+      if (counterExamples.length === 0) return this.directGenerate(question, context);
 
-      // 3. Comparer systématiquement
-      const comparisons = [];
-      for (const counter of counterExamples) {
-        const diff = await this.compare(concept, counter, context);
-        comparisons.push({ counter, difference: diff });
-      }
+      // 3. Comparaison systématique
+      const comparisons = await Promise.all(
+        counterExamples.map(async counter => {
+          const diff = await this.compare(concept, counter, context);
+          return { counter, difference: diff };
+        })
+      );
       
-      // 4. Synthétiser par contraste
+      // 4. Synthèse par contraste
       return await this.synthesizeAnswer(concept, comparisons, question, context);
     } catch (error) {
       console.error("[AI][REASONING] Échec raisonnement contrastif:", error);
-      return "Une erreur est survenue lors de l'analyse comparative.";
+      return this.directGenerate(question, context);
     }
   }
 
@@ -40,7 +38,7 @@ export class ContrastiveReasoning {
     const { ai } = await import('@/ai/genkit');
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un extracteur de concept. Retourne uniquement le nom du concept principal (1-3 mots) de la question, sans ponctuation.",
+      system: "Retourne uniquement le mot clé principal (1-2 mots).",
       prompt: `Question: "${question}"`,
     });
     return response.text.trim() || "Sujet technique";
@@ -51,10 +49,10 @@ export class ContrastiveReasoning {
     try {
       const response = await ai.generate({
         model: 'ollama/tinyllama:latest',
-        system: "Tu es un expert technique. Identifie 2 concepts proches mais différents du concept fourni, présents ou suggérés dans le contexte.",
-        prompt: `Concept: ${concept}\nContexte: ${context}\n\nDonne 2 contre-exemples (un par ligne) :`,
+        system: "Identifie un concept proche mais différent de l'entrée.",
+        prompt: `Concept: ${concept}\nContexte: ${context.substring(0, 500)}\nDonne un contre-exemple :`,
       });
-      return response.text.split('\n').map(c => c.replace(/^\d+\.\s*/, '').trim()).filter(c => c && c !== concept).slice(0, 2);
+      return [response.text.trim()].filter(c => c && c !== concept);
     } catch (e) {
       return [];
     }
@@ -64,8 +62,7 @@ export class ContrastiveReasoning {
     const { ai } = await import('@/ai/genkit');
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un analyste technique. Explique en une phrase la différence clé entre les deux concepts fournis.",
-      prompt: `Concept A: ${concept}\nConcept B: ${counter}\nContexte: ${context}\n\nDifférence clé :`,
+      prompt: `Quelle est la différence majeure entre ${concept} et ${counter} ?`,
     });
     return response.text.trim();
   }
@@ -74,15 +71,7 @@ export class ContrastiveReasoning {
     const { ai } = await import('@/ai/genkit');
     const response = await ai.generate({
       model: 'ollama/phi3:mini',
-      system: "Tu es un Assistant Expert. Réponds à la question en utilisant les contrastes fournis pour apporter une précision technique maximale.",
-      prompt: `
-        Question: ${question}
-        Concept Central: ${concept}
-        
-        CONTRASTES IDENTIFIÉS :
-        ${comparisons.map(c => `- Différence avec ${c.counter}: ${c.difference}`).join('\n')}
-        
-        RÉPONSE FINALE PRÉCISE :`,
+      prompt: `Question: ${question}\nConcept: ${concept}\nDifférences: ${comparisons.map(c => c.difference).join('. ')}\nRéponse précise :`,
     });
     return response.text;
   }
