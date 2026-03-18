@@ -1,89 +1,92 @@
-// src/ai/integration/complete-loop.ts
-export class CompleteLearningLoop {
-    private vectorDB: VectorDatabase;
-    private phase1: Phase1VectorIntegration;
-    private phase2: Phase2VectorIntegration;
-    private phase3: Phase3VectorIntegration;
-    private phase4: Phase4VectorIntegration;
-    
-    async processUserInteraction(interaction: UserInteraction) {
-      // 1. PHASE 1: COMPRENDRE avec contexte vectoriel enrichi
-      const contexte = await this.phase1.comprendre(
-        interaction.query, 
-        interaction.userId
-      );
-      
-      // 2. PHASE 2: RAISONNER avec analogies vectorielles
-      const raisonnement = await this.phase2.raisonner(
-        interaction.query, 
-        contexte
-      );
-      
-      // 3. PHASE 3: AGIR basé sur actions passées vectorisées
-      const action = await this.phase3.agir(
-        raisonnement.decision,
-        interaction.userId
-      );
-      
-      // 4. Observer la réaction de l'utilisateur
-      const result = await this.presentAction(action);
-      const feedback = await this.getUserFeedback(result);
-      
-      // 5. PHASE 4: APPRENDRE de toute l'interaction
-      await this.phase4.apprendre({
-        ...interaction,
-        contexte,
-        raisonnement,
-        action,
-        result,
-        feedback
-      });
-      
-      // 6. BONUS: Mise à jour vectorielle des documents
-      if (feedback.correction) {
-        await this.updateDocumentFromCorrection(interaction, feedback);
-      }
-      
-      return {
-        result,
-        learned: true,
-        nextSuggestions: await this.generateSuggestions(interaction.userId)
-      };
-    }
-    
-    private async updateDocumentFromCorrection(interaction: UserInteraction, feedback: any) {
-      // Trouver le document source
-      const sourceDocs = await this.vectorDB.search({
-        embedding: await this.getEmbedding(interaction.query),
-        collection: 'documents',
-        limit: 3
-      });
-      
-      for (const doc of sourceDocs) {
-        // Marquer pour révision ou créer une note
-        await this.vectorDB.insert({
-          collection: 'document_notes',
-          vector: await this.getEmbedding(feedback.correction),
-          metadata: {
-            documentId: doc.id,
-            correction: feedback.correction,
-            originalQuery: interaction.query,
-            timestamp: Date.now()
-          }
-        });
-      }
-    }
-    
-    private async generateSuggestions(userId: string) {
-      // Proposer des actions basées sur l'historique vectoriel
-      const userVector = await this.getUserVector(userId);
-      
-      const suggestions = await this.vectorDB.search({
-        embedding: userVector,
-        collection: 'suggestions',
-        limit: 3
-      });
-      
-      return suggestions.map(s => s.metadata);
-    }
+'use server';
+/**
+ * @fileOverview CompleteLearningLoop - Innovation Elite 32.
+ * Orchestration unifiée de la boucle cognitive liée à la base vectorielle.
+ * Next.js 15 Compliant: Uniquement des fonctions asynchrones exportées.
+ */
+
+import { comprendreVector, formatVectorContext } from './phase1-vector';
+import { raisonnerVector } from './phase2-vector';
+import { agirVector, formatActionInsight } from './phase3-vector';
+import { apprendreVector } from './phase4-vector';
+import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
+
+export interface LoopInteraction {
+  userId: string;
+  query: string;
+  documentContext: string;
+  history: any[];
+  episodicMemory: any[];
+  distilledRules: any[];
+  userProfile?: any;
+}
+
+export interface LoopResult {
+  answer: string;
+  confidence: number;
+  disclaimer?: string;
+  lessons: any[];
+  actionInsight: any;
+  newMemoryEpisode: any;
+}
+
+/**
+ * Exécute la boucle cognitive complète Elite 32.
+ * Comprendre (Phase 1) -> Raisonner (Phase 2) -> Agir (Phase 3) -> Apprendre (Phase 4).
+ */
+export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
+  console.log(`[AI][ELITE-LOOP] Traitement de l'interaction pour l'utilisateur : ${interaction.userId}`);
+
+  // 1. PHASE 1: COMPRENDRE (Contexte Vectoriel Multi-Strates)
+  const vectorInsights = await comprendreVector(interaction.query, {
+    episodicMemory: interaction.episodicMemory,
+    distilledRules: interaction.distilledRules,
+    userProfile: interaction.userProfile
+  });
+  
+  let enrichedContext = interaction.documentContext;
+  enrichedContext += await formatVectorContext(vectorInsights);
+
+  // 2. PHASE 3: AGIR (Anticipation basée sur patterns vectoriels d'action)
+  const actionInsight = await agirVector(interaction.query, { mode: 'standard' });
+  if (actionInsight) {
+    enrichedContext += await formatActionInsight(actionInsight);
   }
+
+  // 3. PHASE 2: RAISONNER (Méta-cognition guidée par analogies)
+  const metaResult = await metacognitiveReasoner.reason(
+    interaction.query, 
+    enrichedContext, 
+    async (q, ctx) => {
+      // Tentative de raisonnement par analogie vectorielle
+      const analogy = await raisonnerVector(q, ctx, []); 
+      if (analogy) return analogy;
+      
+      // Fallback vers raisonnement modulaire standard
+      const { modularReasoner } = await import('@/ai/reasoning/modular');
+      return await modularReasoner.reason(q, ctx);
+    }
+  );
+
+  // 4. PHASE 4: APPRENDRE (Extraction et Vectorisation dynamique)
+  const lessons = await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
+
+  // Préparation du nouvel épisode de mémoire pour persistance client
+  const newMemoryEpisode = {
+    type: 'interaction',
+    content: metaResult.answer.substring(0, 300),
+    context: interaction.query,
+    importance: metaResult.confidence,
+    timestamp: Date.now(),
+    tags: lessons.map(l => l.content.substring(0, 15))
+  };
+
+  return {
+    answer: metaResult.answer,
+    confidence: metaResult.confidence,
+    disclaimer: metaResult.disclaimer,
+    lessons,
+    actionInsight,
+    newMemoryEpisode
+  };
+}
