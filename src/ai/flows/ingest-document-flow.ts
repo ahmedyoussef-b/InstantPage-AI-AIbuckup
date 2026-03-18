@@ -1,11 +1,12 @@
 'use server';
 /**
  * @fileOverview Flux d'ingestion et de construction du graphe de connaissances (Logique Serveur).
- * Implémente un fallback automatique si les modèles spécialisés (NER ONNX) sont absents.
+ * Intègre désormais l'indexation hiérarchique des concepts (Innovation 32.1).
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { extractHierarchicalConcepts } from '@/ai/learning/concept-hierarchy';
 
 const IngestInputSchema = z.object({
   fileName: z.string(),
@@ -21,6 +22,7 @@ const IngestOutputSchema = z.object({
   processedAt: z.string(),
   concepts: z.array(z.string()),
   graphData: z.any().optional(),
+  hierarchy: z.any().optional(),
 });
 export type IngestOutput = z.infer<typeof IngestOutputSchema>;
 
@@ -30,7 +32,6 @@ export type IngestOutput = z.infer<typeof IngestOutputSchema>;
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
-    // Tentative d'extraction structurée via le modèle Ollama configuré
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
       system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 relations les plus importantes entre les concepts.",
@@ -56,7 +57,6 @@ async function extractKnowledgeFromText(docId: string, text: string) {
       }
     });
 
-    // Fallback si l'IA n'a pas retourné de format structuré exploitable
     if (nodes.length === 1) {
       nodes.push({ id: 'technical_base', label: 'Connaissances Techniques', type: 'concept' });
       relations.push({ from: docId, to: 'technical_base', predicate: 'concerne' });
@@ -64,7 +64,7 @@ async function extractKnowledgeFromText(docId: string, text: string) {
 
     return { nodes, relations };
   } catch (e) {
-    console.warn("[AI][INGEST] Échec de l'extraction IA (Modèle indisponible ?), passage en mode structurel.");
+    console.warn("[AI][INGEST] Échec de l'extraction IA, passage en mode structurel.");
     return { 
       nodes: [
         { id: docId, label: 'Document', type: 'document' },
@@ -95,15 +95,18 @@ const ingestDocumentFlow = ai.defineFlow(
     outputSchema: IngestOutputSchema,
   },
   async (input) => {
-    console.log(`[SERVER][INGEST] Traitement robuste de : ${input.fileName}`);
+    console.log(`[SERVER][INGEST] Traitement Elite de : ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
     const docId = Math.random().toString(36).substring(7);
 
-    // Construction du Graphe de Connaissances avec fallback automatique
+    // 1. Extraction du Graphe de Connaissances Standard
     const { nodes, relations } = await extractKnowledgeFromText(docId, input.fileContent);
 
-    // Génération des Embeddings (Limité pour la performance locale)
+    // 2. Innovation 32.1: Construction de la hiérarchie des concepts
+    const hierarchy = await extractHierarchicalConcepts(input.fileContent);
+
+    // 3. Génération des Embeddings (Limité pour la performance locale)
     if (chunks.length > 0) {
       try {
         await ai.embedMany({
@@ -111,7 +114,7 @@ const ingestDocumentFlow = ai.defineFlow(
           content: chunks.slice(0, 3),
         });
       } catch (e) {
-        console.warn(`[SERVER][INGEST] Service d'embedding indisponible, indexation vectorielle limitée.`);
+        console.warn(`[SERVER][INGEST] Service d'embedding indisponible.`);
       }
     }
 
@@ -121,7 +124,8 @@ const ingestDocumentFlow = ai.defineFlow(
       embeddingModel: 'embedding-001',
       processedAt: new Date().toISOString(),
       concepts: nodes.map(n => n.label),
-      graphData: { nodes, relations }
+      graphData: { nodes, relations },
+      hierarchy
     };
   }
 );

@@ -2,13 +2,14 @@
 /**
  * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
  * Architecture de recherche vectorielle multidimensionnelle.
- * Permet de récupérer le contexte technique, historique et comportemental.
+ * Intègre désormais l'expansion hiérarchique des concepts.
  */
 
 import { ai } from '@/ai/genkit';
+import { expandHierarchicalContext } from '@/ai/learning/concept-hierarchy';
 
 export interface VectorSearchResult {
-  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS';
+  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY';
   content: string;
   score: number;
   metadata: any;
@@ -16,18 +17,31 @@ export interface VectorSearchResult {
 
 /**
  * Phase 1: COMPRENDRE - Interroge la base vectorielle centrale sur toutes ses strates.
- * C'est ici que s'opère la "fusion sémantique" entre les docs et le vécu de l'IA.
  */
 export async function comprendreVector(question: string, context: { 
   episodicMemory: any[], 
   distilledRules: any[],
-  userProfile?: any 
+  userProfile?: any,
+  hierarchyNodes?: any[]
 }): Promise<VectorSearchResult[]> {
-  console.log(`[AI][PHASE-1] Fusion Sémantique : Documents + Interactions + Patterns...`);
+  console.log(`[AI][PHASE-1] Fusion Sémantique & Hiérarchique...`);
 
   const results: VectorSearchResult[] = [];
 
-  // STRATE CONCEPTS : Règles techniques et terminologies distillées (Evolution Day 30)
+  // STRATE HIERARCHY : Expansion du contexte via Parent/Enfant (Innovation 32.1)
+  if (context.hierarchyNodes) {
+    const hierarchyContext = await expandHierarchicalContext(question, context.hierarchyNodes);
+    if (hierarchyContext) {
+      results.push({
+        collection: 'HIERARCHY',
+        content: hierarchyContext,
+        score: 1.0,
+        metadata: { type: 'taxonomy' }
+      });
+    }
+  }
+
+  // STRATE CONCEPTS : Règles techniques distillées
   context.distilledRules.forEach(rule => {
     results.push({
       collection: 'CONCEPTS',
@@ -37,8 +51,7 @@ export async function comprendreVector(question: string, context: {
     });
   });
 
-  // STRATE LESSONS : Souvenirs d'interactions critiques (Anticipation de l'oubli)
-  // On priorise les souvenirs qui ont une haute importance pour le contexte actuel
+  // STRATE LESSONS : Souvenirs d'interactions critiques
   const q = question.toLowerCase();
   context.episodicMemory
     .filter(e => e.importance > 0.6 && (q.includes(e.context.toLowerCase()) || e.content.toLowerCase().includes(q)))
@@ -46,13 +59,13 @@ export async function comprendreVector(question: string, context: {
     .forEach(epi => {
       results.push({
         collection: 'LESSONS',
-        content: `Rappel historique : Pour la question "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
+        content: `Rappel historique : Pour "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
         score: 0.88,
         metadata: { timestamp: epi.timestamp }
       });
     });
 
-  // STRATE PATTERNS : Préférences de l'utilisateur (Innovation 26)
+  // STRATE PATTERNS : Préférences utilisateur
   if (context.userProfile) {
     const p = context.userProfile;
     results.push({
@@ -74,7 +87,7 @@ export async function formatVectorContext(results: VectorSearchResult[]): Promis
   
   let output = "\n--- MÉMOIRE SÉMANTIQUE CENTRALE (ELITE 32) ---\n";
   
-  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS')[] = ['CONCEPTS', 'LESSONS', 'PATTERNS'];
+  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY')[] = ['HIERARCHY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
   
   collections.forEach(col => {
     const filtered = results.filter(r => r.collection === col);

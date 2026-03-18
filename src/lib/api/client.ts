@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32 Integrée : Lie la boucle cognitive à la vectorisation centrale.
+ * Version 32.1 Integrée : Support de l'indexation hiérarchique.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -55,7 +55,8 @@ export const api = {
       uploadedAt: new Date().toISOString(),
       parentId,
       tags: result.concepts,
-      graphNodes: result.graphData?.nodes
+      graphNodes: result.graphData?.nodes,
+      hierarchy: result.hierarchy // Nouveau: Données de taxonomie
     } as any;
 
     saveLocalFS([...fs, newFile]);
@@ -70,14 +71,14 @@ export const api = {
     const docContext = await hybridRAG.retrieve(query, files);
     const episodicMemory = loadMemory();
     const distilledRules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
-    const repetitionItems = JSON.parse(localStorage.getItem(REPETITION_KEY) || '[]');
-    const pendingReviews = await getPendingReviews(repetitionItems);
     
-    // Chargement du profil de renforcement implicite
+    // Récupération de tous les nœuds de hiérarchie pour l'expansion sémantique
+    const allHierarchyNodes = files.flatMap(f => (f as any).hierarchy?.nodes || []);
+    
     implicitRL.loadProfile();
     const userProfile = implicitRL.getProfile();
 
-    // 2. APPEL ORCHESTRATEUR CENTRAL (PHASE 1, 2, 3)
+    // 2. APPEL ORCHESTRATEUR CENTRAL (Intégrant la hiérarchie)
     const response = await serverChat({ 
       text: query, 
       history: history.map(msg => ({ 
@@ -87,10 +88,12 @@ export const api = {
       documentContext: docContext,
       episodicMemory: episodicMemory,
       distilledRules: distilledRules,
-      userProfile: userProfile
-    });
+      userProfile: userProfile,
+      // On passe les nœuds hiérarchiques à l'orchestrateur (extension ChatInput)
+      hierarchyNodes: allHierarchyNodes
+    } as any);
 
-    // 3. PHASE 4: APPRENDRE - Persistence & Vectorisation dynamique
+    // 3. PHASE 4: APPRENDRE
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -99,15 +102,12 @@ export const api = {
       }, ...episodicMemory];
       await saveMemory(updatedMemory);
       
-      // Enregistrement automatique des patterns pour le partage (Innovation 32)
       if (response.confidence > 0.9) {
-        // Simule le partage anonymisé si la réponse est de haute qualité
         const mockRule = { instruction: response.answer.substring(0, 100), domain: 'Technique', confidence: response.confidence, id: 'rule-auto', pattern: 'Automatic' };
         shareKnowledge(INSTANCE_ID, mockRule as any).catch(() => {});
       }
     }
 
-    // Application finale des règles d'apprentissage continu
     return { 
       ...response, 
       answer: continuousLearning.applyRules(response.answer) 
@@ -145,7 +145,6 @@ export const api = {
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
     const success = await continuousLearning.recordCorrection(original, corrected);
-    // Signale au moteur RL qu'une correction a eu lieu (Récompense négative)
     await implicitRL.processSignal('CORRECTION', { isTechnical: true });
     return success;
   },
