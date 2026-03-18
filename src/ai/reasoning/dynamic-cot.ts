@@ -28,7 +28,7 @@ export class DynamicChainOfThought {
       const thought = await this.generateThoughtStep(question, currentContext, i, stepsNeeded);
       thoughts.push(thought);
 
-      // Si le raisonnement est suffisant, on s'arrête prématurément (Innovation Innovation 1)
+      // Si le raisonnement est suffisant, on s'arrête prématurément (Innovation 8)
       if (this.canAnswerFromThoughts(thoughts, question)) {
         console.log(`[AI][REASONING] Raisonnement suffisant après ${i + 1} étapes.`);
         break;
@@ -40,7 +40,7 @@ export class DynamicChainOfThought {
   }
 
   /**
-   * Analyse sémantique de la complexité.
+   * Analyse sémantique de la complexité (Stabilité: Déterministe).
    */
   private analyzeComplexity(question: string): number {
     const q = question.toLowerCase();
@@ -56,7 +56,7 @@ export class DynamicChainOfThought {
   }
 
   /**
-   * Génère une étape de réflexion intermédiaire.
+   * Génère une étape de réflexion intermédiaire (Utilise un modèle léger).
    */
   private async generateThoughtStep(question: string, context: string, step: number, total: number): Promise<string> {
     const { ai } = await import('@/ai/genkit');
@@ -73,38 +73,38 @@ export class DynamicChainOfThought {
   }
 
   /**
-   * Détermine si le raisonnement actuel suffit.
+   * Détermine si le raisonnement actuel suffit (Arrêt précoce).
    */
   private canAnswerFromThoughts(thoughts: string[], question: string): boolean {
-    return thoughts.length >= 2 && question.length < 100;
+    return thoughts.length >= 2 && question.length < 150;
   }
 
   /**
-   * Synthèse de la réponse finale basée sur les réflexions.
+   * Synthèse de la réponse finale basée sur les réflexions accumulées.
    */
   private async synthesizeAnswer(thoughts: string[], question: string, context: string): Promise<string> {
     const { ai } = await import('@/ai/genkit');
     try {
       const response = await ai.generate({
         model: 'ollama/phi3:mini',
-        system: "Tu es un Assistant Expert Professionnel. Synthétise les réflexions techniques suivantes pour donner une réponse finale claire et structurée.",
-        prompt: `Question: ${question}\nContexte: ${context}\n\nCHEMINEMENT LOGIQUE :\n${thoughts.map((t, i) => `${i+1}. ${t}`).join('\n')}\n\nRÉPONSE FINALE :`,
+        system: "Tu es un Assistant Expert Professionnel. Synthétise les réflexions techniques suivantes pour donner une réponse finale claire, précise et structurée en français.",
+        prompt: `Question: ${question}\nContexte: ${context}\n\nCHEMINEMENT LOGIQUE DE RÉFLEXION :\n${thoughts.map((t, i) => `${i+1}. ${t}`).join('\n')}\n\nRÉPONSE FINALE STRUCTURÉE :`,
       });
       return response.text;
     } catch (e) {
-      return "Désolé, une erreur de synthèse est survenue.";
+      return "Désolé, une erreur de synthèse est survenue lors du raisonnement.";
     }
   }
 
   /**
-   * Génération directe pour les cas simples.
+   * Génération directe pour les cas simples (Performance).
    */
   private async directGenerate(question: string, context: string): Promise<string> {
     const { ai } = await import('@/ai/genkit');
     try {
       const response = await ai.generate({
         model: 'ollama/phi3:mini',
-        system: "Tu es un Assistant Technique Professionnel. Réponds précisément en français.",
+        system: "Tu es un Assistant Technique Professionnel. Réponds précisément en français en utilisant le contexte fourni.",
         prompt: `Contexte: ${context}\nQuestion: ${question}`,
       });
       return response.text;

@@ -27,11 +27,12 @@ export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   // Fonction de calcul de réponse (exécutée uniquement en cas de cache miss)
   const computeAnswer = async () => {
-    // 1. Analyse du besoin de raisonnement approfondi (CoT)
-    const isTechnical = input.text.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|pression/i);
+    // 1. Analyse du besoin de raisonnement approfondi (Innovation 6: CoT Dynamique)
+    // On active le CoT pour les questions techniques longues ou les mots-clés critiques
+    const isTechnical = input.text.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|pression|dysfonctionnement|réparer/i);
     
-    if (isTechnical && input.text.length > 30) {
-      console.log("[AI][CHAT] Activation de la Chaîne de Pensée Dynamique...");
+    if (isTechnical && input.text.length > 25) {
+      console.log("[AI][CHAT] Activation de la Chaîne de Pensée Dynamique (Innovation 6)...");
       return await dynamicCoT.reason(input.text, input.documentContext || "");
     }
 
@@ -41,35 +42,24 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, input.documentContext || "");
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const url = 'http://localhost:11434/api/generate';
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: targetModel, 
-          prompt: optimizedPrompt,
-          stream: false,
-          options: { temperature: 0.7, num_ctx: 4096 }
-        }),
-        signal: controller.signal
+      const { ai } = await import('@/ai/genkit');
+      const response = await ai.generate({
+        model: `ollama/${targetModel}`,
+        prompt: optimizedPrompt,
+        config: {
+          temperature: 0.5,
+          num_ctx: 4096
+        }
       });
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error("Ollama indisponible");
-
-      const data = await response.json();
-      return data.response || "Désolé, je n'ai pas pu formuler de réponse.";
+      return response.text || "Désolé, je n'ai pas pu formuler de réponse avec le modèle local.";
     } catch (error) {
-      console.error("[AI][CHAT] Erreur génération:", error);
-      return "Une erreur technique empêche la connexion à l'IA locale.";
+      console.error("[AI][CHAT] Erreur génération Ollama:", error);
+      return "Une erreur technique empêche la connexion à l'IA locale (Ollama). Vérifiez que le service est actif.";
     }
   };
 
-  // 3. Utilisation du cache sémantique intelligent
+  // 3. Utilisation du cache sémantique intelligent (Innovation 2)
   const finalAnswer = await semanticCache.getOrCompute(input.text, computeAnswer);
 
   return {
