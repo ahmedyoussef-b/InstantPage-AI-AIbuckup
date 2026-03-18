@@ -118,7 +118,6 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
-                  {/* Accessiblity Fix: Added SheetTitle */}
                   <SheetTitle className="sr-only">Menu de Navigation</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />

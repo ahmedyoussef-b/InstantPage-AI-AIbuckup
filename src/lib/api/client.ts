@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persitante (VFS).
- * Assure la survie des données d'AHMED entre les sessions.
+ * Persistance stable via synchronisation atomique du localStorage.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -10,8 +10,11 @@ import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V7';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V10';
 
+/**
+ * Charge le système de fichiers depuis le stockage local.
+ */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -19,34 +22,37 @@ const loadLocalFS = (): FileSystemItem[] => {
     if (!stored) return [];
     return JSON.parse(stored);
   } catch (e) {
-    console.error("[API_CLIENT] Erreur lors de la lecture de la base locale :", e);
+    console.error("[API_CLIENT] Échec de lecture de la BDD locale :", e);
     return [];
   }
 };
 
+/**
+ * Sauvegarde le système de fichiers de manière atomique.
+ */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
   } catch (e: any) {
-    console.error("[API_CLIENT] Erreur de sauvegarde (Vérifiez le quota local) :", e.message);
+    console.error("[API_CLIENT] Échec de sauvegarde (Quota dépassé ?) :", e.message);
   }
 };
 
 export const api = {
   /**
-   * Ingestion d'un document avec extraction de graphe de connaissances.
+   * Ingestion d'un document avec extraction de graphe côté serveur.
    */
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
     if (fs.some(item => item.name === file.name && item.parentId === parentId)) {
-      throw new Error(`Le fichier "${file.name}" existe déjà dans ce répertoire.`);
+      throw new Error(`Le fichier "${file.name}" existe déjà.`);
     }
 
     try {
       const text = await file.text();
-      // Appel au flux serveur pour l'ingestion IA (Vecteurs + Graphe)
+      // Appel au flux serveur pour l'ingestion IA
       const result = await ingestDocument({
         fileName: file.name,
         fileContent: text,
@@ -62,10 +68,12 @@ export const api = {
         content: text,
         uploadedAt: new Date().toISOString(),
         parentId,
-        // @ts-ignore - On stocke les nœuds du graphe dans les métadonnées du fichier
-        graphNodes: result.graphData?.nodes || [],
+        // On stocke les métadonnées thématiques
         tags: result.concepts
       };
+
+      // @ts-ignore - Stockage des nœuds du graphe pour recherche hybride
+      newFile.graphNodes = result.graphData?.nodes || [];
 
       saveLocalFS([...fs, newFile]);
       return { success: true, chunks: result.chunks, docId: result.docId };
@@ -76,14 +84,14 @@ export const api = {
   },
 
   /**
-   * Chat intelligent avec RAG Hybride (Recherche croisée).
+   * Chat intelligent avec RAG Hybride consolidé.
    */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fs = loadLocalFS();
       const files = fs.filter(i => i.type === 'file');
       
-      // Utilisation du moteur de recherche hybride consolidé
+      // Recherche croisée via le moteur hybride
       const context = await hybridRAG.retrieve(query, files);
       
       const genkitHistory = history.map(msg => ({
@@ -106,7 +114,7 @@ export const api = {
     const fs = loadLocalFS();
     const newFs = fs.filter(item => item.id !== id);
     saveLocalFS(newFs);
-    // Purge asynchrone côté serveur si nécessaire
+    // Nettoyage asynchrone côté serveur
     deleteDocument({ docId: id, fileName: name }).catch(() => {});
     return { success: true, purgedChunks: 1 };
   },
@@ -145,9 +153,9 @@ export const api = {
       totalChunks: chunks,
       totalSize: size,
       diskSpace: { 
-        total: "10 MB", 
+        total: "Local Storage", 
         used: `${(size / 1024).toFixed(1)} KB`, 
-        free: `${(10240 - size / 1024).toFixed(1)} KB` 
+        free: "Quota variable" 
       }
     };
   },

@@ -3,6 +3,7 @@
 import { z } from 'genkit';
 import { semanticRouter } from '@/ai/router';
 import { semanticCache } from '@/ai/semantic-cache';
+import { dynamicPromptEngine } from '@/ai/dynamic-prompt';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -20,23 +21,15 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat avec Routage Sémantique, Cache Intelligent et RAG Hybride.
+ * Chat avec Routage Sémantique, Cache Intelligent et Prompt Dynamique.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     // 1. Détermination du modèle via le routeur sémantique
     const targetModel = await semanticRouter.route(input.text);
 
-    const systemPrompt = `Tu es un Assistant Professionnel Intelligent expert.
-      
-      INSTRUCTIONS :
-      - Réponds de manière précise, technique et concise.
-      - Réponds toujours en français.
-      - Utilise le contexte des documents fournis ci-dessous.
-      - Cite tes sources si l'information provient d'un document.
-      
-      CONTEXTE DOCUMENTS :
-      ${input.documentContext || "Aucun document n'est chargé pour le moment."}`;
+    // 2. Construction du prompt dynamique adaptatif
+    const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, input.documentContext || "");
 
     try {
       const controller = new AbortController();
@@ -49,7 +42,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: targetModel, 
-          prompt: `${systemPrompt}\n\nQuestion : ${input.text}\n\nRéponse :`,
+          prompt: optimizedPrompt,
           stream: false,
           options: { temperature: 0.7 }
         }),
@@ -59,18 +52,18 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error("Service IA indisponible");
+        throw new Error("Service IA local (Ollama) indisponible");
       }
 
       const data = await response.json();
       return data.response || "Désolé, je n'ai pas pu formuler de réponse.";
     } catch (error) {
       console.error("[AI][CHAT] Erreur génération:", error);
-      return "Une erreur technique empêche la connexion à l'IA locale (Ollama). Vérifiez que le service est démarré.";
+      return "Une erreur technique empêche la connexion à l'IA locale. Vérifiez que le service Ollama est démarré.";
     }
   };
 
-  // Utilisation du cache sémantique pour optimiser la réponse
+  // 3. Utilisation du cache sémantique pour optimiser la réponse
   const finalAnswer = await semanticCache.getOrCompute(input.text, computeAnswer);
 
   return {
