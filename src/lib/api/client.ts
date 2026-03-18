@@ -1,18 +1,16 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Persistance atomique via localStorage avec vérification d'intégrité.
+ * Intègre désormais le moteur d'apprentissage continu pour le post-traitement.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
+import { continuousLearning } from '@/ai/continuous-learning';
 
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V12';
 
-/**
- * Charge le système de fichiers depuis le stockage local de manière sécurisée.
- */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -25,9 +23,6 @@ const loadLocalFS = (): FileSystemItem[] => {
   }
 };
 
-/**
- * Sauvegarde le système de fichiers de manière atomique.
- */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
@@ -38,9 +33,6 @@ const saveLocalFS = (fs: FileSystemItem[]) => {
 };
 
 export const api = {
-  /**
-   * Ingestion d'un document avec enrichissement sémantique.
-   */
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
@@ -68,7 +60,6 @@ export const api = {
         tags: result.concepts
       };
 
-      // Sauvegarde des métadonnées du graphe pour le RAG Hybride
       (newFile as any).graphNodes = result.graphData?.nodes || [];
 
       const updatedFs = [...fs, newFile];
@@ -81,15 +72,10 @@ export const api = {
     }
   },
 
-  /**
-   * Chat intelligent exploitant le RAG Hybride (Vecteurs + Graphe).
-   */
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fs = loadLocalFS();
       const files = fs.filter(i => i.type === 'file');
-      
-      // Récupération du contexte via le moteur hybride local
       const context = await hybridRAG.retrieve(query, files);
       
       const genkitHistory = history.map(msg => ({
@@ -97,15 +83,27 @@ export const api = {
         content: [{ text: msg.text || '' }]
       }));
       
-      return await serverChat({ 
+      const response = await serverChat({ 
         text: query, 
         history: genkitHistory,
         documentContext: context
       });
+
+      // Innovation : Application des règles d'apprentissage continu (Post-traitement)
+      const correctedAnswer = continuousLearning.applyRules(response.answer);
+      
+      return {
+        ...response,
+        answer: correctedAnswer
+      };
     } catch (error) {
       console.error("[API_CLIENT] Erreur lors du chat intelligent :", error);
       throw error;
     }
+  },
+
+  async submitCorrection(original: string, corrected: string): Promise<boolean> {
+    return await continuousLearning.recordCorrection(original, corrected);
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
@@ -135,7 +133,7 @@ export const api = {
     return true;
   },
 
-  async getStats(): Promise<Stats> {
+  async getStats(): Promise<Stats & { rulesCount: number }> {
     const fs = loadLocalFS();
     let docs = 0, chunks = 0, size = 0;
     fs.forEach(i => {
@@ -153,7 +151,8 @@ export const api = {
         total: "VFS Browser Storage", 
         used: `${(size / 1024).toFixed(1)} KB`, 
         free: "Stable" 
-      }
+      },
+      rulesCount: continuousLearning.getRulesCount()
     };
   },
 
