@@ -57,6 +57,10 @@ const saveDemonstration = (demo: any) => {
   localStorage.setItem(DEMO_KEY, JSON.stringify(updated));
 };
 
+// Variable pour la détection de répétition/reformulation
+let lastQueryTime = 0;
+let lastQueryText = '';
+
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
@@ -86,8 +90,26 @@ export const api = {
     const demonstrations = loadDemonstrations();
     const episodicMemory = loadMemory();
     
-    // Charger le profil RL
+    // --- INNOVATION 26: SIGNaux IMPLICITES ---
     implicitRL.loadProfile();
+    const now = Date.now();
+    
+    // 1. Détection de Reformulation (Même intention en < 30s)
+    if (lastQueryText && query.length > 5 && now - lastQueryTime < 30000) {
+      const similarity = query.toLowerCase().includes(lastQueryText.toLowerCase().substring(0, 10)) ? 0.8 : 0;
+      if (similarity > 0.5) {
+        await implicitRL.processSignal('REFORMULATION', { isLong: false });
+      }
+    }
+    
+    // 2. Détection d'Hésitation (Long délai entre deux messages techniques)
+    if (lastQueryTime > 0 && now - lastQueryTime > 300000) { // 5 mins
+       await implicitRL.processSignal('HESITATION', {});
+    }
+
+    lastQueryTime = now;
+    lastQueryText = query;
+
     const rlDirective = implicitRL.getSystemDirective();
     
     const genkitHistory = history.map(msg => ({
@@ -105,13 +127,12 @@ export const api = {
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
-    // Signaux RL Implicites
+    // 3. Signal d'Acceptation tacite
     if (history.length > 0 && query.length < 15) {
-      // Si la question est très courte après une réponse, c'est souvent une acceptation ou une suite logique
       implicitRL.processSignal('ACCEPTANCE', { isLong: response.answer.length > 200 });
     }
 
-    // Enregistrement démonstration (Innovation 22)
+    // 4. Signal d'Usage (si l'IA a pris une action et que l'utilisateur continue)
     if (response.actionTaken) {
       saveDemonstration({
         timestamp: Date.now(),
@@ -119,6 +140,7 @@ export const api = {
         action: response.actionTaken,
         result: response.answer.substring(0, 100)
       });
+      await implicitRL.processSignal('USAGE', { isTechnical: true });
     }
 
     // Mémorisation épisodique (Innovation 25)
@@ -135,7 +157,7 @@ export const api = {
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
-    // Signal de récompense négative forte pour le RL
+    // --- INNOVATION 26: SIGNAL RL NÉGATIF ---
     await implicitRL.processSignal('CORRECTION', { isLong: original.length > 200 });
     return await continuousLearning.recordCorrection(original, corrected);
   },

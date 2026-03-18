@@ -73,14 +73,14 @@ L'IA observe les actions de l'utilisateur et apprend à reproduire des workflows
 ### 23. Workflow Asynchrone Non-Bloquant
 Exécution des tâches lourdes en arrière-plan avec suivi de progression temps réel, permettant une utilisation fluide du chat en parallèle.
 
-### 24. Actions Prédictives Proactives (Bonus)
+### 24. Actions Prédictives Proactives
 Analyse des patterns temporels et contextuels pour suggérer la prochaine action pertinente avant même qu'elle ne soit demandée.
 
-### 25. Mémoire Épisodique Multi-Niveaux (Innovation Apprentissage)
+### 25. Mémoire Épisodique Multi-Niveaux (Cognition Temporelle)
 Gestion cognitive de la mémoire à horizons temporels (Travail, Court terme, Long terme) avec oubli sémantique intelligent.
 
 ### 26. Apprentissage par Renforcement Implicite (Innovation RL)
-L'IA déduit des signaux de récompense à partir de vos corrections et comportements pour ajuster son style et ses politiques de réponse.
+L'IA déduit des signaux de récompense à partir de vos comportements (reformulations, hésitations, corrections) pour ajuster son style et ses politiques.
 
 ## 🛠️ Stack Technique
 
