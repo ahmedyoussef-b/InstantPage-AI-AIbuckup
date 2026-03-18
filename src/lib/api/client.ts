@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.2 Intégrée : Support du cycle d'auto-amélioration nocturne.
+ * Version 32.2 Intégrée : Support du pipeline ML complet et des recommandations.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -123,7 +123,7 @@ export const api = {
   },
 
   /**
-   * Innovation Finale : Exécute l'optimisation globale.
+   * Innovation Finale : Exécute l'optimisation globale incluant le pipeline ML.
    */
   async runGlobalOptimization(): Promise<any> {
     const fs = loadLocalFS();
@@ -141,10 +141,10 @@ export const api = {
   },
 
   /**
-   * Récupère les métriques d'apprentissage ML.
+   * Récupère les métriques d'apprentissage ML via le nouveau pipeline.
    */
   async getTrainingDashboard(): Promise<any> {
-    const res = await fetch('/api/training/dashboard');
+    const res = await fetch('/api/ml/dashboard');
     return res.json();
   },
 
