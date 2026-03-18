@@ -1,125 +1,112 @@
-// src/ai/actions/contextual-validator.ts
-export class ContextualValidator {
-    private safetyRules: SafetyRule[] = [];
-    private contextHistory: ContextSnapshot[] = [];
-    
-    async validateAction(action: Action, context: any): Promise<ValidationResult> {
-      // 1. Vérifications de base
-      const basicChecks = await this.basicSafetyChecks(action);
-      if (!basicChecks.passed) {
-        return {
-          valid: false,
-          reason: basicChecks.reason,
-          severity: 'high'
-        };
-      }
+'use server';
+/**
+ * @fileOverview ContextualValidator - Innovation 21.
+ * Validation de la sécurité et de la pertinence des actions avant exécution.
+ */
+
+import { ai } from '@/ai/genkit';
+
+export interface Action {
+  type: 'respond' | 'use_tool' | 'command' | 'delete' | 'plan' | 'PLANIFICATION';
+  tool?: string;
+  params?: any;
+  command?: string;
+  backup?: boolean;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  reason?: string;
+  severity: 'low' | 'medium' | 'high';
+  suggestedAlternative?: Action;
+}
+
+/**
+ * Valide une action par rapport au contexte actuel.
+ */
+export async function validateAction(action: any, context: string): Promise<ValidationResult> {
+  console.log(`[AI][VALIDATOR] Analyse de sécurité pour l'action: ${action.type || action.tool}`);
+
+  // 1. Vérifications de base (Hard-coded safety rules)
+  const basicCheck = checkBasicSafety(action);
+  if (!basicCheck.valid) return basicCheck;
+
+  // 2. Vérification de pertinence contextuelle via LLM
+  try {
+    const response = await ai.generate({
+      model: 'ollama/phi3:mini',
+      system: "Tu es un Contrôleur de Sécurité IA. Évalue si l'action proposée est sûre et pertinente.",
+      prompt: `Action proposée: ${JSON.stringify(action)}
+      Contexte actuel: ${context.substring(0, 500)}
       
-      // 2. Vérification contextuelle
-      const contextCheck = await this.checkContextualRelevance(action, context);
-      if (!contextCheck.relevant) {
-        return {
-          valid: false,
-          reason: `Action hors contexte: ${contextCheck.reason}`,
-          severity: 'medium'
-        };
-      }
-      
-      // 3. Vérification des précédents
-      const precedentCheck = await this.checkPrecedents(action, context);
-      
-      // 4. Simulation rapide
-      const simulation = await this.simulateAction(action, context);
-      
-      // 5. Analyse des risques
-      const riskAnalysis = await this.analyzeRisks(action, simulation);
-      
-      // 6. Décision finale
-      return this.makeDecision(basicChecks, contextCheck, precedentCheck, riskAnalysis);
-    }
-    
-    private async basicSafetyChecks(action: Action): Promise<CheckResult> {
-      // Règle 1: Pas de suppression sans backup
-      if (action.type === 'delete' && !action.backup) {
-        return { passed: false, reason: 'Suppression sans backup interdite' };
-      }
-      
-      // Règle 2: Pas de commandes système dangereuses
-      const dangerousCommands = ['rm -rf', 'format', 'dd', 'mkfs'];
-      if (action.type === 'command') {
-        for (const cmd of dangerousCommands) {
-          if (action.command.includes(cmd)) {
-            return { passed: false, reason: `Commande dangereuse détectée: ${cmd}` };
-          }
-        }
-      }
-      
-      // Règle 3: Limite de taux
-      if (await this.isRateLimited(action)) {
-        return { passed: false, reason: 'Trop d\'actions récentes' };
-      }
-      
-      return { passed: true };
-    }
-    
-    private async checkContextualRelevance(action: Action, context: any): Promise<ContextCheck> {
-      const prompt = `Action proposée: ${JSON.stringify(action)}
-  Contexte actuel: ${JSON.stringify(context).substring(0, 500)}
-  
-  Cette action est-elle pertinente dans le contexte actuel?
-  Considère:
-  - Cohérence avec la conversation en cours
-  - Moment approprié
-  - État du système
-  
-  Réponds en JSON: {
-    "relevant": boolean,
-    "reason": string,
-    "suggestedTiming": "immediate" | "delayed" | "never"
-  }`;
-      
-      const response = await this.model.generate(prompt);
-      return JSON.parse(response);
-    }
-    
-    private async analyzeRisks(action: Action, simulation: any): Promise<RiskAssessment> {
-      const risks = [];
-      let overallRisk = 'low';
-      
-      // Analyser différents types de risques
-      const riskTypes = ['data_loss', 'performance', 'security', 'user_experience'];
-      
-      for (const riskType of riskTypes) {
-        const risk = await this.assessRiskType(action, riskType, simulation);
-        if (risk.level !== 'low') {
-          risks.push(risk);
-        }
-      }
-      
-      // Déterminer le risque global
-      if (risks.some(r => r.level === 'high')) {
-        overallRisk = 'high';
-      } else if (risks.some(r => r.level === 'medium')) {
-        overallRisk = 'medium';
-      }
-      
+      Cette action est-elle pertinente et sans risque majeur (sécurité, perte de données) ?
+      Réponds en JSON STRICT: { "valid": boolean, "reason": "explication", "severity": "low|medium|high" }`,
+    });
+
+    const match = response.text.match(/\{.*\}/s);
+    if (match) {
+      const result = JSON.parse(match[0]);
       return {
-        level: overallRisk,
-        risks,
-        mitigation: await this.suggestMitigations(risks)
+        valid: result.valid,
+        reason: result.reason,
+        severity: result.severity || 'low'
       };
     }
-    
-    async suggestAlternative(action: Action, validation: ValidationResult): Promise<Action | null> {
-      if (validation.severity === 'high') {
-        return null; // Pas d'alternative pour les actions à haut risque
-      }
-      
-      const prompt = `Action refusée: ${JSON.stringify(action)}
-  Raison: ${validation.reason}
-  
-  Propose une alternative plus sûre qui accomplit le même objectif:`;
-      
-      const alternative = await this.model.generate(prompt);
-      return this.parseAction(alternative);
+  } catch (e) {
+    console.warn("[AI][VALIDATOR] Échec validation IA, repli sur sécurité de base.");
+  }
+
+  return { valid: true, severity: 'low' };
+}
+
+function checkBasicSafety(action: any): ValidationResult {
+  const type = action.type?.toLowerCase() || '';
+  const tool = action.tool?.toLowerCase() || '';
+
+  // Règle: Pas de suppression sans backup (Simulé)
+  if (type === 'delete' || tool.includes('delete')) {
+    if (!action.backup) {
+      return { 
+        valid: false, 
+        reason: "Action de suppression refusée : Aucun backup détecté dans les paramètres.",
+        severity: 'high'
+      };
     }
   }
+
+  // Règle: Commandes système dangereuses
+  if (action.command) {
+    const dangerous = ['rm -rf', 'format', 'mkfs', 'dd'];
+    if (dangerous.some(cmd => action.command.includes(cmd))) {
+      return { 
+        valid: false, 
+        reason: "Commande système interdite détectée (risque de destruction).",
+        severity: 'high'
+      };
+    }
+  }
+
+  return { valid: true, severity: 'low' };
+}
+
+/**
+ * Propose une alternative plus sûre si l'action est rejetée.
+ */
+export async function suggestAlternative(action: any, reason: string): Promise<Action | null> {
+  try {
+    const response = await ai.generate({
+      model: 'ollama/tinyllama:latest',
+      system: "Tu es un conseiller en sécurité technique. Propose une alternative sûre.",
+      prompt: `Action refusée: ${JSON.stringify(action)}
+      Raison du refus: ${reason}
+      
+      Propose une alternative (ex: 'lire' au lieu de 'supprimer').
+      Réponds en JSON: { "type": "respond", "params": { "suggestion": "..." } }`,
+    });
+
+    const match = response.text.match(/\{.*\}/s);
+    return match ? JSON.parse(match[0]) : null;
+  } catch {
+    return null;
+  }
+}
