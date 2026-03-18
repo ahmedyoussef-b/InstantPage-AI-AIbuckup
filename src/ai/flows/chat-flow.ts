@@ -46,37 +46,43 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
     if (action.type === 'use_tool') {
       console.log(`[AI][ACTION] Activation de l'outil : ${action.tool}`);
-      actionInfo = { tool: action.tool, params: action.params };
-      // Simulation de l'enrichissement du contexte par l'outil
-      docContext += `\n[ACTION REQUISE: ${action.tool}] Résultat simulé de l'outil pour aider à la réponse.`;
+      actionInfo = { tool: action.tool, params: action.params, prediction: action.expectedOutcome };
+      docContext += `\n[NOTE SYSTÈME: Outil ${action.tool} utilisé. Prédiction: ${action.expectedOutcome}]`;
     }
 
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
+      // Priorité 1: Mémoire Analogique (Innovation 12)
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
 
-      if (q.match(/analyse complète|expertise|synthèse technique|consensus|débat/i) || query.length > 150) {
+      // Priorité 2: Raisonnement Collaboratif (Innovation 16) pour analyse lourde
+      if (q.match(/analyse complète|expertise|consensus|débat/i) || query.length > 200) {
         return await collaborativeReasoner.reason(query, ctx);
       }
 
-      if (q.match(/dois-je|devrais-je|choisir|décider|investissement|choix/i) && ctx.length > 50) {
+      // Priorité 3: Arbre Latent (Innovation 11) pour décisions
+      if (q.match(/dois-je|devrais-je|choisir|décider/i) && ctx.length > 50) {
         return await latentTree.reason(query, ctx);
       }
 
-      if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
-        return await contrastiveReasoning.reason(query, ctx);
-      }
-
+      // Priorité 4: Raisonnement Modulaire (Innovation 15) pour multi-domaines
       if (q.match(/impact|conséquence|calcul|période/i) && ctx.length > 100) {
         return await modularReasoner.reason(query, ctx);
       }
 
+      // Priorité 5: Contraste (Innovation 9) pour définitions
+      if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
+        return await contrastiveReasoning.reason(query, ctx);
+      }
+
+      // Priorité 6: CoT Dynamique (Innovation 6) pour pannes
       if (q.match(/comment|pourquoi|panne|maintenance/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
 
+      // Fallback: Génération standard optimisée par routeur (Innovation 1)
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
 
@@ -90,6 +96,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return response.text || "Désolé, je n'ai pas pu formuler de réponse technique.";
     };
 
+    // Méta-cognition (Innovation 13) - Enveloppe finale de sécurité
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
