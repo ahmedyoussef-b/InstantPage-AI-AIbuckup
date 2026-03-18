@@ -1,8 +1,8 @@
 # AGENTIC - Assistant IA Professionnel Hybrid RAG
 
-AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 19 innovations majeures consolidées.
+AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une performance d'élite grâce à 20 innovations majeures consolidées.
 
-## 🚀 Les 19 Innovations Majeures
+## 🚀 Les 20 Innovations Majeures
 
 ### 1. Architecture Multi-Modèles & Routeur Sémantique
 Le système dirige chaque question vers le modèle le plus adapté (Llama 3, Phi-3, TinyLlama) pour une précision maximale.
@@ -49,7 +49,7 @@ Exploration des scénarios "Et si" pour identifier les causes racines profondes 
 ### 15. Raisonnement Modulaire (Modular Reasoning)
 Décomposition des questions en modules spécialisés (Logique, Causal, Mathématique) collaborant en parallèle.
 
-### 16. Raisonnement Collaboratif Multi-Agents (Collaborative Reasoning)
+### 16. Raisonnement Collaboratif (Collaborative Reasoning)
 Dialogue interne entre plusieurs instances d'IA qui se critiquent et s'améliorent mutuellement sur plusieurs cycles.
 
 ### 17. Toolformer Local - Auto-apprentissage d'outils
@@ -60,6 +60,9 @@ Décomposition des tâches complexes en sous-actions exécutables avec validatio
 
 ### 19. Exécution Réversible (Reversible Actions)
 Sécurisation des actions de l'IA par snapshots et historique complet permettant l'annulation (Undo) des opérations.
+
+### 20. Orchestration Multi-Agents Spécialisés
+Déploiement d'une équipe d'experts IA (Analyste, Technicien, Sécurité) collaborant en temps réel pour une précision industrielle d'élite.
 
 ## 🛠️ Stack Technique
 

@@ -15,6 +15,7 @@ import { collaborativeReasoner } from '@/ai/reasoning/collaborative';
 import { toolformer } from '@/ai/actions/toolformer-local';
 import { getHierarchicalPlan, formatHierarchicalPlan } from '@/ai/actions/hierarchical-planner';
 import { recordAction, undoLastAction, getActionHistoryReport } from '@/ai/actions/reversible-executor';
+import { orchestrateMultiAgents } from '@/ai/orchestration/multi-agent-system';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -35,6 +36,7 @@ const ChatOutputSchema = z.object({
   actionTaken: z.any().optional(),
   planGenerated: z.boolean().optional(),
   historyReport: z.string().optional(),
+  multiAgentActive: z.boolean().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -45,8 +47,9 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let docContext = input.documentContext || "";
     let prefixOutput = "";
     let planGenerated = false;
+    let multiAgentActive = false;
 
-    // 1. Innovation 19: Détection de commande d'annulation ou historique
+    // 1. Innovation 19: Détection de commande d'annulation
     if (q.match(/annuler|undo|revenir en arrière|effacer dernière action/i)) {
       const undoResult = await undoLastAction();
       return {
@@ -64,64 +67,71 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 2. Planification Hiérarchique (Innovation 18) - Détection d'intention de tâche complexe
-    if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || q.length > 80) {
-      console.log("[AI][FLOW] Activation de la Planification Hiérarchique...");
+    // 2. Innovation 20: Orchestration Multi-Agents (Pour requêtes critiques/complexes)
+    if (q.match(/expertise complète|audit technique|analyse multi-domaine|complet/i) || q.length > 250) {
+      console.log("[AI][FLOW] Activation de l'Orchestration Multi-Agents (Innovation 20)...");
+      const orchestration = await orchestrateMultiAgents(input.text, docContext);
+      multiAgentActive = true;
+      
+      return {
+        answer: orchestration.finalAnswer,
+        confidence: orchestration.consensusScore,
+        multiAgentActive: true,
+        suggestions: ["Voir les contributions par agent", "Affiner l'analyse"]
+      };
+    }
+
+    // 3. Planification Hiérarchique (Innovation 18)
+    if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || (q.length > 80 && !multiAgentActive)) {
       const plan = await getHierarchicalPlan(input.text, docContext);
       prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
-      docContext += `\n[NOTE SYSTÈME: Un plan hiérarchique a été généré pour cette tâche.]`;
+      docContext += `\n[NOTE SYSTÈME: Un plan hiérarchique a été généré.]`;
       planGenerated = true;
-      
-      // Enregistrer l'action de planification (Innovation 19)
       await recordAction('PLANIFICATION', { task: input.text }, docContext);
     }
 
-    // 3. Toolformer Local (Innovation 17) - Décision d'action avant génération
+    // 4. Toolformer Local (Innovation 17)
     const action = await toolformer.decideAction(input.text, docContext);
     let actionInfo = null;
 
     if (action.type === 'use_tool') {
-      console.log(`[AI][ACTION] Activation de l'outil : ${action.tool}`);
       actionInfo = { tool: action.tool, params: action.params, prediction: action.expectedOutcome };
-      docContext += `\n[NOTE SYSTÈME: Outil ${action.tool} utilisé. Prédiction: ${action.expectedOutcome}]`;
-      
-      // Enregistrer l'usage de l'outil pour réversibilité (Innovation 19)
+      docContext += `\n[NOTE SYSTÈME: Outil ${action.tool} utilisé.]`;
       await recordAction(`TOOL_${action.tool.toUpperCase()}`, action.params, input.documentContext || "");
     }
 
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
-      // Priorité 1: Mémoire Analogique (Innovation 12)
+      // Innovation 12: Analogies
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
 
-      // Priorité 2: Raisonnement Collaboratif (Innovation 16)
+      // Innovation 16: Collaboration
       if (q.match(/analyse complète|expertise|consensus|débat/i) || query.length > 200) {
         return await collaborativeReasoner.reason(query, ctx);
       }
 
-      // Priorité 3: Arbre Latent (Innovation 11) pour décisions
+      // Innovation 11: Arbre Latent
       if (q.match(/dois-je|devrais-je|choisir|décider/i) && ctx.length > 50) {
         return await latentTree.reason(query, ctx);
       }
 
-      // Priorité 4: Raisonnement Modulaire (Innovation 15)
+      // Innovation 15: Modulaire
       if (q.match(/impact|conséquence|calcul|période/i) && ctx.length > 100) {
         return await modularReasoner.reason(query, ctx);
       }
 
-      // Priorité 5: Contraste (Innovation 9)
+      // Innovation 9: Contraste
       if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // Priorité 6: CoT Dynamique (Innovation 6)
+      // Innovation 6: CoT Dynamique
       if (q.match(/comment|pourquoi|panne|maintenance/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
 
-      // Fallback: Génération standard optimisée par routeur (Innovation 1)
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
 
@@ -135,7 +145,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return response.text || "Désolé, je n'ai pas pu formuler de réponse technique.";
     };
 
-    // Méta-cognition (Innovation 13) - Enveloppe finale de sécurité
+    // Innovation 13: Méta-cognition
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
@@ -145,7 +155,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       suggestions: metaResult.suggestions,
       actionTaken: actionInfo,
       planGenerated,
-      isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0)
+      isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0),
+      multiAgentActive: false
     };
   };
 
@@ -164,6 +175,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       actionTaken: parsed.actionTaken,
       planGenerated: parsed.planGenerated,
       isAnalogical: parsed.isAnalogical || false,
+      multiAgentActive: parsed.multiAgentActive || false,
       sources: []
     };
   } catch {
