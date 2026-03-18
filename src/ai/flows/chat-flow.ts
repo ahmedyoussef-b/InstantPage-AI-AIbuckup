@@ -7,6 +7,7 @@ import { dynamicPromptEngine } from '@/ai/dynamic-prompt';
 import { dynamicCoT } from '@/ai/reasoning/dynamic-cot';
 import { contrastiveReasoning } from '@/ai/reasoning/contrastive';
 import { selfConsistencyReasoner } from '@/ai/reasoning/self-consistency';
+import { latentTree } from '@/ai/reasoning/latent-tree';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -25,26 +26,33 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent intégrant les 10 Innovations Élite.
- * Gère le routage sémantique, le cache, et les 3 modes de raisonnement avancés.
+ * Chat Intelligent intégrant les 11 Innovations Élite.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     const q = input.text.toLowerCase();
     const docContext = input.documentContext || "";
 
-    // 1. Analyse du type de raisonnement requis (Innovations 6, 9 & 10)
+    // 1. Analyse du type de raisonnement requis (Innovations 6, 9, 10 & 11)
     
-    // CAS A : Vérification Auto-Consistante (Innovation 10)
-    // Activé pour les faits critiques, valeurs numériques ou confirmations oui/non.
+    // CAS A : Arbre de Décision Latent (Innovation 11)
+    // Activé pour les choix stratégiques et décisions complexes.
+    const isDecision = q.match(/dois-je|devrais-je|choisir|décider|investir|opportunité|conseille-moi|quel choix/i);
+    if (isDecision && docContext.length > 50) {
+      const answer = await latentTree.reason(input.text, docContext);
+      return { answer };
+    }
+
+    // CAS B : Vérification Auto-Consistante (Innovation 10)
+    // Activé pour les faits critiques ou valeurs numériques.
     const isCriticalFact = q.match(/vrai|faux|est-ce que|valeur|seuil|pression|limite|autorisé|obligatoire|combien|température/i);
     if (isCriticalFact && docContext.length > 50) {
       const result = await selfConsistencyReasoner.reason(input.text, docContext);
       return { answer: result.answer, confidence: result.confidence };
     }
 
-    // CAS B : Raisonnement par Contraste (Innovation 9)
-    // Activé pour les définitions techniques et les comparaisons.
+    // CAS C : Raisonnement par Contraste (Innovation 9)
+    // Activé pour les définitions et comparaisons.
     const isDefinition = q.includes('qu\'est-ce que') || q.includes('définition') || q.includes('signifie');
     const isComparison = q.includes('différence') || q.includes('comparer') || q.includes(' vs ') || q.includes('mieux que');
     if ((isDefinition || isComparison) && docContext.length > 100) {
@@ -52,15 +60,15 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return { answer };
     }
 
-    // CAS C : Chaîne de Pensée Dynamique (Innovation 6)
-    // Activé pour les problèmes de maintenance et les procédures complexes.
+    // CAS D : Chaîne de Pensée Dynamique (Innovation 6)
+    // Activé pour les problèmes techniques.
     const isTechnicalProblem = q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|circuit|dysfonctionnement|réparer|étape/i);
     if (isTechnicalProblem && input.text.length > 20) {
       const answer = await dynamicCoT.reason(input.text, docContext);
       return { answer };
     }
 
-    // 2. Routage standard (Innovation 1) avec Prompt Dynamique (Innovation 5)
+    // 2. Routage standard (Innovation 1)
     const hasContext = docContext.length > 100;
     const targetModel = await semanticRouter.route(input.text, hasContext);
     const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, docContext);
