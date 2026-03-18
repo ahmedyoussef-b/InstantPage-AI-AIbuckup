@@ -10,6 +10,7 @@ import { selfConsistencyReasoner } from '@/ai/reasoning/self-consistency';
 import { latentTree } from '@/ai/reasoning/latent-tree';
 import { analogicalReasoner, type SolvedProblem } from '@/ai/reasoning/analogical';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
+import { counterfactualReasoner } from '@/ai/reasoning/counterfactual';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -31,8 +32,8 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent intégrant les 13 Innovations Élite.
- * Version stabilisée avec méta-cognition et orchestration dynamique.
+ * Chat Intelligent intégrant les 14 Innovations Élite.
+ * Version stabilisée avec raisonnement contrefactuel et méta-cognition.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
@@ -65,7 +66,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // CAS D : Chaîne de Pensée Dynamique (Innovation 6) - Pour les problèmes techniques
+      // CAS D : Raisonnement Contrefactuel (Innovation 14) - Pour l'analyse de causes
+      if (q.match(/pourquoi|cause|raison|si on avait|impact de|origine de|facteur|influence/i) && ctx.length > 100) {
+        return await counterfactualReasoner.reason(query, ctx);
+      }
+
+      // CAS E : Chaîne de Pensée Dynamique (Innovation 6) - Pour les problèmes techniques
       if (q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|circuit|réparer|étape/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
@@ -86,7 +92,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     };
 
     // 4. Application de la Méta-cognition (Innovation 13)
-    // Elle englobe tout le processus pour assurer l'humilité cognitive
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
