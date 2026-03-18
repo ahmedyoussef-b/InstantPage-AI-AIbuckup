@@ -1,9 +1,7 @@
 'use client';
 
 /**
- * API Client avec BDD Locale Persistante.
- * Gère le stockage VFS (Virtual File System) dans le localStorage.
- * Ce module est strictement client.
+ * API Client avec BDD Locale Persistante et support Graphe.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -11,15 +9,14 @@ import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V5';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V6';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
+    return JSON.parse(stored);
   } catch (e) {
     console.error("[API_CLIENT] Erreur lecture VFS locale:", e);
     return [];
@@ -29,10 +26,9 @@ const loadLocalFS = (): FileSystemItem[] => {
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
-    const data = JSON.stringify(fs);
-    localStorage.setItem(STORAGE_KEY, data);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
   } catch (e: any) {
-    console.error("[API_CLIENT] Erreur sauvegarde VFS:", e.message);
+    console.error("[API_CLIENT] Erreur sauvegarde VFS (Quota peut-être plein):", e.message);
   }
 };
 
@@ -40,14 +36,12 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
-    const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
-    if (exists) {
-      throw new Error(`Le fichier "${file.name}" est déjà présent dans ce dossier.`);
+    if (fs.some(item => item.name === file.name && item.parentId === parentId)) {
+      throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
     }
 
     try {
       const text = await file.text();
-      // L'ingestion et l'extraction de concepts se font côté serveur
       const result = await ingestDocument({
         fileName: file.name,
         fileContent: text,
@@ -63,7 +57,9 @@ export const api = {
         content: text,
         uploadedAt: new Date().toISOString(),
         parentId,
-        tags: result.concepts 
+        tags: result.concepts,
+        // @ts-ignore - Extension pour le graphe
+        graphNodes: result.graphData?.nodes || []
       };
 
       saveLocalFS([...fs, newFile]);
@@ -79,7 +75,6 @@ export const api = {
       const fs = loadLocalFS();
       const files = fs.filter(i => i.type === 'file');
       
-      // Le RAG Hybride (filtrage local) reste sur le client
       const context = await hybridRAG.retrieve(query, files);
       
       const genkitHistory = history.map(msg => ({

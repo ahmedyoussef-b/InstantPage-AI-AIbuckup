@@ -3,6 +3,7 @@
  * Fusionne les résultats de différentes méthodes pour un contexte optimal.
  */
 import { FileSystemItem } from '@/types';
+import { queryKnowledgeGraph } from '@/ai/knowledge-graph-builder';
 
 export class HybridRAG {
   /**
@@ -11,7 +12,7 @@ export class HybridRAG {
   async retrieve(query: string, documents: FileSystemItem[]): Promise<string> {
     const q = query.toLowerCase();
     
-    // 1. Recherche Vectorielle (Simulée par filtrage sémantique sur le contenu)
+    // 1. Recherche Vectorielle (Filtrage sémantique simulé)
     const vectorResults = documents.filter(doc => 
       doc.content?.toLowerCase().includes(q) || 
       q.split(' ').some(word => word.length > 3 && doc.content?.toLowerCase().includes(word))
@@ -22,11 +23,14 @@ export class HybridRAG {
       new Date(b.uploadedAt || '').getTime() - new Date(a.uploadedAt || '').getTime()
     ).slice(0, 2);
 
-    // 3. Fusion et Ranking
-    const seen = new Set();
-    let context = "";
+    // 3. Recherche dans le Graphe (Contexte thématique)
+    const allNodes = documents.flatMap(d => (d as any).graphNodes || []);
+    const graphContext = await queryKnowledgeGraph(query, allNodes);
 
-    // On fusionne les résultats vectoriels et temporels
+    // 4. Fusion et Ranking
+    const seen = new Set();
+    let context = graphContext ? `${graphContext}\n\n` : "";
+
     const finalDocs = [...vectorResults, ...temporalResults].filter(doc => {
       if (seen.has(doc.id)) return false;
       seen.add(doc.id);
@@ -37,7 +41,7 @@ export class HybridRAG {
       context += `--- DOCUMENT: ${doc.name} (Mis à jour: ${doc.uploadedAt}) ---\n${doc.content}\n\n`;
     });
 
-    console.log(`[AI][HYBRID-RAG] Context enrichi avec ${finalDocs.length} documents.`);
+    console.log(`[AI][HYBRID-RAG] Context hybride avec ${finalDocs.length} docs et connaissances graphe.`);
     return context || "Aucun document pertinent trouvé dans la base de connaissances.";
   }
 }

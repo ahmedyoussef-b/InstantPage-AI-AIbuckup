@@ -18,9 +18,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-/**
- * Interface principale de l'Assistant Intelligent Professionnel.
- */
 export default function HomePage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -54,7 +51,6 @@ export default function HomePage() {
               "flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-blue-600/10 border border-blue-500/20 rounded-xl transition-all",
               collapsed && "justify-center px-0 border-none bg-transparent hover:bg-blue-600/10"
             )}
-            title="Chat Intelligent"
           >
             <MessageSquare className="w-4 h-4 text-blue-400 shrink-0" />
             {!collapsed && <span className="truncate">Chat Intelligent</span>}
@@ -65,7 +61,6 @@ export default function HomePage() {
               "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
               collapsed && "justify-center px-0"
             )}
-            title="Base de Connaissances"
           >
             <HardDrive className="w-4 h-4 group-hover:text-purple-400 transition-colors shrink-0" />
             {!collapsed && <span className="truncate">Base de Connaissances</span>}
@@ -125,7 +120,7 @@ export default function HomePage() {
                 <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="font-bold text-white text-sm uppercase tracking-widest">Assistant AI</h1>
+            <h1 className="font-bold text-white text-sm uppercase tracking-widest text-center flex-1">Assistant AI</h1>
           </div>
         </header>
         

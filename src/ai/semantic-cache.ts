@@ -1,8 +1,7 @@
 /**
  * @fileOverview Cache Sémantique Intelligent.
- * Mémorise les vecteurs des questions passées pour réutiliser les réponses similaires.
+ * Les appels Genkit ont été déplacés à l'intérieur des méthodes pour éviter les erreurs d'import client.
  */
-import { ai } from '@/ai/genkit';
 
 interface CacheEntry {
   answer: string;
@@ -50,6 +49,8 @@ export class SemanticCache {
 
   private async getEmbedding(text: string): Promise<number[] | null> {
     try {
+      // Import dynamique pour éviter l'inclusion dans le bundle client
+      const { ai } = await import('@/ai/genkit');
       const result = await ai.embed({
         embedder: 'googleai/embedding-001',
         content: text,
@@ -90,11 +91,10 @@ export class SemanticCache {
   }
 
   private async adaptResponse(answer: string, newQ: string, oldQ: string): Promise<string> {
-    // Si la question est identique, pas d'adaptation nécessaire
     if (newQ.toLowerCase() === oldQ.toLowerCase()) return answer;
 
     try {
-      // Utilisation d'un prompt ultra-rapide pour l'adaptation contextuelle
+      const { ai } = await import('@/ai/genkit');
       const response = await ai.generate({
         model: 'ollama/tinyllama:latest',
         system: "Tu es un adaptateur de réponse professionnel. Ta mission est d'ajuster légèrement une réponse existante pour qu'elle réponde parfaitement à une nouvelle question très similaire, sans changer les faits techniques.",
