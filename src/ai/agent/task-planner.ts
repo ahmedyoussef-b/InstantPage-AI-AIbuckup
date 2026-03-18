@@ -76,7 +76,6 @@ export class TaskPlanner {
   async createPlan(steps: TaskStep[], context: AgentContext): Promise<TaskPlan> {
     console.log(`[PLANNER] Structuration du plan (${steps.length} étapes).`);
 
-    // 1. Enrichissement des étapes avec des métriques (Innovation 18)
     const enrichedSteps = await Promise.all(
       steps.map(async (step) => {
         const metrics = await this.estimateStepMetrics(step);
@@ -84,12 +83,10 @@ export class TaskPlanner {
       })
     );
 
-    // 2. Calcul du chemin critique (étapes marquées comme critiques)
     const criticalPath = enrichedSteps
       .filter(s => s.critical)
       .map(s => s.id);
 
-    // 3. Calcul du temps total
     const totalTime = enrichedSteps.reduce((acc, s) => acc + (s.estimatedTime || 0), 0);
 
     return {
@@ -116,7 +113,7 @@ export class TaskPlanner {
         };
       }
     } catch {
-      // Ignorer l'erreur LLM d'estimation
+      // Ignore
     }
     return { estimatedTime: 60, successProbability: 0.8 };
   }

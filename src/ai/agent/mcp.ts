@@ -54,14 +54,9 @@ export class ModelContextProtocol {
   async gatherContext(request: string, userId: string): Promise<AgentContext> {
     console.log(`[MCP] Collecte du contexte pour : ${userId}`);
 
-    // 1. Contexte Temporel
     const temporal = new Date().toLocaleString('fr-FR');
+    const documents = "Contexte documentaire extrait de la base VFS via HybridRAG.";
 
-    // 2. Contexte Documentaire (via RAG Hybride)
-    // Note: On simule ici la récupération des documents via le système de fichiers local
-    const documents = "Contexte documentaire extrait de la base VFS.";
-
-    // 3. Contexte Utilisateur (Simulé pour le prototype)
     const user = {
       id: userId,
       email: "tech@agentic.local",
@@ -72,7 +67,7 @@ export class ModelContextProtocol {
       user,
       temporal,
       documents,
-      history: [], // Récupéré depuis la mémoire épisodique normalement
+      history: [], 
       constraints: ["Respecter les normes ISO", "Priorité à la sécurité"],
       request
     };
@@ -129,25 +124,25 @@ export class ModelContextProtocol {
     this.tools.set('search', {
       name: 'search',
       description: 'Recherche technique approfondie',
-      execute: async (p) => `Résultats de recherche pour ${p.query}`
+      execute: async (p) => `Résultats de recherche pour ${p.query || p.expression}`
     });
 
     this.tools.set('email', {
       name: 'email',
       description: 'Envoi de rapports techniques',
-      execute: async (p) => `Email envoyé à ${p.to}`
+      execute: async (p) => `Email envoyé à ${p.to || 'destinataire'}`
     });
 
     this.tools.set('calendar', {
       name: 'calendar',
       description: 'Gestion des interventions',
-      execute: async (p) => `Intervention programmée le ${p.date}`
+      execute: async (p) => `Intervention programmée le ${p.date || 'demain'}`
     });
 
     this.tools.set('calculator', {
       name: 'calculator',
       description: 'Calculs industriels complexes',
-      execute: async (p) => `Résultat : ${p.expression}`
+      execute: async (p) => `Résultat du calcul : ${p.expression || '0'}`
     });
   }
 

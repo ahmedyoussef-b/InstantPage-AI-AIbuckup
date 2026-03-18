@@ -15,6 +15,7 @@ export interface AgentResponse {
   steps: AgentStep[];
   suggestions: string[];
   canUndo: boolean;
+  patternsLearned: number;
 }
 
 /**
@@ -56,7 +57,7 @@ export class IntelligentAgent {
       console.log(`[AGENT][PHASE-3] Exécution terminée. Succès: ${executionResult.success}`);
 
       // 4. PHASE 4: APPRENDRE - Analyse de l'expérience et mémorisation des patterns
-      await this.learner.learnFromExecution({
+      const learningResults = await this.learner.learnFromExecution({
         request,
         intention,
         plan,
@@ -67,7 +68,7 @@ export class IntelligentAgent {
       console.log(`[AGENT][PHASE-4] Apprentissage consolidé dans la base vectorielle.`);
 
       // Synthèse de la réponse finale
-      return this.generateResponse(executionResult, plan);
+      return this.generateResponse(executionResult, plan, learningResults.patternsLearned);
     } catch (error: any) {
       console.error("[AGENT][ERROR] Échec de la mission complexe:", error);
       throw new Error(`Échec de l'agent: ${error.message}`);
@@ -77,8 +78,7 @@ export class IntelligentAgent {
   /**
    * Génère une réponse structurée incluant le rapport d'exécution et des suggestions.
    */
-  private async generateResponse(executionResult: any, plan: any): Promise<AgentResponse> {
-    // Suggestions proactives basées sur le résultat technique
+  private async generateResponse(executionResult: any, plan: any, patternsLearned: number): Promise<AgentResponse> {
     const suggestions = [
       "Souhaitez-vous archiver le rapport d'exécution ?",
       "Dois-je programmer un suivi pour cette opération ?",
@@ -94,7 +94,8 @@ export class IntelligentAgent {
         result: s.result
       })),
       suggestions,
-      canUndo: executionResult.reversible || false
+      canUndo: executionResult.reversible || false,
+      patternsLearned
     };
   }
 }

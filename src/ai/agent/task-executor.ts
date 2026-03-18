@@ -42,26 +42,21 @@ export class TaskExecutor {
     console.log(`[EXECUTOR] DÉMARRAGE MISSION : ${plan.steps.length} étapes à traiter.`);
 
     for (const step of plan.steps) {
-      // 1. Vérification des dépendances (Innovation 18)
       if (!this.areDependenciesSatisfied(step, executedSteps)) {
         console.warn(`[EXECUTOR] Étape ${step.id} reportée : Dépendances manquantes.`);
         continue;
       }
 
-      // 2. Exécution avec gestion des erreurs et Retries (Stabilité)
       const result = await this.executeStepWithRetry(step, context);
       results.push(result);
       
-      // Mise à jour de l'objet step pour le rapport final (agent-core)
       (step as any).status = result.success ? 'completed' : 'failed';
       (step as any).result = result.output || result.error;
 
       if (result.success) {
         executedSteps.add(step.id);
-        // Adaptation dynamique du contexte pour les étapes suivantes (MCP)
         context = this.updateContextWithResult(context, step, result);
       } else if (step.critical) {
-        // 3. Fallback Critique (Innovation 21)
         console.error(`[EXECUTOR] Échec critique à l'étape ${step.id}. Activation du plan de secours.`);
         const fallbackResult = await this.handleFallback(step, plan, context);
         
@@ -99,7 +94,6 @@ export class TaskExecutor {
       try {
         console.log(`[EXECUTOR] Step: ${step.description} | Tool: ${step.tool} (Essai ${attempt})`);
         
-        // Adaptation des paramètres selon le contexte (Innovation 21)
         const adaptedParams = this.adaptParamsToContext(step.params, context);
         const toolResult = await this.mcp.executeTool(step.tool, adaptedParams);
 
@@ -118,7 +112,6 @@ export class TaskExecutor {
         lastError = e.message;
       }
 
-      // Backoff exponentiel pour la stabilité locale
       if (attempt < this.maxRetries) {
         const delay = Math.pow(2, attempt) * 800;
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -147,14 +140,12 @@ export class TaskExecutor {
 
   private adaptParamsToContext(params: any, context: AgentContext): any {
     const adapted = { ...(params || {}) };
-    // Injection des variables dynamiques du contexte dans les outils
     if (context.temporal) adapted.timestamp = context.temporal;
     if (context.user) adapted.caller = context.user.email;
     return adapted;
   }
 
   private updateContextWithResult(context: AgentContext, step: TaskStep, result: StepResult): AgentContext {
-    // Enrichissement du contexte sémantique pour les étapes suivantes
     return {
       ...context,
       documents: context.documents + `\n[Résultat ${step.id}]: ${JSON.stringify(result.output)}`,
