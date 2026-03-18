@@ -1,7 +1,13 @@
-import { ModelContextProtocol } from './mcp';
-import { TaskPlanner } from './task-planner';
-import { TaskExecutor } from './task-executor';
-import { AgentLearner } from './agent-learner';
+'use server';
+/**
+ * @fileOverview IntelligentAgent Core - Orchestrateur central Elite 32.
+ * Unifie les phases : Comprendre -> Raisonner -> Agir -> Apprendre.
+ */
+
+import { gatherContext, analyzeIntention } from './mcp';
+import { decomposeIntention, createTaskPlan } from './task-planner';
+import { executeTaskPlan } from './task-executor';
+import { learnFromExecution } from './agent-learner';
 
 export interface AgentStep {
   description: string;
@@ -19,72 +25,38 @@ export interface AgentResponse {
 }
 
 /**
- * @fileOverview IntelligentAgent - Orchestrateur central Elite 32.
- * Unifie les phases : Comprendre -> Raisonner -> Agir -> Apprendre pour les missions complexes.
+ * Orchestre le traitement d'une demande complexe via les 4 phases cognitives.
  */
-export class IntelligentAgent {
-  private mcp: ModelContextProtocol;
-  private planner: TaskPlanner;
-  private executor: TaskExecutor;
-  private learner: AgentLearner;
+export async function processAgentMission(request: string, userId: string): Promise<AgentResponse> {
+  console.log(`[AGENT][CORE] Démarrage mission Elite pour: "${request.substring(0, 50)}..."`);
 
-  constructor() {
-    this.mcp = new ModelContextProtocol();
-    this.planner = new TaskPlanner();
-    this.executor = new TaskExecutor();
-    this.learner = new AgentLearner();
-  }
+  try {
+    // 1. PHASE 1: COMPRENDRE - Collecte du contexte et analyse de l'intention (MCP)
+    const context = await gatherContext(request, userId);
+    const intention = await analyzeIntention(request, context);
+    console.log(`[AGENT][PHASE-1] Intention identifiée: ${intention.type} (Complexité: ${intention.complexity}/10)`);
 
-  /**
-   * Orchestre le traitement d'une demande complexe via les 4 phases cognitives.
-   */
-  async processComplexRequest(request: string, userId: string): Promise<AgentResponse> {
-    console.log(`[AGENT][CORE] Démarrage mission Elite pour: "${request.substring(0, 50)}..."`);
+    // 2. PHASE 2: RAISONNER - Décomposition hiérarchique et planification
+    const steps = await decomposeIntention(intention, context);
+    const plan = await createTaskPlan(steps, context);
+    console.log(`[AGENT][PHASE-2] Plan généré avec ${plan.steps.length} étapes.`);
 
-    try {
-      // 1. PHASE 1: COMPRENDRE - Collecte du contexte et analyse de l'intention (MCP)
-      const context = await this.mcp.gatherContext(request, userId);
-      const intention = await this.mcp.analyzeIntention(request, context);
-      console.log(`[AGENT][PHASE-1] Intention identifiée: ${intention.type} (Complexité: ${intention.complexity}/10)`);
+    // 3. PHASE 3: AGIR - Exécution du plan via les outils sécurisés MCP
+    const executionResult = await executeTaskPlan(plan, context);
+    console.log(`[AGENT][PHASE-3] Exécution terminée. Succès: ${executionResult.success}`);
 
-      // 2. PHASE 2: RAISONNER - Décomposition hiérarchique et planification
-      const steps = await this.planner.decompose(intention, context);
-      const plan = await this.planner.createPlan(steps, context);
-      console.log(`[AGENT][PHASE-2] Plan généré avec ${plan.steps.length} étapes.`);
+    // 4. PHASE 4: APPRENDRE - Analyse de l'expérience et mémorisation des patterns
+    const learningResults = await learnFromExecution({
+      request,
+      intention,
+      plan,
+      result: executionResult,
+      userId,
+      context
+    });
+    console.log(`[AGENT][PHASE-4] Apprentissage consolidé dans la base vectorielle.`);
 
-      // 3. PHASE 3: AGIR - Exécution du plan via les outils sécurisés MCP
-      const executionResult = await this.executor.executePlan(plan, context);
-      console.log(`[AGENT][PHASE-3] Exécution terminée. Succès: ${executionResult.success}`);
-
-      // 4. PHASE 4: APPRENDRE - Analyse de l'expérience et mémorisation des patterns
-      const learningResults = await this.learner.learnFromExecution({
-        request,
-        intention,
-        plan,
-        result: executionResult,
-        userId,
-        context
-      });
-      console.log(`[AGENT][PHASE-4] Apprentissage consolidé dans la base vectorielle.`);
-
-      // Synthèse de la réponse finale
-      return this.generateResponse(executionResult, plan, learningResults.patternsLearned);
-    } catch (error: any) {
-      console.error("[AGENT][ERROR] Échec de la mission complexe:", error);
-      throw new Error(`Échec de l'agent: ${error.message}`);
-    }
-  }
-
-  /**
-   * Génère une réponse structurée incluant le rapport d'exécution et des suggestions.
-   */
-  private async generateResponse(executionResult: any, plan: any, patternsLearned: number): Promise<AgentResponse> {
-    const suggestions = [
-      "Souhaitez-vous archiver le rapport d'exécution ?",
-      "Dois-je programmer un suivi pour cette opération ?",
-      "Vérifier les contraintes de sécurité associées ?"
-    ];
-
+    // Synthèse de la réponse finale
     return {
       summary: executionResult.summary || "Mission accomplie avec succès.",
       details: executionResult.details || "Toutes les étapes du plan ont été validées via le protocole MCP.",
@@ -93,9 +65,16 @@ export class IntelligentAgent {
         status: s.status,
         result: s.result
       })),
-      suggestions,
+      suggestions: [
+        "Souhaitez-vous archiver le rapport d'exécution ?",
+        "Dois-je programmer un suivi pour cette opération ?",
+        "Vérifier les contraintes de sécurité associées ?"
+      ],
       canUndo: executionResult.reversible || false,
-      patternsLearned
+      patternsLearned: learningResults.patternsLearned
     };
+  } catch (error: any) {
+    console.error("[AGENT][ERROR] Échec de la mission complexe:", error);
+    throw new Error(`Échec de l'agent: ${error.message}`);
   }
 }

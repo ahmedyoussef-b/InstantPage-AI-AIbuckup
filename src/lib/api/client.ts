@@ -1,26 +1,20 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.2 Intégrée : Support du pipeline ML complet, feedback et recommandations.
- * Ajout du support pour les missions Agentic complexes.
+ * Support du pipeline ML complet et des missions Agentic complexes.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
-import { runAgentMission } from '@/ai/flows/agent-flow';
+import { processAgentMission } from '@/ai/agent/agent-core';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
-import { shareKnowledge } from '@/ai/learning/collaborative-network';
-import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
-import { runNighttimeImprovement } from '@/ai/integration/self-improvement';
 import { feedbackLoop } from '@/ai/ml/feedback-loop';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const MEMORY_KEY = 'AGENTIC_EPisodic_MEMORY_V1';
 const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
-const REPETITION_KEY = 'AGENTIC_SPACED_REP_V1';
-const INSTANCE_ID = typeof window !== 'undefined' ? (localStorage.getItem('AGENTIC_INSTANCE_ID') || `inst-${Math.random().toString(36).substring(7)}`) : 'server-node';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -44,9 +38,6 @@ const saveMemory = async (episodes: Episode[]) => {
 };
 
 export const api = {
-  /**
-   * Ingestion Elite 32 : Extrait métadonnées, graphe, hiérarchie et vectorise.
-   */
   async upload(file: File, parentId: string | null = null): Promise<any> {
     const fs = loadLocalFS();
     const text = await file.text();
@@ -62,37 +53,21 @@ export const api = {
       uploadedAt: new Date().toISOString(),
       parentId,
       tags: result.concepts,
-      graphNodes: result.graphData?.nodes,
-      hierarchy: result.hierarchy,
-      version: 1,
-      lastRevectorized: new Date().toISOString()
+      version: 1
     };
 
     saveLocalFS([...fs, newFile]);
     return { success: true, chunks: result.chunks };
   },
 
-  /**
-   * Chat Elite 32 : Exécute la boucle cognitive complète en 4 phases.
-   * Détecte si une demande nécessite un Agent complexe ou une réponse RAG simple.
-   */
   async chat(query: string, history: any[] = []): Promise<any> {
-    const fs = loadLocalFS();
-    const searchableDocs = fs.filter(i => i.type === 'file').map(f => ({
-      ...f,
-      content: f.enhancedContent || f.content
-    }));
+    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie/gi) || []).length > 1;
 
-    const docContext = await hybridRAG.retrieve(query, searchableDocs);
-    
-    // HEURISTIQUE AGENTIC: Si la demande contient des verbes d'action multiples
-    const isComplexMission = (query.match(/et|ensuite|puis|organise|prépare|envoie/gi) || []).length > 1;
-
-    if (isComplexMission) {
-      console.log("[API] Détection de mission complexe -> Activation Agent");
-      const agentRes = await runAgentMission({ text: query, context: docContext });
+    if (isComplex) {
+      console.log("[API] Mission complexe -> Agentic Mode");
+      const agentRes = await processAgentMission(query, 'default-user');
       return {
-        answer: agentRes.answer,
+        answer: agentRes.summary,
         sources: [],
         confidence: 0.95,
         isAgentMission: true,
@@ -100,84 +75,29 @@ export const api = {
       };
     }
 
+    const fs = loadLocalFS();
+    const searchableDocs = fs.filter(i => i.type === 'file');
+    const docContext = await hybridRAG.retrieve(query, searchableDocs);
     const episodicMemory = loadMemory();
-    const distilledRules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
-    const allHierarchyNodes = searchableDocs.flatMap(f => (f as any).hierarchy?.nodes || []);
     
     implicitRL.loadProfile();
-    const userProfile = implicitRL.getProfile();
-
     const response = await serverChat({ 
       text: query, 
-      history: history.map(msg => ({ 
-        role: msg.role === 'user' ? 'user' : 'model', 
-        content: [{ text: msg.text || '' }] 
-      })),
+      history: history.map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', content: [{ text: msg.text || '' }] })),
       documentContext: docContext,
       episodicMemory: episodicMemory,
-      distilledRules: distilledRules,
-      userProfile: userProfile,
-      hierarchyNodes: allHierarchyNodes
+      distilledRules: [],
+      userProfile: implicitRL.getProfile()
     } as any);
 
-    feedbackLoop.recordInteraction({
-      input: query,
-      prediction: response.answer,
-      modelVersion: 'v1-base',
-      context: { hasRelevantDocs: !!docContext }
-    });
-
     if (response.newMemoryEpisode) {
-      const updatedMemory = [{
-        ...response.newMemoryEpisode,
-        id: `epi-${Math.random().toString(36).substring(7)}`,
-        timestamp: Date.now()
-      }, ...episodicMemory];
-      await saveMemory(updatedMemory);
+      await saveMemory([response.newMemoryEpisode, ...episodicMemory]);
     }
 
     return { 
       ...response, 
       answer: continuousLearning.applyRules(response.answer) 
     };
-  },
-
-  async submitFeedback(input: string, prediction: string, rating: number, correction?: string): Promise<void> {
-    feedbackLoop.recordInteraction({
-      input,
-      prediction,
-      feedback: { rating, correction },
-      modelVersion: 'v1-base'
-    });
-  },
-
-  async runGlobalOptimization(): Promise<any> {
-    const fs = loadLocalFS();
-    const memory = loadMemory();
-    const rules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
-    return runNighttimeImprovement({ documents: fs, memory, currentRules: rules, instanceId: INSTANCE_ID });
-  },
-
-  async getTrainingDashboard(): Promise<any> {
-    const res = await fetch('/api/ml/dashboard');
-    return res.json();
-  },
-
-  async revectorizeDocument(docId: string): Promise<any> {
-    const fs = loadLocalFS();
-    const doc = fs.find(f => f.id === docId);
-    if (!doc || doc.type !== 'file') throw new Error("Document introuvable.");
-    const memory = loadMemory();
-    const relatedEpisodes = memory.filter(e => e.content.toLowerCase().includes(doc.name.toLowerCase()));
-    const { enhancedContent } = await enrichDocumentContent(doc.content || "", {
-      corrections: [], 
-      relatedQueries: relatedEpisodes.map(e => e.context),
-      lessons: relatedEpisodes.map(e => e.content)
-    });
-    await revectorizeContent(enhancedContent);
-    const updatedFs = fs.map(f => f.id === docId ? { ...f, enhancedContent, version: (f.version || 1) + 1, lastRevectorized: new Date().toISOString() } : f);
-    saveLocalFS(updatedFs);
-    return { success: true, version: (doc.version || 1) + 1 };
   },
 
   async deleteItem(id: string): Promise<any> {
@@ -210,17 +130,11 @@ export const api = {
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
-    const success = await continuousLearning.recordCorrection(original, corrected);
-    await implicitRL.processSignal('CORRECTION', { isTechnical: true });
-    return success;
+    return await continuousLearning.recordCorrection(original, corrected);
   },
 
-  async clearAll(): Promise<void> {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(MEMORY_KEY);
-      localStorage.removeItem(RULES_KEY);
-      localStorage.removeItem(REPETITION_KEY);
-    }
+  async getTrainingDashboard(): Promise<any> {
+    const res = await fetch('/api/ml/dashboard');
+    return res.json();
   }
 };
