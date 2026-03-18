@@ -44,7 +44,7 @@ AGENTIC n'est plus un simple répondeur, c'est un **organisme apprenant** qui bo
 29. **Réactivation Espacée (Spaced Repetition)** : Révisions périodiques des concepts critiques.
 30. **Transfert Cross-Domaine Intelligent** : Application du savoir d'un domaine à un autre.
 31. **Méta-Apprentissage (Learning to Learn)** : Auto-optimisation du processus de réflexion.
-32. **Détection de Patterns Communautaires (32.2)** : Intelligence collective anonymisée.
+32. **Entraînement ML Local (Fine-tuning LoRA)** : L'IA modifie ses propres neurones chaque nuit.
 
 ---
 

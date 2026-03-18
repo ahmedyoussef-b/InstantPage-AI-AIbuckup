@@ -140,6 +140,14 @@ export const api = {
     return result;
   },
 
+  /**
+   * Récupère les métriques d'apprentissage ML.
+   */
+  async getTrainingDashboard(): Promise<any> {
+    const res = await fetch('/api/training/dashboard');
+    return res.json();
+  },
+
   async revectorizeDocument(docId: string): Promise<any> {
     const fs = loadLocalFS();
     const doc = fs.find(f => f.id === docId);
