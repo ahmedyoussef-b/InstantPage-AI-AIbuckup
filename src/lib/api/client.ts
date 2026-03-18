@@ -54,6 +54,7 @@ async function safeJsonParse(res: Response) {
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<any> {
+    console.log(`[CLIENT_API][UPLOAD_INIT] Initiating upload for file: ${file.name} to parent: ${parentId || 'root'}`);
     if (!(file instanceof File)) throw new Error("Le fichier est invalide.");
     
     const fs = loadLocalFS();
@@ -64,7 +65,7 @@ export const api = {
     const res = await fetch('/api/ingest', { method: 'POST', body: formData });
     const result = await safeJsonParse(res);
 
-    if (result.error) throw new Error(result.error);
+    if (result.error) throw new Error(result.details || result.error);
 
     const text = await file.text().catch(() => "");
     const newFile: FileSystemItem = {
@@ -80,6 +81,7 @@ export const api = {
       version: 1
     };
 
+    console.log(`[CLIENT_API][VFS_WRITE] Saving document ${newFile.id} to local storage VFS.`);
     saveLocalFS([...fs, newFile]);
     return result;
   },

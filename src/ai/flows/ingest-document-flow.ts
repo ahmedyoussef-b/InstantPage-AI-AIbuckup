@@ -32,6 +32,7 @@ export type IngestOutput = z.infer<typeof IngestOutputSchema>;
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
+    console.log(`[FLOW][INGEST_GRAPH] Attempting knowledge graph extraction...`);
     // On limite la taille du texte envoyé au LLM pour l'extraction de concepts
     const slice = text.substring(0, 2000);
     
@@ -64,10 +65,10 @@ async function extractKnowledgeFromText(docId: string, text: string) {
       nodes.push({ id: 'technical_base', label: 'Connaissances Techniques', type: 'concept' });
       relations.push({ from: docId, to: 'technical_base', predicate: 'concerne' });
     }
-
+    console.log(`[FLOW][INGEST_GRAPH_DONE] Extracted ${nodes.length} nodes and ${relations.length} relations.`);
     return { nodes, relations };
   } catch (e) {
-    console.warn("[AI][INGEST] Échec de l'extraction IA (Ollama probablement hors ligne), passage en mode structurel.");
+    console.warn("[AI][INGEST_GRAPH_FAIL] Échec de l'extraction IA (Ollama probablement hors ligne), passage en mode structurel.");
     return { 
       nodes: [
         { id: docId, label: 'Document', type: 'document' },
@@ -98,9 +99,10 @@ const ingestDocumentFlow = ai.defineFlow(
     outputSchema: IngestOutputSchema,
   },
   async (input) => {
-    console.log(`[SERVER][INGEST] Traitement Elite de : ${input.fileName}`);
+    console.log(`[FLOW][INGEST] Start processing: ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
+    console.log(`[FLOW][INGEST_CHUNK] Document split into ${chunks.length} chunks of ~1000 chars.`);
     const docId = Math.random().toString(36).substring(7);
 
     // 1. Extraction du Graphe de Connaissances Standard (Hardi)
@@ -109,23 +111,28 @@ const ingestDocumentFlow = ai.defineFlow(
     // 2. Innovation 32.1: Construction de la hiérarchie des concepts (Optionnelle/Sécurisée)
     let hierarchy = null;
     try {
+      console.log(`[FLOW][INGEST_HIERARCHY] Attempting hierarchical concept extraction (Innovation 32.1)...`);
       hierarchy = await extractHierarchicalConcepts(input.fileContent.substring(0, 1500));
+      console.log(`[FLOW][INGEST_HIERARCHY_DONE] Hierarchy analysis complete.`);
     } catch (e) {
-      console.warn("[AI][INGEST] Échec hiérarchie concepts.");
+      console.warn("[AI][INGEST_HIERARCHY_FAIL] Échec hiérarchie concepts.");
     }
 
     // 3. Génération des Embeddings (Limité pour la performance locale)
     if (chunks.length > 0) {
       try {
+        console.log(`[FLOW][INGEST_EMBED] Generating embeddings for ${Math.min(chunks.length, 3)} chunks...`);
         await ai.embedMany({
           embedder: 'googleai/embedding-001',
-          content: chunks.slice(0, 3),
+          content: chunks.slice(0, 3), // Limiter à 3 pour la démo
         });
+        console.log(`[FLOW][INGEST_EMBED_DONE] Embedding process finished.`);
       } catch (e) {
-        console.warn(`[SERVER][INGEST] Service d'embedding indisponible. Ingestion simplifiée.`);
+        console.warn(`[SERVER][INGEST_EMBED_FAIL] Service d'embedding indisponible. Ingestion simplifiée.`);
       }
     }
 
+    console.log(`[FLOW][INGEST_COMPLETE] Flow finished for ${input.fileName}.`);
     return {
       docId,
       chunks: chunks.length,

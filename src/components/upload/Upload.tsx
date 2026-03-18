@@ -67,6 +67,7 @@ export default function Upload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
+      console.log(`[UI][UPLOAD] File selected: ${selected.name}`);
       setFile(selected);
       setStatus(null);
     }
@@ -78,17 +79,20 @@ export default function Upload() {
     const targetId = selectedFolderId === 'root' ? null : selectedFolderId;
     setUploading(true);
     setStatus(null);
+    console.log(`[UI][UPLOAD] Starting upload for ${file.name} into folder ID: ${targetId || 'root'}`);
     
     try {
       const result = await api.upload(file, targetId);
+      console.log(`[UI][UPLOAD_SUCCESS] API returned success for ${file.name}. Result:`, result);
       setStatus({ 
         type: 'success', 
         message: `Réussi !`,
-        chunks: result.chunks
+        chunks: result.stats?.chunks
       });
       setFile(null);
       if (inputRef.current) inputRef.current.value = '';
     } catch (error: any) {
+      console.error(`[UI][UPLOAD_ERROR] API returned error for ${file.name}. Error:`, error);
       setStatus({ 
         type: 'error', 
         message: error.message || "Échec de l'indexation." 

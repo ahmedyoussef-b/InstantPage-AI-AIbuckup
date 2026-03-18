@@ -18,14 +18,18 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File;
     const userId = formData.get('userId') as string || 'default-user';
 
-    if (!file) {
-      return NextResponse.json({ error: "Aucun fichier n'a été détecté dans la requête." }, { status: 400 });
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "Aucun fichier valide n'a été détecté dans la requête." }, { status: 400 });
     }
+
+    console.log(`[API][INGEST_START] Received request to ingest file: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+
 
     // PHASE 1: Extraction du texte brut
     let text = "";
     try {
       text = await file.text();
+      console.log(`[API][TEXT_EXTRACT] Successfully extracted ${text.length} characters.`);
     } catch (e) {
       return NextResponse.json({ error: "Impossible de lire le contenu du fichier." }, { status: 400 });
     }
@@ -36,12 +40,14 @@ export async function POST(req: NextRequest) {
 
     // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite
     // Gère le chunking, les embeddings, le graphe et la hiérarchie (Innovation 32.1)
-    // Nous ajoutons un timeout de sécurité ici si nécessaire via une promesse
+    console.log(`[API][FLOW_CALL] Calling ingestDocumentFlow for ${file.name}...`);
     const result = await ingestDocument({
       fileName: file.name,
       fileContent: text,
       fileType: file.type
     });
+    console.log(`[API][FLOW_SUCCESS] ingestDocumentFlow completed. Doc ID: ${result.docId}, Chunks: ${result.chunks}`);
+
 
     // PHASE 5: Signal d'apprentissage pour le profilage utilisateur (Innovation 26)
     const isTechnical = (result.concepts?.length || 0) > 5;
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
     // Génération de suggestions contextuelles
     const suggestions = generateInitialSuggestions(file.name, result.concepts || []);
 
-    console.log(`[API][INGEST] Succès : ${file.name} traité en ${result.chunks} segments.`);
+    console.log(`[API][RESPONSE] Sending successful ingest response to client for ${file.name}.`);
 
     return NextResponse.json({
       success: true,
