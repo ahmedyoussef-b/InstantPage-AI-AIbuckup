@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 /**
  * @fileOverview API Dashboard d'Apprentissage Consolidé - Innovation Elite 32.
- * Point d'entrée unique pour le monitoring de l'intelligence du système.
+ * Centralise les métriques RAG, Agent et Pipeline ML local.
  */
 import { getLearningStats, getRecommendedActions, getImprovementSuggestions } from '@/ai/learning/analytics';
 import { getCurrentActiveModel } from '@/ai/training/model-registry';
 
 export async function GET() {
   try {
-    // 1. Récupération des données multi-sources
     const [stats, currentModel, nextActions, improvements] = await Promise.all([
       getLearningStats(),
       getCurrentActiveModel(),
@@ -16,7 +15,6 @@ export async function GET() {
       getImprovementSuggestions()
     ]);
 
-    // 2. Construction de la réponse consolidée
     return NextResponse.json({
       model: {
         name: currentModel.id,

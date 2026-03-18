@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 /**
  * @fileOverview Ingest API Route - Phase 1 de l'Architecture Elite 32.
- * Orchestre le pipeline complet d'intégration documentaire.
+ * Orchestre le pipeline complet d'intégration documentaire avec suggestions proactives.
  */
 
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 
 /**
  * Gère l'upload et le traitement intelligent d'un document.
+ * Intègre la boucle de profilage pour l'apprentissage adaptatif.
  */
 export async function POST(req: NextRequest) {
   console.log("[API][INGEST] Démarrage du pipeline d'ingestion Elite...");
@@ -25,11 +26,7 @@ export async function POST(req: NextRequest) {
     const text = await file.text();
     
     // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite
-    // Ce flux gère :
-    // - Le découpage en segments (chunks)
-    // - La génération des vecteurs (Embeddings)
-    // - L'extraction du graphe de connaissances (Relations)
-    // - La construction de la hiérarchie des concepts (Innovation 32.1)
+    // Gère le chunking, les embeddings, le graphe et la hiérarchie (Innovation 32.1)
     const result = await ingestDocument({
       fileName: file.name,
       fileContent: text,

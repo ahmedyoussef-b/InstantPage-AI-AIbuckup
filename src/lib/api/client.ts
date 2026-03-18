@@ -1,6 +1,6 @@
 /**
- * @fileOverview API Client Elite - Orchestration AI Complete.
- * Support du pipeline ML complet et des missions Agentic complexes.
+ * @fileOverview API Client Elite - Orchestrateur de Décision Amélioré.
+ * Support du pipeline ML complet et du routage intelligent RAG/Agent.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -36,6 +36,9 @@ const saveMemory = async (episodes: Episode[]) => {
 };
 
 export const api = {
+  /**
+   * Pipeline d'ingestion avec enrichissement sémantique.
+   */
   async upload(file: File, parentId: string | null = null): Promise<any> {
     const fs = loadLocalFS();
     const text = await file.text();
@@ -58,14 +61,20 @@ export const api = {
     return { success: true, chunks: result.chunks };
   },
 
+  /**
+   * ORCHESTRATEUR AMÉLIORÉ - Routage intelligent et boucle d'apprentissage.
+   */
   async chat(query: string, history: any[] = []): Promise<any> {
-    // Détection auto du mode Agent pour les missions complexes
-    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie|planifie/gi) || []).length > 1;
+    // 1. ANALYSE & ROUTING - Détection de mission complexe
+    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie|planifie|calcule/gi) || []).length > 1;
+
+    let result;
 
     if (isComplex) {
-      console.log("[API] Mission complexe détectée -> Mode Agentic Elite");
+      // workflow Agentic (Phase 2 & 3)
+      console.log("[API][ORCHESTRATOR] Routage -> Mission Agentic Elite");
       const agentRes = await processAgentMission(query, 'default-user');
-      return {
+      result = {
         answer: agentRes.summary,
         sources: [],
         confidence: 0.95,
@@ -73,65 +82,42 @@ export const api = {
         steps: agentRes.steps,
         pedagogicalLevel: 'EXPERT'
       };
+    } else {
+      // workflow RAG Enhancée (Phase 1 & 2)
+      console.log("[API][ORCHESTRATOR] Routage -> Chat RAG Enhancée");
+      const fs = loadLocalFS();
+      const searchableDocs = fs.filter(i => i.type === 'file');
+      const docContext = await hybridRAG.retrieve(query, searchableDocs);
+      const episodicMemory = loadMemory();
+      
+      implicitRL.loadProfile();
+      result = await serverChat({ 
+        text: query, 
+        history: history.map(msg => ({ 
+          role: msg.role === 'user' ? 'user' : 'model', 
+          content: [{ text: msg.text || '' }] 
+        })),
+        documentContext: docContext,
+        episodicMemory: episodicMemory,
+        distilledRules: [],
+        userProfile: implicitRL.getProfile()
+      } as any);
     }
 
-    // Mode RAG Enhancée Standard
-    const fs = loadLocalFS();
-    const searchableDocs = fs.filter(i => i.type === 'file');
-    const docContext = await hybridRAG.retrieve(query, searchableDocs);
-    const episodicMemory = loadMemory();
-    
-    implicitRL.loadProfile();
-    const response = await serverChat({ 
-      text: query, 
-      history: history.map(msg => ({ 
-        role: msg.role === 'user' ? 'user' : 'model', 
-        content: [{ text: msg.text || '' }] 
-      })),
-      documentContext: docContext,
-      episodicMemory: episodicMemory,
-      distilledRules: [],
-      userProfile: implicitRL.getProfile()
-    } as any);
-
-    // Sauvegarde de l'expérience dans la mémoire épisodique (Phase 4)
-    if (response.newMemoryEpisode) {
-      await saveMemory([response.newMemoryEpisode, ...episodicMemory]);
+    // 2. VALIDATION & APPRENTISSAGE (Phase 4)
+    if (result.newMemoryEpisode) {
+      const currentMemory = loadMemory();
+      await saveMemory([result.newMemoryEpisode, ...currentMemory]);
     }
+
+    // 3. AMÉLIORATION - Application des règles apprises localement
+    const finalAnswer = continuousLearning.applyRules(result.answer);
 
     return { 
-      ...response, 
-      answer: continuousLearning.applyRules(response.answer) 
+      ...result, 
+      answer: finalAnswer,
+      learning: { recorded: true }
     };
-  },
-
-  async submitFeedback(input: string, prediction: string, rating: number, correction?: string) {
-    try {
-      const res = await fetch('/api/learn', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, prediction, rating, correction, modelVersion: 'v1-base' })
-      });
-      return await res.json();
-    } catch (e) {
-      console.error("[API] Feedback error", e);
-    }
-  },
-
-  async runGlobalOptimization(): Promise<any> {
-    const fs = loadLocalFS();
-    const memory = loadMemory();
-    
-    try {
-      const res = await fetch('/api/train', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documents: fs, memory })
-      });
-      return await res.json();
-    } catch (e) {
-      throw new Error("Échec de l'optimisation globale.");
-    }
   },
 
   async deleteItem(id: string): Promise<any> {
@@ -181,5 +167,16 @@ export const api = {
     doc.lastRevectorized = new Date().toISOString();
     saveLocalFS([...fs]);
     return { version: doc.version };
+  },
+
+  async runGlobalOptimization(): Promise<any> {
+    const fs = loadLocalFS();
+    const memory = loadMemory();
+    const res = await fetch('/api/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documents: fs, memory })
+    });
+    return await res.json();
   }
 };

@@ -20,23 +20,16 @@ export async function POST(req: NextRequest) {
     }
 
     // PHASE 1: COMPRENDRE - Analyse sémantique de l'intention
-    // On utilise l'analyseur de la Phase 1 du RAG pour décider de la stratégie optimale
     const analysis = await analyzeQuery(prompt);
     
-    // Logique de décision : Agent vs Chat
-    // L'agent est activé si :
-    // - Complexité élevée (> 0.75) indiquant une tâche multi-étapes
-    // - L'intention est de type 'action' (demande d'exécution d'outils)
-    // - Le mode est explicitement forcé sur 'agent' par l'UI
+    // Logique de routage : Agent vs Chat RAG
     const useAgent = mode === 'agent' || (mode === 'auto' && (analysis.complexity > 0.75 || analysis.type === 'action'));
 
     let responseData;
 
     if (useAgent) {
       // --- BRANCHE 1: AGENT INTELLIGENT (Innovation Agentic) ---
-      // Gère les missions complexes : Planification -> Exécution MCP -> Apprentissage
       console.log(`[API][CHAT] Déclenchement MISSION AGENT pour: "${prompt.substring(0, 40)}..."`);
-      
       const agentRes = await processAgentMission(prompt, userId);
       
       responseData = {
@@ -51,10 +44,7 @@ export async function POST(req: NextRequest) {
       };
     } else {
       // --- BRANCHE 2: CHAT RAG ENHANCÉE (Innovation Elite 32) ---
-      // Gère les réponses informatives ancrées dans la base de connaissances
       console.log(`[API][CHAT] Déclenchement CHAT RAG pour: "${prompt.substring(0, 40)}..."`);
-      
-      // Appel du flux Genkit qui encapsule la boucle sémantique complète
       const chatRes = await chat({
         text: prompt,
         history: history,
@@ -74,10 +64,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // PHASE 4: APPRENDRE - Intégration du monitoring ML
     const activeModel = await getCurrentActiveModel();
-
-    console.log(`[API][CHAT] Réponse générée avec succès via le modèle: ${activeModel.id}`);
 
     return NextResponse.json({
       ...responseData,
