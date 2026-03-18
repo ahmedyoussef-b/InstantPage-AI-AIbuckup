@@ -1,8 +1,7 @@
 'use server';
 /**
  * @fileOverview SelfImprovingAI - Innovation Elite Finale.
- * Orchestre le cycle d'auto-amélioration nocturne : consolidation sémantique, 
- * distillation de connaissances et optimisation ML.
+ * Orchestre le cycle d'auto-amélioration nocturne.
  */
 
 import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
@@ -10,7 +9,7 @@ import { detectCommunityPatterns } from '@/ai/learning/cross-user-learning';
 import { extractHierarchicalConcepts } from '@/ai/learning/concept-hierarchy';
 import { distillInteractions } from '@/ai/learning/knowledge-distillation';
 import { extractTaskFeatures, selectOptimalStrategy } from '@/ai/learning/meta-learning';
-import { trainingPipeline } from '@/ai/training/training-pipeline';
+import { runFullTrainingCycle } from '@/ai/training/training-pipeline';
 
 export interface ImprovementResult {
   consolidatedDocs: number;
@@ -36,7 +35,7 @@ export async function runNighttimeImprovement(context: {
   let newRulesCount = 0;
   let communityPatternsCount = 0;
 
-  // 1. PHASE 5.3: Re-vectorisation et enrichissement des documents
+  // 1. Re-vectorisation et enrichissement des documents
   for (const doc of context.documents) {
     if (doc.type === 'file') {
       const relatedMemory = context.memory.filter(e => 
@@ -55,26 +54,26 @@ export async function runNighttimeImprovement(context: {
     }
   }
 
-  // 2. PHASE 32.2: Détection de patterns collectifs
+  // 2. Détection de patterns collectifs
   const newPatterns = await detectCommunityPatterns(context.memory);
   communityPatternsCount = newPatterns.length;
 
-  // 3. PHASE 32.1: Mise à jour de la hiérarchie pour les nouveaux docs
+  // 3. Mise à jour de la hiérarchie pour les nouveaux docs
   for (const doc of context.documents.slice(0, 3)) {
     await extractHierarchicalConcepts(doc.content);
   }
 
-  // 4. PHASE 28: Distillation globale des interactions
+  // 4. Distillation globale des interactions
   const distillation = await distillInteractions(context.memory);
   newRulesCount = distillation.rules.length;
 
-  // 5. NOUVEAU : CYCLE D'ENTRAÎNEMENT ML LOCAL (Fine-Tuning)
-  const mlCycleResult = await trainingPipeline.runFullCycle({
+  // 5. CYCLE D'ENTRAÎNEMENT ML LOCAL (Fine-Tuning)
+  const mlCycleResult = await runFullTrainingCycle({
     memory: context.memory,
     documents: context.documents
   });
 
-  // 6. PHASE 31: Méta-optimisation de la stratégie
+  // 6. Méta-optimisation de la stratégie
   if (context.memory.length > 0) {
     const lastTask = context.memory[0];
     const features = await extractTaskFeatures(lastTask.context, lastTask.content);
