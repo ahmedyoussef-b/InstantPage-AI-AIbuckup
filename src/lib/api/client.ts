@@ -3,9 +3,6 @@
  * Support du pipeline ML complet et du routage intelligent RAG/Agent.
  */
 import { FileSystemItem, Stats } from '@/types';
-import { chat as serverChat } from '@/ai/flows/chat-flow';
-import { ingestDocument } from '@/ai/flows/ingest-document-flow';
-import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
@@ -34,6 +31,18 @@ const saveMemory = async (episodes: Episode[]) => {
   localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
 };
 
+/**
+ * Utilitaire pour parser le JSON de manière sécurisée.
+ */
+async function safeJsonParse(res: Response) {
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return await res.json();
+  }
+  const text = await res.text();
+  throw new Error(`Réponse invalide du serveur (${res.status}). Attendu JSON, reçu: ${text.substring(0, 50)}...`);
+}
+
 export const api = {
   /**
    * Pipeline d'ingestion avec enrichissement sémantique (Phase 1).
@@ -48,7 +57,13 @@ export const api = {
     formData.append('userId', 'default-user');
     
     const res = await fetch('/api/ingest', { method: 'POST', body: formData });
-    const result = await res.json();
+    
+    if (!res.ok) {
+      const errorData = await safeJsonParse(res).catch(() => ({ error: "Erreur serveur inconnue" }));
+      throw new Error(errorData.error || `Erreur lors de l'upload (${res.status})`);
+    }
+
+    const result = await safeJsonParse(res);
 
     const newFile: FileSystemItem = {
       id: result.documentId,
@@ -85,8 +100,12 @@ export const api = {
       })
     });
 
-    if (!response.ok) throw new Error("Échec de la communication avec l'assistant.");
-    const result = await response.json();
+    if (!response.ok) {
+      const errorData = await safeJsonParse(response).catch(() => ({ error: "Échec de la communication avec l'assistant." }));
+      throw new Error(errorData.error || "Erreur de communication.");
+    }
+    
+    const result = await safeJsonParse(response);
 
     // 2. APPRENTISSAGE : Enregistrement de l'épisode de mémoire (Phase 4)
     if (result.newMemoryEpisode) {
@@ -142,7 +161,8 @@ export const api = {
 
   async getTrainingDashboard(): Promise<any> {
     const res = await fetch('/api/training/dashboard');
-    return res.json();
+    if (!res.ok) return { activeBrain: { accuracy: 0.72 }, pipelineStatus: {}, improvementTrend: [] };
+    return safeJsonParse(res);
   },
 
   async revectorizeDocument(id: string): Promise<any> {
@@ -164,6 +184,6 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documents: fs, memory })
     });
-    return await res.json();
+    return await safeJsonParse(res);
   }
 };

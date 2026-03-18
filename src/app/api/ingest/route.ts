@@ -23,10 +23,20 @@ export async function POST(req: NextRequest) {
     }
 
     // PHASE 1: Extraction du texte brut
-    const text = await file.text();
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (e) {
+      return NextResponse.json({ error: "Impossible de lire le contenu du fichier." }, { status: 400 });
+    }
     
+    if (!text || text.trim().length === 0) {
+      return NextResponse.json({ error: "Le fichier est vide ou corrompu." }, { status: 400 });
+    }
+
     // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite
     // Gère le chunking, les embeddings, le graphe et la hiérarchie (Innovation 32.1)
+    // Nous ajoutons un timeout de sécurité ici si nécessaire via une promesse
     const result = await ingestDocument({
       fileName: file.name,
       fileContent: text,
@@ -34,11 +44,15 @@ export async function POST(req: NextRequest) {
     });
 
     // PHASE 5: Signal d'apprentissage pour le profilage utilisateur (Innovation 26)
-    const isTechnical = result.concepts.length > 5;
-    await implicitRL.processSignal('USAGE', { isTechnical, modelUsed: result.embeddingModel });
+    const isTechnical = (result.concepts?.length || 0) > 5;
+    try {
+      await implicitRL.processSignal('USAGE', { isTechnical, modelUsed: result.embeddingModel });
+    } catch (e) {
+      console.warn("[API][INGEST] Échec signal ImplicitRL, non bloquant.");
+    }
 
     // Génération de suggestions contextuelles
-    const suggestions = generateInitialSuggestions(file.name, result.concepts);
+    const suggestions = generateInitialSuggestions(file.name, result.concepts || []);
 
     console.log(`[API][INGEST] Succès : ${file.name} traité en ${result.chunks} segments.`);
 
@@ -53,7 +67,7 @@ export async function POST(req: NextRequest) {
       },
       stats: {
         chunks: result.chunks,
-        conceptsIdentified: result.concepts.length,
+        conceptsIdentified: result.concepts?.length || 0,
         embeddingModel: result.embeddingModel
       },
       hierarchy: result.hierarchy,
@@ -62,8 +76,9 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error("[API][INGEST] Échec du pipeline d'ingestion :", error);
+    // On s'assure de TOUJOURS retourner du JSON, même en cas d'erreur fatale
     return NextResponse.json({ 
-      error: "Une erreur est survenue lors du traitement du document.",
+      error: "Une erreur critique est survenue lors du traitement du document. Vérifiez que le service Ollama est actif.",
       details: error.message 
     }, { status: 500 });
   }
@@ -78,7 +93,7 @@ function generateInitialSuggestions(filename: string, concepts: string[]): strin
     `Quels sont les points critiques identifiés dans ce document ?`
   ];
 
-  if (concepts.length > 0) {
+  if (concepts && concepts.length > 0) {
     baseSuggestions.push(`Explique-moi le concept de "${concepts[0]}" mentionné ici.`);
   }
 

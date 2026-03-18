@@ -32,11 +32,14 @@ export type IngestOutput = z.infer<typeof IngestOutputSchema>;
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
+    // On limite la taille du texte envoyé au LLM pour l'extraction de concepts
+    const slice = text.substring(0, 2000);
+    
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
       system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 relations les plus importantes entre les concepts.",
       prompt: `Analyse ce document technique et extrait au maximum 3 relations clés sous le format "Sujet -> Relation -> Objet".
-      Contenu : "${text.substring(0, 1000)}"`,
+      Contenu : "${slice}"`,
     });
 
     const lines = response.text.split('\n').filter(l => l.includes('->'));
@@ -64,7 +67,7 @@ async function extractKnowledgeFromText(docId: string, text: string) {
 
     return { nodes, relations };
   } catch (e) {
-    console.warn("[AI][INGEST] Échec de l'extraction IA, passage en mode structurel.");
+    console.warn("[AI][INGEST] Échec de l'extraction IA (Ollama probablement hors ligne), passage en mode structurel.");
     return { 
       nodes: [
         { id: docId, label: 'Document', type: 'document' },
@@ -100,11 +103,16 @@ const ingestDocumentFlow = ai.defineFlow(
     const chunks = chunkText(input.fileContent, 1000);
     const docId = Math.random().toString(36).substring(7);
 
-    // 1. Extraction du Graphe de Connaissances Standard
+    // 1. Extraction du Graphe de Connaissances Standard (Hardi)
     const { nodes, relations } = await extractKnowledgeFromText(docId, input.fileContent);
 
-    // 2. Innovation 32.1: Construction de la hiérarchie des concepts
-    const hierarchy = await extractHierarchicalConcepts(input.fileContent);
+    // 2. Innovation 32.1: Construction de la hiérarchie des concepts (Optionnelle/Sécurisée)
+    let hierarchy = null;
+    try {
+      hierarchy = await extractHierarchicalConcepts(input.fileContent.substring(0, 1500));
+    } catch (e) {
+      console.warn("[AI][INGEST] Échec hiérarchie concepts.");
+    }
 
     // 3. Génération des Embeddings (Limité pour la performance locale)
     if (chunks.length > 0) {
@@ -114,7 +122,7 @@ const ingestDocumentFlow = ai.defineFlow(
           content: chunks.slice(0, 3),
         });
       } catch (e) {
-        console.warn(`[SERVER][INGEST] Service d'embedding indisponible.`);
+        console.warn(`[SERVER][INGEST] Service d'embedding indisponible. Ingestion simplifiée.`);
       }
     }
 
