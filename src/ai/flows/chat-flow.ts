@@ -13,6 +13,7 @@ import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
 import { modularReasoner } from '@/ai/reasoning/modular';
 import { collaborativeReasoner } from '@/ai/reasoning/collaborative';
 import { toolformer } from '@/ai/actions/toolformer-local';
+import { getHierarchicalPlan, formatHierarchicalPlan } from '@/ai/actions/hierarchical-planner';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -31,6 +32,7 @@ const ChatOutputSchema = z.object({
   disclaimer: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
   actionTaken: z.any().optional(),
+  planGenerated: z.boolean().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -39,8 +41,19 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     const q = input.text.toLowerCase();
     let docContext = input.documentContext || "";
+    let prefixOutput = "";
+    let planGenerated = false;
 
-    // 1. Toolformer Local (Innovation 17) - Décision d'action avant génération
+    // 1. Planification Hiérarchique (Innovation 18) - Détection d'intention de tâche complexe
+    if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || q.length > 80) {
+      console.log("[AI][FLOW] Activation de la Planification Hiérarchique...");
+      const plan = await getHierarchicalPlan(input.text, docContext);
+      prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
+      docContext += `\n[NOTE SYSTÈME: Un plan hiérarchique a été généré pour cette tâche. Analyse-le pour finaliser la réponse.]`;
+      planGenerated = true;
+    }
+
+    // 2. Toolformer Local (Innovation 17) - Décision d'action avant génération
     const action = await toolformer.decideAction(input.text, docContext);
     let actionInfo = null;
 
@@ -100,11 +113,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const metaResult = await metacognitiveReasoner.reason(input.text, docContext, standardGenerate);
 
     return {
-      answer: metaResult.answer,
+      answer: prefixOutput + metaResult.answer,
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
       suggestions: metaResult.suggestions,
       actionTaken: actionInfo,
+      planGenerated,
       isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0)
     };
   };
@@ -122,6 +136,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       disclaimer: parsed.disclaimer,
       suggestions: parsed.suggestions,
       actionTaken: parsed.actionTaken,
+      planGenerated: parsed.planGenerated,
       isAnalogical: parsed.isAnalogical || false,
       sources: []
     };
