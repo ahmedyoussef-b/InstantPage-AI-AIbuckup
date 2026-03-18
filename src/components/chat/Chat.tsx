@@ -5,11 +5,8 @@ import { api } from '@/lib/api/client';
 import { 
   Send, 
   Sparkles, 
-  FileText, 
   Brain, 
-  ShieldCheck, 
   ListChecks, 
-  HelpCircle, 
   Mic, 
   MicOff,
   Activity,
@@ -22,7 +19,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent } from '@/components/ui/card';
 import VoiceMessage from '@/components/chat/VoiceMessage';
 import VoiceControls from '@/components/chat/VoiceControls';
 import { useVoiceEnhanced } from '@/hooks/useVoiceEnhanced';
@@ -54,6 +50,7 @@ export default function Chat() {
     const trimmed = textToSend.trim();
     if (!trimmed || loading) return;
 
+    console.log(`[UI][CHAT] Envoi du message utilisateur : "${trimmed.substring(0, 50)}..."`);
     setLoading(true);
     if (!textOverride) setInput('');
     
@@ -62,7 +59,10 @@ export default function Chat() {
     setMessages(prev => [...prev, userMsg]);
 
     try {
+      console.log(`[UI][CHAT] Appel de l'API orchestrateur...`);
       const data = await api.chat(trimmed, messages);
+      console.log(`[UI][CHAT] Réponse reçue de l'IA (Mode: ${data.isAgentMission ? 'AGENT' : 'RAG'})`);
+      
       const aiMsgId = Math.random().toString(36).substring(7);
       
       setMessages(prev => [...prev, { 
@@ -79,6 +79,7 @@ export default function Chat() {
         setExpandedMissionId(aiMsgId);
       }
     } catch (error) {
+      console.error(`[UI][CHAT] Erreur lors de l'interaction :`, error);
       const errId = Math.random().toString(36).substring(7);
       setMessages(prev => [...prev, { 
         role: 'ai', 
@@ -92,7 +93,6 @@ export default function Chat() {
 
   const {
     isListening,
-    isSpeaking,
     interimTranscript,
     startListening,
     stopListening,
@@ -118,14 +118,14 @@ export default function Chat() {
         <Button
           onClick={() => setMode('chat')}
           variant={mode === 'chat' ? 'default' : 'ghost'}
-          className={mode === 'chat' ? 'bg-blue-600 text-white rounded-xl' : 'text-gray-400 hover:text-white rounded-xl'}
+          className={cn(mode === 'chat' ? 'bg-blue-600 text-white rounded-xl' : 'text-gray-400 hover:text-white rounded-xl')}
         >
           <Brain className="w-4 h-4 mr-2" /> Chat Intelligent
         </Button>
         <Button
           onClick={() => setMode('procedure')}
           variant={mode === 'procedure' ? 'default' : 'ghost'}
-          className={mode === 'procedure' ? 'bg-green-600 text-white rounded-xl' : 'text-gray-400 hover:text-white rounded-xl'}
+          className={cn(mode === 'procedure' ? 'bg-green-600 text-white rounded-xl' : 'text-gray-400 hover:text-white rounded-xl')}
         >
           <ListChecks className="w-4 h-4 mr-2" /> Mode Procédure
         </Button>
@@ -174,7 +174,6 @@ export default function Chat() {
                       autoPlay={autoPlayResponse && msg.role === 'ai' && msg === messages[messages.length - 1]}
                     />
                     
-                    {/* Visualisation du Plan Agentic */}
                     {msg.isAgentMission && msg.steps && (
                       <div className="ml-12 mr-4 bg-purple-600/5 border border-purple-500/20 rounded-3xl overflow-hidden animate-in slide-in-from-top-4 duration-500 shadow-2xl shadow-purple-500/5">
                         <button 
@@ -227,7 +226,6 @@ export default function Chat() {
                       </div>
                     )}
 
-                    {/* Suggestions contextuelles */}
                     {msg.role === 'ai' && msg.suggestions && msg.suggestions.length > 0 && (
                       <div className="ml-12 flex flex-wrap gap-2 animate-in fade-in duration-700">
                         {msg.suggestions.map((suggestion, i) => (

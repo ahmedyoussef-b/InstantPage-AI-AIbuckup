@@ -27,14 +27,10 @@ const loadMemory = (): Episode[] => {
 
 const saveMemory = async (episodes: Episode[]) => {
   if (typeof window === 'undefined') return;
-  // Note: applyForgetting est appelé côté serveur ou simulé ici pour éviter les imports 'use server'
   const optimized = episodes.slice(0, 50); 
   localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
 };
 
-/**
- * Utilitaire pour parser le JSON de manière sécurisée.
- */
 async function safeJsonParse(res: Response) {
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
@@ -45,7 +41,6 @@ async function safeJsonParse(res: Response) {
     }
   }
   const text = await res.text();
-  // Si on reçoit du HTML (erreur serveur), on extrait le message d'erreur si possible
   if (text.includes('<html>')) {
     throw new Error(`Erreur serveur (${res.status}). Veuillez vérifier que le backend est opérationnel.`);
   }
@@ -54,7 +49,7 @@ async function safeJsonParse(res: Response) {
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<any> {
-    console.log(`[CLIENT_API][UPLOAD_INIT] Initiating upload for file: ${file.name} to parent: ${parentId || 'root'}`);
+    console.log(`[CLIENT_API][UPLOAD] Envoi du fichier : ${file.name}`);
     if (!(file instanceof File)) throw new Error("Le fichier est invalide.");
     
     const fs = loadLocalFS();
@@ -81,12 +76,14 @@ export const api = {
       version: 1
     };
 
-    console.log(`[CLIENT_API][VFS_WRITE] Saving document ${newFile.id} to local storage VFS.`);
+    console.log(`[CLIENT_API][UPLOAD] Document indexé avec succès (ID: ${newFile.id})`);
     saveLocalFS([...fs, newFile]);
     return result;
   },
 
   async chat(query: string, history: any[] = []): Promise<any> {
+    console.log(`[CLIENT_API][CHAT] Envoi de la requête au backend : "${query.substring(0, 30)}..."`);
+    
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -99,18 +96,24 @@ export const api = {
     });
 
     const result = await safeJsonParse(response);
-    if (result.error) throw new Error(result.error);
+    if (result.error) {
+      console.error(`[CLIENT_API][CHAT] Erreur backend :`, result.error);
+      throw new Error(result.error);
+    }
 
     if (result.newMemoryEpisode) {
+      console.log(`[CLIENT_API][CHAT] Mémorisation d'un nouvel épisode épisodique.`);
       const currentMemory = loadMemory();
       await saveMemory([result.newMemoryEpisode, ...currentMemory]);
     }
 
     const finalAnswer = continuousLearning.applyRules(result.answer);
+    console.log(`[CLIENT_API][CHAT] Traitement terminé.`);
     return { ...result, answer: finalAnswer };
   },
 
   async deleteItem(id: string): Promise<any> {
+    console.log(`[CLIENT_API][DELETE] Suppression de l'élément : ${id}`);
     const fs = loadLocalFS();
     saveLocalFS(fs.filter(item => item.id !== id));
     return { success: true };
@@ -140,10 +143,12 @@ export const api = {
   },
 
   async submitFeedback(query: string, _response: string, rating: number): Promise<void> {
+    console.log(`[CLIENT_API][FEEDBACK] Signal ImplicitRL (Rating: ${rating})`);
     await implicitRL.processSignal(rating >= 4 ? 'ACCEPTANCE' : 'CORRECTION', { isTechnical: query.length > 50 });
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
+    console.log(`[CLIENT_API][CORRECTION] Enregistrement d'une règle corrective.`);
     return await continuousLearning.recordCorrection(original, corrected);
   },
 
@@ -154,6 +159,7 @@ export const api = {
   },
 
   async revectorizeDocument(id: string): Promise<any> {
+    console.log(`[CLIENT_API][REVECTORIZE] Demande de re-vectorisation pour : ${id}`);
     const fs = loadLocalFS();
     const doc = fs.find(f => f.id === id);
     if (!doc) throw new Error("Document introuvable.");
@@ -165,6 +171,7 @@ export const api = {
   },
 
   async runGlobalOptimization(): Promise<any> {
+    console.log(`[CLIENT_API][OPTIMIZE] Lancement du cycle d'optimisation global.`);
     const fs = loadLocalFS();
     const memory = loadMemory();
     const res = await fetch('/api/train', {

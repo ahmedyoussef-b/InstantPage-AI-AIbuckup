@@ -10,6 +10,8 @@ import { getCurrentActiveModel } from '@/ai/training/model-registry';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
 export async function POST(req: NextRequest) {
+  console.log("[API][CHAT] Nouvelle requête reçue.");
+
   try {
     const { prompt, history = [], userId = 'default-user', mode = 'auto' } = await req.json();
 
@@ -18,17 +20,18 @@ export async function POST(req: NextRequest) {
     }
 
     // PHASE 1: COMPRENDRE - Analyse sémantique de l'intention
+    console.log(`[API][CHAT] Phase 1 : Analyse de l'intention...`);
     const analysis = await analyzeQuery(prompt);
     
     // Logique de routage : Agent vs Chat RAG
-    // Un agent est déclenché si la complexité est haute ou si l'intention est explicitement une action
     const useAgent = mode === 'agent' || (mode === 'auto' && (analysis.complexity > 0.75 || analysis.type === 'action'));
+    console.log(`[API][CHAT] Stratégie sélectionnée : ${useAgent ? 'MISSION AGENT' : 'CHAT RAG'}`);
 
     let responseData;
 
     if (useAgent) {
       // --- BRANCHE 1: AGENT INTELLIGENT (Mission Autonome MCP) ---
-      console.log(`[API][CHAT] Déclenchement MISSION AGENT pour: "${prompt.substring(0, 40)}..."`);
+      console.log(`[API][CHAT] Déclenchement de l'agent missionnaire...`);
       const agentRes = await processAgentMission(prompt, userId);
       
       responseData = {
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
       };
     } else {
       // --- BRANCHE 2: CHAT RAG ENHANCÉE (Raisonnement Métacognitif) ---
-      console.log(`[API][CHAT] Déclenchement CHAT RAG pour: "${prompt.substring(0, 40)}..."`);
+      console.log(`[API][CHAT] Déclenchement du flux RAG Elite...`);
       
       // Charger le profil utilisateur pour adapter la réponse (Implicit RL)
       implicitRL.loadProfile();
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
 
     // Récupérer le modèle actif pour le reporting
     const activeModel = await getCurrentActiveModel();
+    console.log(`[API][CHAT] Réponse prête (Modèle: ${activeModel.id}).`);
 
     return NextResponse.json({
       ...responseData,
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("[API][CHAT] Échec critique de l'orchestrateur hybride:", error);
+    console.error("[API][CHAT] Échec critique de l'orchestrateur hybride :", error);
     return NextResponse.json({ 
       error: "L'assistant a rencontré une difficulté technique lors de l'analyse.",
       details: error.message 
