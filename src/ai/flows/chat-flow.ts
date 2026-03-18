@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'genkit';
+import { semanticRouter } from '@/ai/router';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -19,11 +20,13 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent personnalisé pour AHMED.
- * Gère le contexte RAG et les interactions personnelles.
+ * Chat Intelligent personnalisé pour AHMED avec Routage Sémantique.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   console.log(`[BACKEND][FLOW:chat] Requête pour AHMED : "${input.text}"`);
+
+  // 1. Déterminer le modèle optimal via le Routeur Sémantique
+  const targetModel = await semanticRouter.route(input.text);
 
   const contextPrompt = input.documentContext 
     ? `Voici le contenu des documents disponibles pour t'aider :\n\n${input.documentContext}`
@@ -31,10 +34,10 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
   const systemPrompt = `Tu es l'Assistant Personnel Intelligent de AHMED.
     
-    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, expert en maintenance industrielle et le saluer personnellement.
+    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, expert technique et le saluer personnellement.
     
     INSTRUCTIONS :
-    - Si AHMED te dit "Bonjour", "Bonsoir", "Salut", réponds toujours en mentionnant son nom : "Bonjour AHMED", "Bonsoir AHMED".
+    - Si AHMED te salue ("Bonjour", "Salut", "Bonsoir"), réponds TOUJOURS : "Bonjour AHMED", "Bonsoir AHMED" ou "Salut AHMED".
     - Réponds TOUJOURS en français.
     - Utilise le contexte des documents fournis ci-dessous pour répondre précisément.
     - Sois concis et technique si nécessaire.
@@ -46,14 +49,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // Utilisation d'Ollama local par défaut
     const url = 'http://localhost:11434/api/generate';
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'phi3:mini', // Modèle performant et léger
+        model: targetModel, 
         prompt: `${systemPrompt}\n\nQuestion de AHMED: ${input.text}\n\nRéponse personnalisée en français:`,
         stream: false,
         options: {
@@ -66,15 +68,16 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Fallback amical si Ollama est hors ligne
       const lowerText = input.text.toLowerCase();
       if (["bonjour", "bonsoir", "salut"].some(g => lowerText.includes(g))) {
         return {
-          answer: `Bonjour AHMED ! Ravi de vous voir. Le service IA local est momentanément hors ligne, mais je suis là pour vos documents.`,
+          answer: `Bonjour AHMED ! Ravi de vous voir. Le service IA local est momentanément indisponible, mais je reste à votre disposition pour vos documents.`,
           sources: []
         };
       }
       return {
-        answer: "Désolé AHMED, le moteur IA local (Ollama) ne répond pas.",
+        answer: "Désolé AHMED, le moteur IA local ne répond pas actuellement.",
         sources: [],
       };
     }
@@ -88,7 +91,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const lowerText = input.text.toLowerCase();
     if (["bonjour", "salut", "bonsoir"].some(g => lowerText.includes(g))) {
       return {
-        answer: "Bonjour AHMED ! Ravi de vous voir. Comment puis-je vous aider aujourd'hui ?",
+        answer: `Bonjour AHMED ! Comment puis-je vous aider aujourd'hui ?`,
         sources: []
       };
     }

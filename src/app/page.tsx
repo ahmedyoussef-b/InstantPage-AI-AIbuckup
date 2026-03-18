@@ -79,7 +79,7 @@ export default function HomePage() {
         {!collapsed ? (
           <>
             <div className="px-3 py-2 flex items-center justify-between animate-in fade-in">
-              <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase trackingwidest">
+              <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
                 <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
               </div>
               <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local</Badge>
@@ -120,7 +120,7 @@ export default function HomePage() {
                   <Menu className="w-6 h-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 border-none w-72">
+              <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
                   <SheetTitle className="sr-only">AHMED Pro Assistant Navigation</SheetTitle>
                 </SheetHeader>

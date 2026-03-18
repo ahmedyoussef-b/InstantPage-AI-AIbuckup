@@ -9,7 +9,7 @@ import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
-const STORAGE_KEY = 'AHMED_LOCAL_FS_SECURE';
+const STORAGE_KEY = 'AHMED_LOCAL_FS_SECURE_V2';
 
 /**
  * Charge les données depuis le stockage local avec gestion d'erreurs.
@@ -18,7 +18,9 @@ const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     console.error("[API_CLIENT] Erreur de lecture BDD locale:", e);
     return [];
@@ -31,10 +33,16 @@ const loadLocalFS = (): FileSystemItem[] => {
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
+    const data = JSON.stringify(fs);
+    localStorage.setItem(STORAGE_KEY, data);
+    // Double vérification pour s'assurer que l'écriture a réussi
+    const check = localStorage.getItem(STORAGE_KEY);
+    if (check !== data) {
+      throw new Error("Échec de la vérification de l'écriture atomique.");
+    }
   } catch (e: any) {
     if (e.name === 'QuotaExceededError') {
-      alert("Attention AHMED : Limite de stockage local atteinte. Veuillez supprimer des documents anciens.");
+      alert("Attention AHMED : Limite de stockage local atteinte (5MB). Veuillez supprimer des documents anciens.");
     }
     console.error("[API_CLIENT] Erreur de sauvegarde BDD locale:", e);
   }
@@ -44,10 +52,9 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
-    // Vérification de doublon par nom dans le même dossier
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
-      throw new Error(`Le fichier "${file.name}" est déjà présent.`);
+      throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
     }
 
     try {
@@ -69,8 +76,8 @@ export const api = {
         parentId
       };
 
-      fs.push(newFile);
-      saveLocalFS(fs);
+      const updatedFS = [...fs, newFile];
+      saveLocalFS(updatedFS);
 
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
@@ -111,8 +118,8 @@ export const api = {
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
     let fs = loadLocalFS();
-    fs = fs.filter(item => item.id !== id);
-    saveLocalFS(fs);
+    const updatedFS = fs.filter(item => item.id !== id);
+    saveLocalFS(updatedFS);
     
     await deleteDocument({ docId: id, fileName: name }).catch(() => {});
     return { success: true, purgedChunks: 1 };
@@ -130,8 +137,8 @@ export const api = {
       uploadedAt: new Date().toISOString()
     };
     
-    fs.push(newFolder);
-    saveLocalFS(fs);
+    const updatedFS = [...fs, newFolder];
+    saveLocalFS(updatedFS);
     return { ...newFolder, children: [] };
   },
 
@@ -151,7 +158,11 @@ export const api = {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "5 MB", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "Local" }
+      diskSpace: { 
+        total: "5 MB", 
+        used: `${(stats.size / 1024).toFixed(1)} KB`, 
+        free: `${(5120 - stats.size / 1024).toFixed(1)} KB` 
+      }
     };
   },
 
@@ -171,12 +182,10 @@ export const api = {
   },
 
   async getDocChunks(docId: string) {
-    // Dans le mode local, on simule l'extraction des chunks depuis le contenu stocké
     const fs = loadLocalFS();
     const file = fs.find(i => i.id === docId);
     if (!file || !file.content) return [];
     
-    // Simuler le découpage pour l'inspection
     const chunks = [];
     const size = 1000;
     for (let i = 0; i < file.content.length; i += size) {
