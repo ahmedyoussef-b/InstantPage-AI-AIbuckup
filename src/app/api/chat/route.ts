@@ -7,6 +7,7 @@ import { analyzeQuery } from '@/ai/rag/query-analyzer';
 import { chat } from '@/ai/flows/chat-flow';
 import { processAgentMission } from '@/ai/agent/agent-core';
 import { getCurrentActiveModel } from '@/ai/training/model-registry';
+import { implicitRL } from '@/ai/learning/implicit-rl';
 
 /**
  * Gère les interactions de chat avec détection d'intention et routage intelligent.
@@ -23,12 +24,13 @@ export async function POST(req: NextRequest) {
     const analysis = await analyzeQuery(prompt);
     
     // Logique de routage : Agent vs Chat RAG
+    // Un agent est déclenché si la complexité est haute ou si l'intention est explicitement une action
     const useAgent = mode === 'agent' || (mode === 'auto' && (analysis.complexity > 0.75 || analysis.type === 'action'));
 
     let responseData;
 
     if (useAgent) {
-      // --- BRANCHE 1: AGENT INTELLIGENT (Innovation Agentic) ---
+      // --- BRANCHE 1: AGENT INTELLIGENT (Mission Autonome MCP) ---
       console.log(`[API][CHAT] Déclenchement MISSION AGENT pour: "${prompt.substring(0, 40)}..."`);
       const agentRes = await processAgentMission(prompt, userId);
       
@@ -43,12 +45,16 @@ export async function POST(req: NextRequest) {
         patternsLearned: agentRes.patternsLearned
       };
     } else {
-      // --- BRANCHE 2: CHAT RAG ENHANCÉE (Innovation Elite 32) ---
+      // --- BRANCHE 2: CHAT RAG ENHANCÉE (Raisonnement Métacognitif) ---
       console.log(`[API][CHAT] Déclenchement CHAT RAG pour: "${prompt.substring(0, 40)}..."`);
+      
+      // Charger le profil utilisateur pour adapter la réponse (Implicit RL)
+      implicitRL.loadProfile();
+      
       const chatRes = await chat({
         text: prompt,
         history: history,
-        userId: userId
+        userProfile: implicitRL.getProfile()
       } as any);
 
       responseData = {
@@ -60,10 +66,12 @@ export async function POST(req: NextRequest) {
         pedagogicalLevel: chatRes.pedagogicalLevel,
         collaborativeInsight: chatRes.collaborativeInsight,
         recommendations: chatRes.recommendations,
-        disclaimer: chatRes.disclaimer
+        disclaimer: chatRes.disclaimer,
+        newMemoryEpisode: chatRes.newMemoryEpisode
       };
     }
 
+    // Récupérer le modèle actif pour le reporting
     const activeModel = await getCurrentActiveModel();
 
     return NextResponse.json({

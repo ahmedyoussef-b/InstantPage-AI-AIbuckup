@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 /**
  * @fileOverview Agent API Route - Innovation Elite 32.
- * Point d'entrée pour les missions autonomes : Décomposition -> Planification -> Exécution MCP.
+ * Point d'entrée pour les missions autonomes : Décomposition -> Planification -> Exécution MCP -> Apprentissage.
  */
 import { processAgentMission } from '@/ai/agent/agent-core';
 
 /**
  * Gère les missions agentiques autonomes.
+ * Utilisé pour les tâches multi-étapes nécessitant des outils (search, calculate, email, etc.)
  */
 export async function POST(req: NextRequest) {
-  console.log("[API][AGENT] Réception d'une nouvelle mission complexe...");
+  console.log("[API][AGENT] Réception d'une nouvelle mission autonome...");
 
   try {
     const { request, userId = 'default-user' } = await req.json();
@@ -23,7 +24,11 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now();
 
-    // Orchestration via le cœur décisionnel (Phases 1 à 4)
+    // Orchestration via le cœur décisionnel Agentic (Phases 1 à 4)
+    // 1. MCP Context Gather & Intention Analysis
+    // 2. Task Planning (Hierarchical Decomposition)
+    // 3. Resilient Execution (MCP Tools)
+    // 4. Learning from Execution (Pattern Extraction)
     const missionResult = await processAgentMission(request, userId);
 
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);

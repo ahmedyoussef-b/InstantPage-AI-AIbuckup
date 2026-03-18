@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * @fileOverview Ingest API Route - Phase 1 de l'Architecture Elite 32.
  * Orchestre le pipeline complet d'intégration documentaire avec suggestions proactives.
  */
-
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
+import { implicitRL } from '@/ai/learning/implicit-rl';
 
 /**
  * Gère l'upload et le traitement intelligent d'un document.
@@ -33,7 +33,11 @@ export async function POST(req: NextRequest) {
       fileType: file.type
     });
 
-    // PHASE 5: Génération de suggestions contextuelles
+    // PHASE 5: Signal d'apprentissage pour le profilage utilisateur (Innovation 26)
+    const isTechnical = result.concepts.length > 5;
+    await implicitRL.processSignal('USAGE', { isTechnical, modelUsed: result.embeddingModel });
+
+    // Génération de suggestions contextuelles
     const suggestions = generateInitialSuggestions(file.name, result.concepts);
 
     console.log(`[API][INGEST] Succès : ${file.name} traité en ${result.chunks} segments.`);

@@ -8,6 +8,7 @@ import { getCurrentActiveModel } from '@/ai/training/model-registry';
 
 export async function GET() {
   try {
+    // Collecte des métriques depuis les différents modules d'intelligence
     const [stats, currentModel, nextActions, improvements] = await Promise.all([
       getLearningStats(),
       getCurrentActiveModel(),
@@ -21,7 +22,8 @@ export async function GET() {
         version: "Elite-32-v2",
         accuracy: currentModel.accuracy,
         trainedOn: new Date(currentModel.deployedAt || Date.now()).toLocaleDateString('fr-FR'),
-        dataSize: "14.5 MB"
+        dataSize: "14.5 MB",
+        status: currentModel.status
       },
       learning: {
         totalInteractions: stats.totalInteractions,
@@ -44,7 +46,8 @@ export async function GET() {
         lastTraining: stats.training.last,
         nextScheduled: stats.training.next,
         dataAvailable: stats.training.dataAvailable,
-        threshold: 100
+        threshold: 100,
+        isReady: stats.training.dataAvailable >= 100
       },
       recommendations: {
         nextActions,

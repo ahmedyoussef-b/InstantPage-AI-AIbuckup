@@ -4,7 +4,6 @@
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
-import { processAgentMission } from '@/ai/agent/agent-core';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
@@ -37,86 +36,70 @@ const saveMemory = async (episodes: Episode[]) => {
 
 export const api = {
   /**
-   * Pipeline d'ingestion avec enrichissement sémantique.
+   * Pipeline d'ingestion avec enrichissement sémantique (Phase 1).
    */
   async upload(file: File, parentId: string | null = null): Promise<any> {
     const fs = loadLocalFS();
     const text = await file.text();
-    const result = await ingestDocument({ fileName: file.name, fileContent: text, fileType: file.type });
+    
+    // Appel à l'API d'ingestion Elite
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userId', 'default-user');
+    
+    const res = await fetch('/api/ingest', { method: 'POST', body: formData });
+    const result = await res.json();
 
     const newFile: FileSystemItem = {
-      id: result.docId,
+      id: result.documentId,
       name: file.name,
       type: 'file',
       size: file.size,
-      chunks: result.chunks,
+      chunks: result.stats.chunks,
       content: text,
       uploadedAt: new Date().toISOString(),
       parentId,
-      tags: result.concepts,
+      tags: result.concepts || [],
       version: 1
     };
 
     saveLocalFS([...fs, newFile]);
-    return { success: true, chunks: result.chunks };
+    return { success: true, chunks: result.stats.chunks };
   },
 
   /**
-   * ORCHESTRATEUR AMÉLIORÉ - Routage intelligent et boucle d'apprentissage.
+   * ORCHESTRATEUR ELITE 32 - Routage intelligent et boucle d'apprentissage.
    */
   async chat(query: string, history: any[] = []): Promise<any> {
-    // 1. ANALYSE & ROUTING - Détection de mission complexe
-    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie|planifie|calcule/gi) || []).length > 1;
+    console.log("[API][ORCHESTRATOR] Traitement de la demande...");
 
-    let result;
+    // 1. ROUTING & EXECUTION via API Hybride
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: query,
+        history: history,
+        userId: 'default-user',
+        mode: 'auto'
+      })
+    });
 
-    if (isComplex) {
-      // workflow Agentic (Phase 2 & 3)
-      console.log("[API][ORCHESTRATOR] Routage -> Mission Agentic Elite");
-      const agentRes = await processAgentMission(query, 'default-user');
-      result = {
-        answer: agentRes.summary,
-        sources: [],
-        confidence: 0.95,
-        isAgentMission: true,
-        steps: agentRes.steps,
-        pedagogicalLevel: 'EXPERT'
-      };
-    } else {
-      // workflow RAG Enhancée (Phase 1 & 2)
-      console.log("[API][ORCHESTRATOR] Routage -> Chat RAG Enhancée");
-      const fs = loadLocalFS();
-      const searchableDocs = fs.filter(i => i.type === 'file');
-      const docContext = await hybridRAG.retrieve(query, searchableDocs);
-      const episodicMemory = loadMemory();
-      
-      implicitRL.loadProfile();
-      result = await serverChat({ 
-        text: query, 
-        history: history.map(msg => ({ 
-          role: msg.role === 'user' ? 'user' : 'model', 
-          content: [{ text: msg.text || '' }] 
-        })),
-        documentContext: docContext,
-        episodicMemory: episodicMemory,
-        distilledRules: [],
-        userProfile: implicitRL.getProfile()
-      } as any);
-    }
+    if (!response.ok) throw new Error("Échec de la communication avec l'assistant.");
+    const result = await response.json();
 
-    // 2. VALIDATION & APPRENTISSAGE (Phase 4)
+    // 2. APPRENTISSAGE : Enregistrement de l'épisode de mémoire (Phase 4)
     if (result.newMemoryEpisode) {
       const currentMemory = loadMemory();
       await saveMemory([result.newMemoryEpisode, ...currentMemory]);
     }
 
-    // 3. AMÉLIORATION - Application des règles apprises localement
+    // 3. AMÉLIORATION : Application des règles apprises localement (Innovation 28)
     const finalAnswer = continuousLearning.applyRules(result.answer);
 
     return { 
       ...result, 
-      answer: finalAnswer,
-      learning: { recorded: true }
+      answer: finalAnswer
     };
   },
 
@@ -147,6 +130,10 @@ export const api = {
       }));
     };
     return buildTree(null);
+  },
+
+  async submitFeedback(query: string, response: string, rating: number): Promise<void> {
+    await implicitRL.processSignal(rating >= 4 ? 'ACCEPTANCE' : 'CORRECTION', { isTechnical: query.length > 50 });
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
