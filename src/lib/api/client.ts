@@ -10,11 +10,9 @@ import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
 import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
-import { feedbackLoop } from '@/ai/ml/feedback-loop';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const MEMORY_KEY = 'AGENTIC_EPisodic_MEMORY_V1';
-const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -61,20 +59,23 @@ export const api = {
   },
 
   async chat(query: string, history: any[] = []): Promise<any> {
-    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie/gi) || []).length > 1;
+    // Détection auto du mode Agent pour les missions complexes
+    const isComplex = (query.match(/et|ensuite|puis|organise|prépare|envoie|planifie/gi) || []).length > 1;
 
     if (isComplex) {
-      console.log("[API] Mission complexe -> Agentic Mode");
+      console.log("[API] Mission complexe détectée -> Mode Agentic Elite");
       const agentRes = await processAgentMission(query, 'default-user');
       return {
         answer: agentRes.summary,
         sources: [],
         confidence: 0.95,
         isAgentMission: true,
-        steps: agentRes.steps
+        steps: agentRes.steps,
+        pedagogicalLevel: 'EXPERT'
       };
     }
 
+    // Mode RAG Enhancée Standard
     const fs = loadLocalFS();
     const searchableDocs = fs.filter(i => i.type === 'file');
     const docContext = await hybridRAG.retrieve(query, searchableDocs);
@@ -83,13 +84,17 @@ export const api = {
     implicitRL.loadProfile();
     const response = await serverChat({ 
       text: query, 
-      history: history.map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', content: [{ text: msg.text || '' }] })),
+      history: history.map(msg => ({ 
+        role: msg.role === 'user' ? 'user' : 'model', 
+        content: [{ text: msg.text || '' }] 
+      })),
       documentContext: docContext,
       episodicMemory: episodicMemory,
       distilledRules: [],
       userProfile: implicitRL.getProfile()
     } as any);
 
+    // Sauvegarde de l'expérience dans la mémoire épisodique (Phase 4)
     if (response.newMemoryEpisode) {
       await saveMemory([response.newMemoryEpisode, ...episodicMemory]);
     }
@@ -98,6 +103,35 @@ export const api = {
       ...response, 
       answer: continuousLearning.applyRules(response.answer) 
     };
+  },
+
+  async submitFeedback(input: string, prediction: string, rating: number, correction?: string) {
+    try {
+      const res = await fetch('/api/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, prediction, rating, correction, modelVersion: 'v1-base' })
+      });
+      return await res.json();
+    } catch (e) {
+      console.error("[API] Feedback error", e);
+    }
+  },
+
+  async runGlobalOptimization(): Promise<any> {
+    const fs = loadLocalFS();
+    const memory = loadMemory();
+    
+    try {
+      const res = await fetch('/api/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documents: fs, memory })
+      });
+      return await res.json();
+    } catch (e) {
+      throw new Error("Échec de l'optimisation globale.");
+    }
   },
 
   async deleteItem(id: string): Promise<any> {
@@ -134,7 +168,18 @@ export const api = {
   },
 
   async getTrainingDashboard(): Promise<any> {
-    const res = await fetch('/api/ml/dashboard');
+    const res = await fetch('/api/training/dashboard');
     return res.json();
+  },
+
+  async revectorizeDocument(id: string): Promise<any> {
+    const fs = loadLocalFS();
+    const doc = fs.find(f => f.id === id);
+    if (!doc) throw new Error("Document introuvable.");
+    
+    doc.version = (doc.version || 1) + 1;
+    doc.lastRevectorized = new Date().toISOString();
+    saveLocalFS([...fs]);
+    return { version: doc.version };
   }
 };

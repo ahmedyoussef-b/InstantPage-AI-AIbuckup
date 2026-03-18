@@ -58,7 +58,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     }
   );
 
-  // Anticipation d'action
+  // Anticipation d'action (Phase 3.1)
   await agirVector(interaction.query, { mode: 'standard' });
 
   // --- PHASE 4: APPRENDRE (Learning Loop & Vectorisation) ---
@@ -78,7 +78,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     }
   );
 
-  // Création de l'épisode de mémoire
+  // Création de l'épisode de mémoire pour stockage VFS
   const newMemoryEpisode = {
     type: 'interaction',
     content: metaResult.answer.substring(0, 500),
@@ -88,7 +88,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     tags: queryAnalysis.concepts
   };
 
-  console.log(`[AI][ENHANCED-RAG] Cycle terminé avec succès. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
+  console.log(`[AI][ENHANCED-RAG] Cycle terminé. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
 
   return {
     answer: metaResult.answer,
