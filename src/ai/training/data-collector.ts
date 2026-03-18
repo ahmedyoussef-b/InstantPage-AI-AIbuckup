@@ -1,6 +1,7 @@
 /**
- * @fileOverview DataCollector - Collecte des données d'entraînement pour le fine-tuning.
- * Récupère les données depuis toutes les phases de la boucle cognitive Elite 32.
+ * @fileOverview DataCollector - Innovation Elite 32.
+ * Collecte des données d'entraînement multi-sources pour le fine-tuning local.
+ * Transforme les interactions, mémoires et documents en un dataset structuré.
  */
 
 export interface RawTrainingData {
@@ -9,55 +10,102 @@ export interface RawTrainingData {
   output: string;
   context?: string;
   success: boolean;
-  metadata: any;
+  metadata: {
+    importance: number;
+    timestamp: number;
+    sourceId?: string;
+    domain?: string;
+  };
 }
 
 export class DataCollector {
   /**
-   * Collecte les données depuis la mémoire épisodique et les logs d'interactions.
+   * Orchestre la collecte globale depuis toutes les sources de savoir local.
    */
-  async collectFromAllPhases(context: { memory: any[], documents: any[] }): Promise<RawTrainingData[]> {
-    console.log(`[AI][TRAINING-DATA] Collecte de données sur ${context.memory.length} épisodes...`);
+  async collectFromAllPhases(context: { 
+    memory: any[], 
+    documents: any[],
+    actions?: any[] 
+  }): Promise<RawTrainingData[]> {
+    console.log(`[AI][TRAINING-COLLECTOR] Initialisation de la moisson de données...`);
     
     const trainingData: RawTrainingData[] = [];
 
-    // 1. Collecte des corrections (Haute priorité)
+    // 1. SOURCE: CORRECTIONS UTILISATEUR (Priorité Absolue)
+    // C'est ici que l'IA apprend de ses erreurs grâce à vos retours.
     const corrections = context.memory.filter(e => e.type === 'learning' || e.importance > 0.9);
     corrections.forEach(c => {
       trainingData.push({
         type: 'correction',
-        input: c.context,
-        output: c.content,
+        input: c.context, // La question originale
+        output: c.content, // Votre version corrigée
         success: true,
-        metadata: { importance: c.importance, timestamp: c.timestamp }
+        metadata: { 
+          importance: 1.0, 
+          timestamp: c.timestamp,
+          domain: 'User Correction'
+        }
       });
     });
 
-    // 2. Collecte des raisonnements réussis
-    const successfulReasonings = context.memory.filter(e => e.type === 'interaction' && e.importance > 0.7);
+    // 2. SOURCE: RAISONNEMENTS RÉUSSIS (Phase 2)
+    // On capture les réflexions complexes qui ont mené à une réponse de haute confiance.
+    const successfulReasonings = context.memory.filter(e => e.type === 'interaction' && e.importance > 0.75);
     successfulReasonings.forEach(r => {
       trainingData.push({
         type: 'reasoning',
-        input: r.context,
+        input: `Analyse et résous techniquement : ${r.context}`,
         output: r.content,
         success: true,
-        metadata: { score: r.importance }
+        metadata: { 
+          importance: r.importance, 
+          timestamp: r.timestamp,
+          domain: r.tags?.[0] || 'Technical Reasoning'
+        }
       });
     });
 
-    // 3. Collecte à partir du contexte documentaire (Synthèse)
+    // 3. SOURCE: CONTEXTE DOCUMENTAIRE AUGMENTÉ (Phase 1 & Innovation 5.3)
+    // On utilise les versions "enrichies" des documents pour l'entraînement.
     if (context.documents.length > 0) {
-      context.documents.slice(0, 5).forEach(doc => {
+      context.documents.forEach(doc => {
+        if (doc.enhancedContent || doc.content) {
+          trainingData.push({
+            type: 'comprehension',
+            input: `Quels sont les points critiques de l'équipement ou de la procédure : ${doc.name} ?`,
+            output: (doc.enhancedContent || doc.content).substring(0, 800),
+            success: true,
+            metadata: { 
+              importance: 0.8, 
+              timestamp: Date.now(),
+              sourceId: doc.id,
+              domain: 'Knowledge Base'
+            }
+          });
+        }
+      });
+    }
+
+    // 4. SOURCE: PATTERNS D'ACTION VALIDÉS (Phase 3)
+    if (context.actions && context.actions.length > 0) {
+      context.actions.filter(a => a.successRate > 0.9).forEach(action => {
         trainingData.push({
-          type: 'comprehension',
-          input: `Résume les points techniques clés du document : ${doc.name}`,
-          output: doc.enhancedContent || doc.content?.substring(0, 500) || '',
+          type: 'action',
+          input: `Comment exécuter l'outil ${action.tool} pour l'intention : ${action.intent} ?`,
+          output: `Utilise les paramètres optimaux : ${JSON.stringify(action.params)}`,
           success: true,
-          metadata: { docId: doc.id }
+          metadata: { 
+            importance: 0.9, 
+            timestamp: Date.now(),
+            domain: 'Tool Use'
+          }
         });
       });
     }
 
+    console.log(`[AI][TRAINING-COLLECTOR] Collecte terminée : ${trainingData.length} échantillons qualifiés.`);
     return trainingData;
   }
 }
+
+export const dataCollector = new DataCollector();
