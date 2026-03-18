@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.1 Intégrée : Support de l'indexation hiérarchique et re-vectorisation dynamique.
+ * Version 32.2 Intégrée : Support du cycle d'auto-amélioration nocturne.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -11,6 +11,7 @@ import { applyForgetting, type Episode } from '@/ai/learning/episodic-memory';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 import { shareKnowledge } from '@/ai/learning/collaborative-network';
 import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
+import { runNighttimeImprovement } from '@/ai/integration/self-improvement';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
@@ -75,7 +76,6 @@ export const api = {
     const fs = loadLocalFS();
     const files = fs.filter(i => i.type === 'file');
     
-    // Utilisation du contenu enrichi pour la recherche si disponible
     const searchableDocs = files.map(f => ({
       ...f,
       content: f.enhancedContent || f.content
@@ -89,7 +89,6 @@ export const api = {
     implicitRL.loadProfile();
     const userProfile = implicitRL.getProfile();
 
-    // Orchestration via runCompleteEliteLoop (via chat-flow)
     const response = await serverChat({ 
       text: query, 
       history: history.map(msg => ({ 
@@ -103,7 +102,6 @@ export const api = {
       hierarchyNodes: allHierarchyNodes
     } as any);
 
-    // Mémorisation et vectorisation de la leçon extraite
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -112,7 +110,6 @@ export const api = {
       }, ...episodicMemory];
       await saveMemory(updatedMemory);
       
-      // Partage anonymisé si confiance haute (Innovation 32)
       if (response.confidence > 0.9) {
         const mockRule = { instruction: response.answer.substring(0, 100), domain: 'Technique', confidence: response.confidence, id: 'rule-auto', pattern: 'Automatic' };
         shareKnowledge(INSTANCE_ID, mockRule as any).catch(() => {});
@@ -126,8 +123,23 @@ export const api = {
   },
 
   /**
-   * Innovation 5.3 : Re-vectorisation dynamique avec contexte enrichi.
+   * Innovation Finale : Exécute l'optimisation globale.
    */
+  async runGlobalOptimization(): Promise<any> {
+    const fs = loadLocalFS();
+    const memory = loadMemory();
+    const rules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
+
+    const result = await runNighttimeImprovement({
+      documents: fs,
+      memory,
+      currentRules: rules,
+      instanceId: INSTANCE_ID
+    });
+
+    return result;
+  },
+
   async revectorizeDocument(docId: string): Promise<any> {
     const fs = loadLocalFS();
     const doc = fs.find(f => f.id === docId);

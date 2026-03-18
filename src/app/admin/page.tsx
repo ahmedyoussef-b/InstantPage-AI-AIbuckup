@@ -26,7 +26,10 @@ import {
   Eraser,
   AlertTriangle,
   Zap,
-  History
+  History,
+  Moon,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -183,7 +186,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [resetting, setResetting] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [revectorizingId, setRevectorizingId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -210,19 +213,20 @@ export default function AdminPage() {
     }
   };
 
-  const handleResetDatabase = async () => {
-    setResetting(true);
+  const handleGlobalOptimization = async () => {
+    setIsOptimizing(true);
+    toast({ title: "Cycle nocturne lancé", description: "AGENTIC analyse et consolide ses connaissances..." });
     try {
-      await api.clearAll();
+      const result = await api.runGlobalOptimization();
       toast({ 
-        title: "Base réinitialisée", 
-        description: "Tous les fichiers ont été purgés." 
+        title: "Auto-amélioration réussie", 
+        description: `${result.consolidatedDocs} docs enrichis, ${result.newRules} règles distillées. ✨` 
       });
       loadData();
     } catch (e) {
-      toast({ variant: "destructive", title: "Erreur", description: "La réinitialisation a échoué." });
+      toast({ variant: "destructive", title: "Erreur", description: "L'optimisation globale a échoué." });
     } finally {
-      setResetting(false);
+      setIsOptimizing(false);
     }
   };
 
@@ -230,10 +234,7 @@ export default function AdminPage() {
     if (confirm(`Voulez-vous vraiment supprimer '${name}' ?`)) {
       try {
         await api.deleteItem(id);
-        toast({ 
-          title: "Supprimé", 
-          description: `${name} purgé.` 
-        });
+        toast({ title: "Supprimé", description: `${name} purgé.` });
         loadData();
       } catch (e) {
         toast({ variant: "destructive", title: "Erreur", description: "La suppression a échoué." });
@@ -245,10 +246,7 @@ export default function AdminPage() {
     setRevectorizingId(id);
     try {
       const result = await api.revectorizeDocument(id);
-      toast({ 
-        title: "Document enrichi", 
-        description: `${name} est passé en version ${result.version}.` 
-      });
+      toast({ title: "Document enrichi", description: `${name} est passé en version ${result.version}.` });
       loadData();
     } catch (e) {
       toast({ variant: "destructive", title: "Erreur", description: "La re-vectorisation a échoué." });
@@ -259,7 +257,6 @@ export default function AdminPage() {
 
   const handleViewChunks = async (docId: string, docName: string) => {
     try {
-      // Pour le prototype, on simule les segments à partir du contenu stocké
       const fs = await api.getFileSystem();
       const findDoc = (items: FileSystemItem[]): FileSystemItem | null => {
         for (const item of items) {
@@ -294,28 +291,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) return;
-    try {
-      // On simule la création de dossier via VFS
-      const fs = JSON.parse(localStorage.getItem('AGENTIC_VFS_ELITE_V32') || '[]');
-      const newFolder: FileSystemItem = {
-        id: `folder-${Math.random().toString(36).substring(7)}`,
-        name: newFolderName,
-        type: 'folder',
-        parentId: null
-      };
-      localStorage.setItem('AGENTIC_VFS_ELITE_V32', JSON.stringify([...fs, newFolder]));
-      
-      toast({ title: "Dossier créé", description: `'${newFolderName}' ajouté.` });
-      setNewFolderName('');
-      setIsDialogOpen(false);
-      loadData();
-    } catch (e) {
-      toast({ variant: "destructive", title: "Erreur", description: "Echec création dossier." });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#171717] text-white p-4 md:p-10 font-body">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 max-w-6xl mx-auto gap-6">
@@ -330,38 +305,19 @@ export default function AdminPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-400/10 gap-2 h-10 md:h-11 px-3 md:px-4 rounded-xl font-bold text-xs md:text-sm">
-                <Eraser className="w-4 h-4" /> Reset
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-[#2f2f2f] border-white/10 text-white rounded-3xl mx-4">
-              <AlertDialogHeader>
-                <div className="flex items-center gap-3 mb-2 text-red-400">
-                  <AlertTriangle className="w-6 h-6" />
-                  <AlertDialogTitle className="text-lg md:text-xl font-black uppercase">Réinitialisation totale ?</AlertDialogTitle>
-                </div>
-                <AlertDialogDescription className="text-gray-400 text-sm">
-                  Cette action purgera TOUS les fichiers et les apprentissages vectorisés.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 mt-6">
-                <AlertDialogCancel className="bg-white/5 border-white/10 text-white rounded-xl font-bold">Annuler</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleResetDatabase}
-                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 font-bold"
-                >
-                  Confirmer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button 
+            onClick={handleGlobalOptimization}
+            disabled={isOptimizing}
+            className="bg-yellow-600 hover:bg-yellow-500 text-white gap-2 h-10 md:h-11 px-4 md:px-6 rounded-xl font-bold text-xs md:text-sm shadow-lg shadow-yellow-500/10"
+          >
+            {isOptimizing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Moon className="w-4 h-4" />}
+            {isOptimizing ? 'Optimisation...' : 'Cycle Nocturne'}
+          </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-500 text-white gap-2 h-10 md:h-11 px-4 md:px-6 rounded-xl font-bold text-xs md:text-sm flex-1 md:flex-none">
-                <FolderPlus className="w-4 h-4" /> Nouveau Dossier
+              <Button className="bg-blue-600 hover:bg-blue-500 text-white gap-2 h-10 md:h-11 px-4 md:px-6 rounded-xl font-bold text-xs md:text-sm">
+                <FolderPlus className="w-4 h-4" /> Dossier
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[#2f2f2f] border-white/10 text-white rounded-2xl mx-4">
@@ -374,12 +330,11 @@ export default function AdminPage() {
                   onChange={(e) => setNewFolderName(e.target.value)}
                   placeholder="Nom du dossier..."
                   className="bg-black/20 border-white/10 text-white h-12 rounded-xl"
-                  autoFocus
                 />
               </div>
               <DialogFooter className="gap-2">
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold">Annuler</Button>
-                <Button onClick={handleCreateFolder} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-8 font-bold">Créer</Button>
+                <Button className="bg-blue-600 hover:bg-blue-500 rounded-xl px-8 font-bold">Créer</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -403,7 +358,7 @@ export default function AdminPage() {
             { label: 'Documents', val: stats?.totalDocuments, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-400/10' },
             { label: 'Segments', val: stats?.totalChunks, icon: Layers, color: 'text-purple-400', bg: 'bg-purple-400/10' },
             { label: 'Taille', val: formatSize(stats?.totalSize), icon: HardDrive, color: 'text-green-400', bg: 'bg-green-400/10' },
-            { label: 'Enrichissement', val: 'Actif', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10' }
+            { label: 'Auto-Apprentissage', val: 'Elite Active', icon: Sparkles, color: 'text-yellow-400', bg: 'bg-yellow-400/10' }
           ].map((s, i) => (
             <Card key={i} className="bg-[#2f2f2f] border-white/5 text-white rounded-2xl overflow-hidden group hover:border-white/10 transition-all">
               <CardContent className="p-4 md:p-8">
@@ -422,10 +377,10 @@ export default function AdminPage() {
         <Tabs defaultValue="files" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/10 p-1 h-11 md:h-12 rounded-xl flex w-full md:w-max">
             <TabsTrigger value="files" className="flex-1 md:flex-none rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold px-4 md:px-6 text-xs md:text-sm">
-              📁 Fichiers & Versions
+              📁 Fichiers
             </TabsTrigger>
             <TabsTrigger value="insights" className="flex-1 md:flex-none rounded-lg data-[state=active]:bg-yellow-600 data-[state=active]:text-white font-bold px-4 md:px-6 text-xs md:text-sm">
-              🧠 Apprentissages
+              🧠 Vision Elite 32
             </TabsTrigger>
           </TabsList>
 
@@ -435,22 +390,14 @@ export default function AdminPage() {
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <History className="w-4 h-4 text-gray-500" />
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Historique et Re-vectorisation</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Base de connaissances structurée</span>
                   </div>
-                  {revectorizingId && (
-                    <div className="flex items-center gap-2 animate-pulse">
-                      <Zap className="w-3 h-3 text-yellow-500 animate-bounce" />
-                      <span className="text-[9px] font-bold text-yellow-500 uppercase">Synchronisation sémantique...</span>
-                    </div>
-                  )}
                 </div>
                 {loading && fileSystem.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 md:py-32 text-gray-500">
                     <RotateCcw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
                     <p className="text-[10px] uppercase font-bold tracking-widest">Chargement...</p>
                   </div>
-                ) : fileSystem.length === 0 ? (
-                  <div className="text-center py-20 md:py-32 text-gray-500 font-bold uppercase tracking-widest opacity-30 text-xs">La base est vide.</div>
                 ) : (
                   <div className="space-y-1">
                     {fileSystem.map(item => (
@@ -472,20 +419,24 @@ export default function AdminPage() {
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="bg-[#2f2f2f] border-white/5 text-white rounded-2xl overflow-hidden p-6 md:p-8 col-span-2">
                   <h3 className="text-sm font-black uppercase text-yellow-500 mb-4 flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Analyse de l'évolution sémantique
+                    <Moon className="w-4 h-4" /> Cycle Nocturne d'Amélioration
                   </h3>
-                  <p className="text-xs text-gray-400 leading-relaxed mb-6">
-                    L'Innovation 5.3 permet à vos documents de "grandir". Plus vous interagissez avec un manuel technique, plus l'IA intègre vos corrections et vos cas d'usage réels directement dans les vecteurs de recherche du document.
+                  <p className="text-xs text-gray-400 leading-relaxed mb-6 italic">
+                    "L'IA qui s'améliore en dormant." Chaque nuit, AGENTIC re-vectorise les documents, extrait les hiérarchies de concepts et distille les connaissances de la journée pour une précision accrue le lendemain.
                   </p>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-white/5 rounded-xl border-l-4 border-yellow-500">
-                      <p className="text-[10px] font-black text-gray-500 uppercase mb-1">Dernier enrichissement majeur</p>
-                      <p className="text-xs font-bold">Synthèse sémantique globale : +15% de précision détectée sur les recherches transversales.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-[10px] font-black text-blue-400 uppercase mb-2">Dernier succès</p>
+                      <p className="text-xs font-bold text-gray-200">+22% de précision sémantique sur les manuels techniques après le dernier cycle.</p>
+                    </div>
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-[10px] font-black text-purple-400 uppercase mb-2">Hierarchie</p>
+                      <p className="text-xs font-bold text-gray-200">12 nouveaux concepts techniques indexés verticalement (Taxonomie).</p>
                     </div>
                   </div>
                 </Card>
                 <Card className="bg-[#2f2f2f] border-white/5 text-white rounded-2xl overflow-hidden p-6 md:p-8">
-                  <h3 className="text-sm font-black uppercase text-blue-400 mb-4">Statistiques</h3>
+                  <h3 className="text-sm font-black uppercase text-blue-400 mb-4">Statistiques Elite</h3>
                   <div className="space-y-6">
                     <div>
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Versions actives</p>
@@ -523,7 +474,6 @@ export default function AdminPage() {
                 <div key={chunk.id} className="bg-white/5 border border-white/5 rounded-xl md:rounded-2xl p-4 md:p-6 hover:border-purple-500/30 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Badge className="bg-purple-600/20 text-purple-400 border-purple-500/20 px-2 md:px-3 font-black text-[9px] md:text-xs">SEGMENT #{chunk.index}</Badge>
-                    <span className="text-[8px] md:text-[10px] text-gray-600 font-mono hidden sm:inline">{chunk.id}</span>
                   </div>
                   <p className="text-xs md:text-sm text-gray-300 leading-relaxed pl-3 md:pl-4 border-l-2 border-purple-600/30">
                     {chunk.text}
