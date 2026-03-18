@@ -1,8 +1,6 @@
 'use server';
 /**
- * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
- * Architecture de recherche vectorielle multidimensionnelle.
- * Fusionne sémantique, hiérarchie et souvenirs.
+ * @fileOverview Phase 1: COMPRENDRE - Retriever Intelligent Multi-Sources.
  */
 
 import { ai } from '@/ai/genkit';
@@ -12,6 +10,7 @@ export interface VectorSearchResult {
   collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY';
   content: string;
   score: number;
+  weight: number; // Nouveau: Poids pour Phase 2
   metadata: any;
 }
 
@@ -24,11 +23,11 @@ export async function comprendreVector(question: string, context: {
   userProfile?: any,
   hierarchyNodes?: any[]
 }): Promise<VectorSearchResult[]> {
-  console.log(`[AI][PHASE-1] Fusion Sémantique et Hiérarchique Elite 32...`);
+  console.log(`[AI][PHASE-1] Identification des concepts et expansion contextuelle...`);
 
   const results: VectorSearchResult[] = [];
 
-  // STRATE HIERARCHY : Expansion via Relations Parent/Enfant (Innovation 32.1)
+  // STRATE HIERARCHY : Expansion via Relations (Taxonomie)
   if (context.hierarchyNodes && context.hierarchyNodes.length > 0) {
     const hierarchyContext = await expandHierarchicalContext(question, context.hierarchyNodes);
     if (hierarchyContext) {
@@ -36,22 +35,24 @@ export async function comprendreVector(question: string, context: {
         collection: 'HIERARCHY',
         content: hierarchyContext,
         score: 1.0,
+        weight: 0.8, // Poids fort (Structure technique)
         metadata: { type: 'taxonomy' }
       });
     }
   }
 
-  // STRATE CONCEPTS : Règles techniques distillées
+  // STRATE CONCEPTS : Règles techniques (Poids: 0.7)
   context.distilledRules.forEach(rule => {
     results.push({
       collection: 'CONCEPTS',
       content: `Concept appris : ${rule.instruction} (Domaine: ${rule.domain})`,
       score: 0.95,
+      weight: 0.7,
       metadata: { type: 'rule', id: rule.id }
     });
   });
 
-  // STRATE LESSONS : Souvenirs d'interactions critiques
+  // STRATE LESSONS : Expériences passées (Poids: 0.6)
   const q = question.toLowerCase();
   context.episodicMemory
     .filter(e => e.importance > 0.6 && (q.includes(e.context.toLowerCase()) || e.content.toLowerCase().includes(q)))
@@ -59,19 +60,21 @@ export async function comprendreVector(question: string, context: {
     .forEach(epi => {
       results.push({
         collection: 'LESSONS',
-        content: `Expérience passée liée : Pour "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
+        content: `Leçon apprise : Pour "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
         score: 0.88,
+        weight: 0.6,
         metadata: { timestamp: epi.timestamp }
       });
     });
 
-  // STRATE PATTERNS : Préférences apprises (Innovation 26)
+  // STRATE PATTERNS : Profilage utilisateur
   if (context.userProfile) {
     const p = context.userProfile;
     results.push({
       collection: 'PATTERNS',
-      content: `Profil Utilisateur : Préfère ${p.technicality > 0.7 ? 'une expertise brute' : 'la vulgarisation'} et ${p.conciseness > 0.7 ? 'la brièveté' : 'la pédagogie détaillée'}.`,
+      content: `Préférence : ${p.technicality > 0.7 ? 'Expert' : 'Vulgarisation'}.`,
       score: 1.0,
+      weight: 0.5,
       metadata: { source: 'IMPLICIT_RL' }
     });
   }
@@ -85,14 +88,15 @@ export async function comprendreVector(question: string, context: {
 export async function formatVectorContext(results: VectorSearchResult[]): Promise<string> {
   if (results.length === 0) return "";
   
-  let output = "\n--- MÉMOIRE SÉMANTIQUE CENTRALE (ELITE 32) ---\n";
+  let output = "\n--- MÉMOIRE SÉMANTIQUE AUGMENTÉE (ELITE 32) ---\n";
   
   const collections: ('HIERARCHY' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS')[] = ['HIERARCHY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
   
   collections.forEach(col => {
     const filtered = results.filter(r => r.collection === col);
     if (filtered.length > 0) {
-      output += `[STRATE: ${col}]\n`;
+      const weight = filtered[0].weight;
+      output += `[STRATE: ${col}] (Poids contextuel: ${weight})\n`;
       filtered.forEach(res => {
         output += `- ${res.content}\n`;
       });

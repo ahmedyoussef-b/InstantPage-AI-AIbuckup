@@ -1,60 +1,55 @@
 /**
- * @fileOverview DynamicPromptEngine - Optimisation adaptative des prompts.
- * Analyse le type de question pour construire le meilleur contexte possible.
+ * @fileOverview DynamicPromptEngine - Phase 3: AGIR.
+ * Construction du prompt final avec instructions spécifiques au type de question.
  */
-
-export interface PerformanceRecord {
-  question: string;
-  prompt: string;
-  response: string;
-  feedback: number;
-  timestamp: number;
-}
 
 export class DynamicPromptEngine {
   private defaultTemplate = `Tu es un Assistant Professionnel Intelligent expert.
     
-    INSTRUCTIONS :
+    INSTRUCTIONS GÉNÉRALES :
     - Réponds de manière précise, technique et concise.
     - Réponds toujours en français.
-    - Utilise le contexte des documents fournis ci-dessous.
+    - Utilise scrupuleusement le contexte fourni ci-dessous.
     
-    CONTEXTE DOCUMENTS :
+    CONNAISSANCES RÉCUPÉRÉES :
     {{context}}
     
-    Question : {{question}}`;
+    DEMANDE UTILISATEUR : {{question}}`;
 
   private templates: Record<string, string> = {
-    procedure: `Tu es un Expert en Procédures Techniques. 
-      Ta mission est de fournir des instructions étape par étape claires et sécurisées.
-      Utilise des listes numérotées et mets en évidence les avertissements de sécurité.
+    procedure: `Tu es un Expert en Procédures Techniques Industrielles. 
+      INSTRUCTIONS : 
+      1. Détaille la procédure étape par étape.
+      2. Mets les avertissements de sécurité en GRAS.
+      3. Cite les outils nécessaires identifiés dans le contexte.
       
-      CONTEXTE :
+      CONNAISSANCES :
       {{context}}
       
-      PROCÉDURE DEMANDÉE : {{question}}`,
+      PROCÉDURE : {{question}}`,
     
-    definition: `Tu es un Expert Technique spécialisé dans la vulgarisation.
-      Explique le concept suivant de manière précise mais accessible.
-      Donne une définition courte suivie d'une application concrète.
+    troubleshooting: `Tu es un Analyste de Pannes (Dépannage).
+      INSTRUCTIONS :
+      1. Identifie les causes probables à partir des leçons passées.
+      2. Propose des tests de diagnostic.
+      3. Recommande des actions correctives basées sur les documents.
       
-      CONTEXTE :
+      HISTORIQUE & DOCS :
       {{context}}
       
-      CONCEPT : {{question}}`,
+      PROBLÈME : {{question}}`,
     
-    comparison: `Tu es un Analyste Technique. 
-      Compare les éléments mentionnés en soulignant les avantages, les inconvénients et les différences clés.
-      Utilise un format structuré (tableau ou liste comparative).
+    definition: `Tu es un Expert en Vulgarisation Technique.
+      INSTRUCTIONS : Explique le concept de manière claire en utilisant des analogies industrielles si présentes dans le contexte.
       
-      CONTEXTE :
+      CONNAISSANCES :
       {{context}}
       
-      COMPARAISON : {{question}}`
+      CONCEPT : {{question}}`
   };
 
   /**
-   * Construit un prompt optimisé basé sur la question.
+   * Construit un prompt optimisé basé sur la phase 1 (Analyse de la question).
    */
   async buildPrompt(question: string, context: string): Promise<string> {
     const type = this.analyzeQuestionType(question);
@@ -62,22 +57,19 @@ export class DynamicPromptEngine {
 
     return template
       .replace('{{question}}', question)
-      .replace('{{context}}', context || "Aucun document spécifique n'est chargé pour cette question.");
+      .replace('{{context}}', context || "Aucun document spécifique n'est chargé.");
   }
 
-  /**
-   * Analyse sémantique simplifiée pour déterminer le type de question.
-   */
   private analyzeQuestionType(question: string): string {
     const q = question.toLowerCase();
-    if (q.includes('comment') || q.includes('étape') || q.includes('procédure') || q.includes('faire')) {
+    if (q.includes('panne') || q.includes('erreur') || q.includes('marche pas') || q.includes('problème')) {
+      return 'troubleshooting';
+    }
+    if (q.includes('comment') || q.includes('étape') || q.includes('faire') || q.includes('procédure')) {
       return 'procedure';
     }
-    if (q.includes('qu\'est-ce que') || q.includes('définition') || q.includes('signifie') || q.includes('est quoi')) {
+    if (q.includes('qu\'est-ce que') || q.includes('signifie') || q.includes('définition')) {
       return 'definition';
-    }
-    if (q.includes('différence') || q.includes('comparer') || q.includes('mieux') || q.includes('versus') || q.includes('vs')) {
-      return 'comparison';
     }
     return 'general';
   }
