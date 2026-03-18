@@ -7,7 +7,6 @@ import { semanticCache } from '@/ai/semantic-cache';
 const ChatInputSchema = z.object({
   text: z.string(),
   history: z.array(z.any()).optional(),
-  availableFiles: z.array(z.string()).optional(),
   documentContext: z.string().optional(),
 });
 
@@ -21,16 +20,12 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat avec Routage Sémantique et Cache Intelligent.
+ * Chat avec Routage Sémantique, Cache Intelligent et RAG Hybride.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
     // 1. Détermination du modèle via le routeur sémantique
     const targetModel = await semanticRouter.route(input.text);
-
-    const contextPrompt = input.documentContext 
-      ? `Voici le contenu des documents disponibles pour t'aider :\n\n${input.documentContext}`
-      : "Aucun document n'est chargé pour le moment.";
 
     const systemPrompt = `Tu es un Assistant Professionnel Intelligent expert.
       
@@ -41,7 +36,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       - Cite tes sources si l'information provient d'un document.
       
       CONTEXTE DOCUMENTS :
-      ${contextPrompt}`;
+      ${input.documentContext || "Aucun document n'est chargé pour le moment."}`;
 
     try {
       const controller = new AbortController();
@@ -71,7 +66,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       return data.response || "Désolé, je n'ai pas pu formuler de réponse.";
     } catch (error) {
       console.error("[AI][CHAT] Erreur génération:", error);
-      return "Une erreur technique empêche la connexion à l'IA locale.";
+      return "Une erreur technique empêche la connexion à l'IA locale (Ollama). Vérifiez que le service est démarré.";
     }
   };
 

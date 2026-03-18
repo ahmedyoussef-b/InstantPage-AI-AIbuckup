@@ -2,13 +2,12 @@
 /**
  * @fileOverview Flux d'ingestion et de vectorisation des documents.
  * 
- * - ingestDocument - Découpe le texte et génère des embeddings réels.
- * - IngestInput - Contenu du fichier et métadonnées.
- * - IngestOutput - Statistiques de l'ingestion.
+ * - ingestDocument - Découpe le texte, génère des embeddings et extrait les concepts du graphe.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { extractAndLink } from '@/ai/graph-store';
 
 const IngestInputSchema = z.object({
   fileName: z.string(),
@@ -22,6 +21,7 @@ const IngestOutputSchema = z.object({
   chunks: z.number(),
   embeddingModel: z.string(),
   processedAt: z.string(),
+  concepts: z.array(z.string()),
 });
 export type IngestOutput = z.infer<typeof IngestOutputSchema>;
 
@@ -50,32 +50,31 @@ const ingestDocumentFlow = ai.defineFlow(
   async (input) => {
     console.log(`[BACKEND][INGEST] Démarrage de l'ingestion : ${input.fileName}`);
     
-    // 1. Segmentation (1000 caractères par chunk)
+    // 1. Segmentation
     const chunks = chunkText(input.fileContent, 1000);
-    console.log(`[BACKEND][INGEST] Document découpé en ${chunks.length} segments.`);
-
-    // 2. Génération des Embeddings (Vecteurs réels)
-    // On utilise embedding-001 qui est plus stable sur toutes les versions d'API
-    console.log(`[BACKEND][INGEST] Génération des vecteurs via Google AI (embedding-001)...`);
     
-    let embeddings: any[] = [];
+    // 2. Extraction des concepts (Graphe) - Appel de la fonction utilitaire serveur
+    const docId = Math.random().toString(36).substring(7);
+    const { concepts } = await extractAndLink(docId, input.fileContent);
+
+    // 3. Génération des Embeddings (Limité pour la démo)
     if (chunks.length > 0) {
       try {
-        embeddings = await ai.embedMany({
+        await ai.embedMany({
           embedder: 'googleai/embedding-001',
-          content: chunks.slice(0, 10), // On limite pour la démo
+          content: chunks.slice(0, 5),
         });
-        console.log(`[BACKEND][INGEST] ${embeddings.length} vecteurs générés avec succès.`);
       } catch (e) {
-        console.error(`[BACKEND][INGEST] Erreur lors de la génération des embeddings:`, e);
+        console.error(`[BACKEND][INGEST] Erreur embeddings:`, e);
       }
     }
 
     return {
-      docId: Math.random().toString(36).substring(7),
+      docId,
       chunks: chunks.length,
       embeddingModel: 'embedding-001',
       processedAt: new Date().toISOString(),
+      concepts,
     };
   }
 );

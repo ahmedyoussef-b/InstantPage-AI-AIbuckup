@@ -1,19 +1,18 @@
 'use client';
 
 /**
- * API Client avec BDD Locale Persistante et Atomique.
- * Gère le stockage VFS (Virtual File System) dans le localStorage avec protection contre l'évaporation.
+ * API Client avec BDD Locale Persistante.
+ * Gère le stockage VFS (Virtual File System) dans le localStorage.
+ * Ce module est strictement client.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
+import { hybridRAG } from '@/ai/hybrid-rag';
 
-const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V2';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V5';
 
-/**
- * Charge les données depuis le stockage local avec validation de structure.
- */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -27,26 +26,13 @@ const loadLocalFS = (): FileSystemItem[] => {
   }
 };
 
-/**
- * Sauvegarde les données avec synchronisation atomique forcée et vérification d'intégrité.
- */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     const data = JSON.stringify(fs);
     localStorage.setItem(STORAGE_KEY, data);
-    
-    // Vérification immédiate pour prévenir la perte silencieuse (QuotaExceeded ou autre)
-    const verify = localStorage.getItem(STORAGE_KEY);
-    if (verify !== data) {
-      throw new Error("Échec de la persistance atomique : les données n'ont pas été écrites correctement.");
-    }
   } catch (e: any) {
-    if (e.name === 'QuotaExceededError') {
-      console.error("[API_CLIENT] Quota de stockage local atteint (5MB). Impossible de sauvegarder.");
-    } else {
-      console.error("[API_CLIENT] Erreur lors de la sauvegarde VFS:", e.message);
-    }
+    console.error("[API_CLIENT] Erreur sauvegarde VFS:", e.message);
   }
 };
 
@@ -54,7 +40,6 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
-    // Vérification des doublons pour éviter la corruption
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
       throw new Error(`Le fichier "${file.name}" est déjà présent dans ce dossier.`);
@@ -62,6 +47,7 @@ export const api = {
 
     try {
       const text = await file.text();
+      // L'ingestion et l'extraction de concepts se font côté serveur
       const result = await ingestDocument({
         fileName: file.name,
         fileContent: text,
@@ -76,7 +62,8 @@ export const api = {
         chunks: result.chunks,
         content: text,
         uploadedAt: new Date().toISOString(),
-        parentId
+        parentId,
+        tags: result.concepts 
       };
 
       saveLocalFS([...fs, newFile]);
@@ -90,7 +77,10 @@ export const api = {
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fs = loadLocalFS();
-      const allContent = this.getAllFileContents(fs);
+      const files = fs.filter(i => i.type === 'file');
+      
+      // Le RAG Hybride (filtrage local) reste sur le client
+      const context = await hybridRAG.retrieve(query, files);
       
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
@@ -100,7 +90,7 @@ export const api = {
       return await serverChat({ 
         text: query, 
         history: genkitHistory,
-        documentContext: allContent
+        documentContext: context
       });
     } catch (error) {
       console.error("[API_CLIENT] Échec du chat intelligent:", error);
@@ -112,10 +102,7 @@ export const api = {
     const fs = loadLocalFS();
     const newFs = fs.filter(item => item.id !== id);
     saveLocalFS(newFs);
-    
-    // Nettoyage asynchrone des segments (silencieux si échec)
     deleteDocument({ docId: id, fileName: name }).catch(() => {});
-    
     return { success: true, purgedChunks: 1 };
   },
 
@@ -190,15 +177,5 @@ export const api = {
       });
     }
     return chunks;
-  },
-
-  private getAllFileContents(items: FileSystemItem[]): string {
-    let context = "";
-    items.forEach(item => {
-      if (item.type === 'file' && item.content) {
-        context += `--- DOCUMENT: ${item.name} ---\n${item.content}\n\n`;
-      }
-    });
-    return context;
   }
 };

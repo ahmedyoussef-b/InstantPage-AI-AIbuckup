@@ -36,7 +36,7 @@ export default function HomePage() {
         {!collapsed && (
           <div className="animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="font-bold text-white tracking-tighter text-lg leading-none">AGENTIC</div>
-            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Multi-Model AI</div>
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Hybrid RAG AI</div>
           </div>
         )}
       </Link>
@@ -120,7 +120,7 @@ export default function HomePage() {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
                 <SheetHeader className="p-6">
-                  <SheetTitle className="sr-only">Menu de Navigation de l'Assistant</SheetTitle>
+                  <SheetTitle className="sr-only">Menu de Navigation</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>
