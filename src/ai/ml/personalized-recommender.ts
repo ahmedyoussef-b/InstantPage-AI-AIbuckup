@@ -1,47 +1,92 @@
 /**
- * @fileOverview PersonalizedRecommender - Système de recommandation piloté par le profil utilisateur.
+ * @fileOverview PersonalizedRecommender - Système de recommandation piloté par le profil d'expertise.
+ * Innovation Elite 32 : Suggère proactivement du contenu basé sur l'apprentissage ML.
  */
 
 import { Recommendation, RecommendationContext, UserProfile, Candidate, ScoredCandidate } from './types';
 
 export class PersonalizedRecommender {
   /**
-   * Génère des recommandations personnalisées basées sur l'expertise et l'historique.
+   * Génère des recommandations contextuelles pour l'utilisateur.
    */
   async recommend(userId: string, context: RecommendationContext): Promise<Recommendation[]> {
+    console.log(`[ML-RECOMMENDER] Génération de suggestions pour l'utilisateur : ${userId}`);
+    
+    // 1. Récupération du profil sémantique (appris via Implicit RL - Phase 26)
     const profile = await this.getMockProfile(userId);
     
+    // 2. Génération de candidats potentiels (Maintenance, Formation, Documentation)
     const candidates: Candidate[] = [
-      { id: 'rec-1', title: "Réviser la procédure gaz", description: "Basé sur votre dernière interaction, une révision de la vanne HV701 est suggérée.", category: "Maintenance", confidence: 0.92 },
-      { id: 'rec-2', title: "Nouvelle doc : Pompe à chaleur", description: "Un nouveau manuel sur les PAC a été ajouté à la base.", category: "Document", confidence: 0.85 }
+      { 
+        id: 'rec-gas-1', 
+        title: "Vérification Vanne HV701", 
+        description: "Basé sur vos corrections, un test de pression est suggéré avant l'allumage.", 
+        category: "Maintenance Préventive", 
+        confidence: 0.94 
+      },
+      { 
+        id: 'rec-doc-2', 
+        title: "Nouveau : Manuel Brûleur V2", 
+        description: "Une mise à jour documentaire est disponible pour votre zone actuelle.", 
+        category: "Documentation", 
+        confidence: 0.88 
+      },
+      { 
+        id: 'rec-learn-3', 
+        title: "Module : Sécurité Gaz", 
+        description: "Suggestion pédagogique : Consolider vos connaissances sur les seuils critiques.", 
+        category: "Formation", 
+        confidence: 0.75 
+      }
     ];
 
+    // 3. Scoring et filtrage basé sur l'expertise détectée
     const scored = candidates.map(c => ({
       ...c,
-      score: this.calculateScore(c, profile),
-      reasons: ["Sujet lié à vos activités récentes", "Expertise intermédiaire détectée"]
+      score: this.calculateMatchScore(c, profile, context),
+      reasons: this.generateReasons(c, profile)
     }));
 
-    return scored
+    return (scored as ScoredCandidate[])
       .sort((a, b) => b.score - a.score)
-      .slice(0, context.limit || 5);
+      .slice(0, context.limit || 2);
   }
 
-  private calculateScore(candidate: Candidate, profile: UserProfile): number {
+  private calculateMatchScore(candidate: Candidate, profile: UserProfile, context: RecommendationContext): number {
     let score = candidate.confidence;
-    if (profile.expertise === 'expert' && candidate.category === 'Maintenance') score += 0.05;
+    
+    // Bonus si la catégorie correspond aux intérêts récents
+    if (profile.interests.some(i => candidate.category.toLowerCase().includes(i))) score += 0.1;
+    
+    // Ajustement selon le niveau d'expertise (Innovation 27)
+    if (profile.expertise === 'expert' && candidate.category === 'Formation') score -= 0.2;
+    if (profile.expertise === 'beginner' && candidate.category === 'Maintenance Préventive') score += 0.1;
+
+    // Priorité au domaine actuel
+    if (context.domain && candidate.category.includes(context.domain)) score += 0.15;
+
     return Math.min(score, 1.0);
   }
 
+  private generateReasons(candidate: Candidate, profile: UserProfile): string[] {
+    const reasons = ["Sujet lié à vos activités récentes"];
+    if (profile.expertise === 'intermediate') reasons.push("Adapté à votre niveau d'expertise");
+    if (candidate.confidence > 0.9) reasons.push("Hautement recommandé par l'IA Elite");
+    return reasons;
+  }
+
   private async getMockProfile(userId: string): Promise<UserProfile> {
+    // Dans une version réelle, on interrogerait le store Implicit RL (Phase 26)
     return {
       userId,
-      interests: ['maintenance', 'thermique'],
+      interests: ['gaz', 'maintenance', 'sécurité'],
       expertise: 'intermediate',
       preferences: { conciseness: 0.8 },
-      recentTopics: ['chaudière', 'vanne'],
+      recentTopics: ['chaudière', 'vanne', 'pression'],
       documentTypes: ['pdf', 'json'],
       lastUpdated: Date.now()
     };
   }
 }
+
+export const personalizedRecommender = new PersonalizedRecommender();
