@@ -25,7 +25,8 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat avec Raisonnement Avancé (CoT, Contraste, Auto-Consistance), Routage Sémantique et Cache.
+ * Chat Intelligent intégrant les 10 Innovations Élite.
+ * Gère le routage sémantique, le cache, et les 3 modes de raisonnement avancés.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
@@ -33,31 +34,33 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const docContext = input.documentContext || "";
 
     // 1. Analyse du type de raisonnement requis (Innovations 6, 9 & 10)
-    const isCriticalFact = q.match(/vrai|faux|est-ce que|valeur|seuil|pression|limite|autorisé|obligatoire/i) && input.text.length < 150;
-    const isDefinition = q.includes('qu\'est-ce que') || q.includes('définition') || q.includes('signifie');
-    const isComparison = q.includes('différence') || q.includes('comparer') || q.includes(' vs ');
-    const isTechnicalProblem = q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|pression|dysfonctionnement|réparer/i);
-
-    // Cas C : Vérification Auto-Consistante (Innovation 10) pour les faits critiques
-    if (isCriticalFact && docContext.length > 100) {
+    
+    // CAS A : Vérification Auto-Consistante (Innovation 10)
+    // Activé pour les faits critiques, valeurs numériques ou confirmations oui/non.
+    const isCriticalFact = q.match(/vrai|faux|est-ce que|valeur|seuil|pression|limite|autorisé|obligatoire|combien|température/i);
+    if (isCriticalFact && docContext.length > 50) {
       const result = await selfConsistencyReasoner.reason(input.text, docContext);
       return { answer: result.answer, confidence: result.confidence };
     }
 
-    // Cas A : Raisonnement par Contraste (Innovation 9) pour les définitions et comparaisons
-    if ((isDefinition || isComparison) && docContext.length > 200) {
+    // CAS B : Raisonnement par Contraste (Innovation 9)
+    // Activé pour les définitions techniques et les comparaisons.
+    const isDefinition = q.includes('qu\'est-ce que') || q.includes('définition') || q.includes('signifie');
+    const isComparison = q.includes('différence') || q.includes('comparer') || q.includes(' vs ') || q.includes('mieux que');
+    if ((isDefinition || isComparison) && docContext.length > 100) {
       const answer = await contrastiveReasoning.reason(input.text, docContext);
       return { answer };
     }
 
-    // Cas B : Chaîne de Pensée Dynamique (Innovation 6) pour les problèmes techniques complexes
-    if (isTechnicalProblem && input.text.length > 25) {
-      console.log("[AI][CHAT] Activation de la Chaîne de Pensée Dynamique (Innovation 6)...");
+    // CAS C : Chaîne de Pensée Dynamique (Innovation 6)
+    // Activé pour les problèmes de maintenance et les procédures complexes.
+    const isTechnicalProblem = q.match(/comment|pourquoi|panne|maintenance|chaudière|gaz|circuit|dysfonctionnement|réparer|étape/i);
+    if (isTechnicalProblem && input.text.length > 20) {
       const answer = await dynamicCoT.reason(input.text, docContext);
       return { answer };
     }
 
-    // 2. Routage standard si aucun mode spécial n'est requis
+    // 2. Routage standard (Innovation 1) avec Prompt Dynamique (Innovation 5)
     const hasContext = docContext.length > 100;
     const targetModel = await semanticRouter.route(input.text, hasContext);
     const optimizedPrompt = await dynamicPromptEngine.buildPrompt(input.text, docContext);
@@ -68,12 +71,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         model: `ollama/${targetModel}`,
         prompt: optimizedPrompt,
         config: {
-          temperature: 0.5,
+          temperature: 0.4,
           num_ctx: 4096
         }
       });
 
-      return { answer: response.text || "Désolé, je n'ai pas pu formuler de réponse avec le modèle local." };
+      return { answer: response.text || "Désolé, je n'ai pas pu formuler de réponse avec le moteur local." };
     } catch (error) {
       console.error("[AI][CHAT] Erreur génération Ollama:", error);
       return { answer: "Une erreur technique empêche la connexion à l'IA locale (Ollama). Vérifiez que le service est actif." };
@@ -83,10 +86,9 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
   // 3. Utilisation du cache sémantique intelligent (Innovation 2)
   const result = await semanticCache.getOrCompute(input.text, async () => {
     const res = await computeAnswer();
-    return typeof res === 'string' ? res : JSON.stringify(res);
+    return JSON.stringify(res);
   });
 
-  // Gérer le retour du cache qui peut être un JSON stringifié ou une simple string
   let finalAnswer = "";
   let confidence = undefined;
 
