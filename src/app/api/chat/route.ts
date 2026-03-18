@@ -10,28 +10,31 @@ import { getCurrentActiveModel } from '@/ai/training/model-registry';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
 export async function POST(req: NextRequest) {
-  console.log("[API][CHAT] Nouvelle requête reçue.");
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[API][CHAT][${requestId}] Nouvelle requête reçue.`);
 
   try {
     const { prompt, history = [], userId = 'default-user', mode = 'auto' } = await req.json();
 
     if (!prompt) {
+      console.warn(`[API][CHAT][${requestId}] Erreur: Message manquant.`);
       return NextResponse.json({ error: "Le message est requis." }, { status: 400 });
     }
 
     // PHASE 1: COMPRENDRE - Analyse sémantique de l'intention
-    console.log(`[API][CHAT] Phase 1 : Analyse de l'intention...`);
+    console.log(`[API][CHAT][${requestId}] Analyse de l'intention...`);
     const analysis = await analyzeQuery(prompt);
+    console.log(`[API][CHAT][${requestId}] Type détecté: ${analysis.type}, Complexité: ${analysis.complexity.toFixed(2)}`);
     
     // Logique de routage : Agent vs Chat RAG
     const useAgent = mode === 'agent' || (mode === 'auto' && (analysis.complexity > 0.75 || analysis.type === 'action'));
-    console.log(`[API][CHAT] Stratégie sélectionnée : ${useAgent ? 'MISSION AGENT' : 'CHAT RAG'}`);
+    console.log(`[API][CHAT][${requestId}] Stratégie de routage : ${useAgent ? 'AGENT AUTONOME (MCP)' : 'CHAT RAG ENHANCÉ'}`);
 
     let responseData;
 
     if (useAgent) {
       // --- BRANCHE 1: AGENT INTELLIGENT (Mission Autonome MCP) ---
-      console.log(`[API][CHAT] Déclenchement de l'agent missionnaire...`);
+      console.log(`[API][CHAT][${requestId}][AGENT] Déclenchement de la mission...`);
       const agentRes = await processAgentMission(prompt, userId);
       
       responseData = {
@@ -44,9 +47,10 @@ export async function POST(req: NextRequest) {
         confidence: agentRes.confidence,
         patternsLearned: agentRes.patternsLearned
       };
+      console.log(`[API][CHAT][${requestId}][AGENT] Mission accomplie.`);
     } else {
       // --- BRANCHE 2: CHAT RAG ENHANCÉE (Raisonnement Métacognitif) ---
-      console.log(`[API][CHAT] Déclenchement du flux RAG Elite...`);
+      console.log(`[API][CHAT][${requestId}][RAG] Lancement du flux RAG Elite...`);
       
       // Charger le profil utilisateur pour adapter la réponse (Implicit RL)
       implicitRL.loadProfile();
@@ -69,11 +73,12 @@ export async function POST(req: NextRequest) {
         disclaimer: chatRes.disclaimer,
         newMemoryEpisode: chatRes.newMemoryEpisode
       };
+      console.log(`[API][CHAT][${requestId}][RAG] Réponse RAG prête.`);
     }
 
     // Récupérer le modèle actif pour le reporting
     const activeModel = await getCurrentActiveModel();
-    console.log(`[API][CHAT] Réponse prête (Modèle: ${activeModel.id}).`);
+    console.log(`[API][CHAT][${requestId}] Succès (Modèle: ${activeModel.id}).`);
 
     return NextResponse.json({
       ...responseData,
@@ -85,7 +90,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("[API][CHAT] Échec critique de l'orchestrateur hybride :", error);
+    console.error(`[API][CHAT][${requestId}][FATAL]`, error);
     return NextResponse.json({ 
       error: "L'assistant a rencontré une difficulté technique lors de l'analyse.",
       details: error.message 

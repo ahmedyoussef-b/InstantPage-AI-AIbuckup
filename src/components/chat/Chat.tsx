@@ -24,7 +24,7 @@ import VoiceControls from '@/components/chat/VoiceControls';
 import { useVoiceEnhanced } from '@/hooks/useVoiceEnhanced';
 import StepByStepGuide from '@/components/procedure/StepByStepGuide';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'; // Importation de cn ajoutée
 
 interface Message {
   role: 'user' | 'ai';
@@ -108,8 +108,13 @@ export default function Chat() {
   }, [messages]);
 
   const handleMicClick = async () => {
-    if (isListening) await stopListening();
-    else await startListening();
+    if (isListening) {
+      console.log("[UI][CHAT] Micro désactivé.");
+      await stopListening();
+    } else {
+      console.log("[UI][CHAT] Micro activé, écoute en cours...");
+      await startListening();
+    }
   };
 
   return (
@@ -177,7 +182,11 @@ export default function Chat() {
                     {msg.isAgentMission && msg.steps && (
                       <div className="ml-12 mr-4 bg-purple-600/5 border border-purple-500/20 rounded-3xl overflow-hidden animate-in slide-in-from-top-4 duration-500 shadow-2xl shadow-purple-500/5">
                         <button 
-                          onClick={() => setExpandedMissionId(expandedMissionId === msg.id ? null : msg.id)}
+                          onClick={() => {
+                            const newExpanded = expandedMissionId === msg.id ? null : msg.id;
+                            console.log(`[UI][CHAT] Mission ${msg.id} ${newExpanded ? 'dépliée' : 'repliée'}.`);
+                            setExpandedMissionId(newExpanded);
+                          }}
                           className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
                         >
                           <div className="flex items-center gap-4">

@@ -60,7 +60,10 @@ export const api = {
     const res = await fetch('/api/ingest', { method: 'POST', body: formData });
     const result = await safeJsonParse(res);
 
-    if (result.error) throw new Error(result.details || result.error);
+    if (result.error) {
+      console.error(`[CLIENT_API][UPLOAD_ERROR] ${result.error}`);
+      throw new Error(result.details || result.error);
+    }
 
     const text = await file.text().catch(() => "");
     const newFile: FileSystemItem = {
@@ -76,13 +79,14 @@ export const api = {
       version: 1
     };
 
-    console.log(`[CLIENT_API][UPLOAD] Document indexé avec succès (ID: ${newFile.id})`);
+    console.log(`[CLIENT_API][UPLOAD_SUCCESS] Document indexé (ID: ${newFile.id}, Segments: ${newFile.chunks})`);
     saveLocalFS([...fs, newFile]);
     return result;
   },
 
   async chat(query: string, history: any[] = []): Promise<any> {
-    console.log(`[CLIENT_API][CHAT] Envoi de la requête au backend : "${query.substring(0, 30)}..."`);
+    const startTime = Date.now();
+    console.log(`[CLIENT_API][CHAT] Envoi requête : "${query.substring(0, 40)}..."`);
     
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -97,18 +101,21 @@ export const api = {
 
     const result = await safeJsonParse(response);
     if (result.error) {
-      console.error(`[CLIENT_API][CHAT] Erreur backend :`, result.error);
+      console.error(`[CLIENT_API][CHAT_ERROR] ${result.error}`);
       throw new Error(result.error);
     }
 
+    const duration = Date.now() - startTime;
+    console.log(`[CLIENT_API][CHAT_SUCCESS] Réponse reçue en ${duration}ms. Mode: ${result.isAgentMission ? 'AGENT' : 'RAG'}`);
+
     if (result.newMemoryEpisode) {
-      console.log(`[CLIENT_API][CHAT] Mémorisation d'un nouvel épisode épisodique.`);
+      console.log(`[CLIENT_API][CHAT] Mémorisation d'un nouvel épisode (Importance: ${result.confidence.toFixed(2)})`);
       const currentMemory = loadMemory();
       await saveMemory([result.newMemoryEpisode, ...currentMemory]);
     }
 
+    // Appliquer les corrections locales apprises
     const finalAnswer = continuousLearning.applyRules(result.answer);
-    console.log(`[CLIENT_API][CHAT] Traitement terminé.`);
     return { ...result, answer: finalAnswer };
   },
 
@@ -143,7 +150,7 @@ export const api = {
   },
 
   async submitFeedback(query: string, _response: string, rating: number): Promise<void> {
-    console.log(`[CLIENT_API][FEEDBACK] Signal ImplicitRL (Rating: ${rating})`);
+    console.log(`[CLIENT_API][FEEDBACK] Signal ImplicitRL (Rating: ${rating}) pour "${query.substring(0, 20)}..."`);
     await implicitRL.processSignal(rating >= 4 ? 'ACCEPTANCE' : 'CORRECTION', { isTechnical: query.length > 50 });
   },
 

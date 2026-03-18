@@ -35,15 +35,17 @@ export interface LoopResult {
  * Exécute la boucle RAG Enhancée complète.
  */
 export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
-  console.log(`[AI][RAG][CYCLE] Démarrage pour: "${interaction.query.substring(0, 30)}..."`);
+  const cycleId = Math.random().toString(36).substring(7);
+  console.log(`[AI][RAG][CYCLE][${cycleId}] DÉMARRAGE : "${interaction.query.substring(0, 30)}..."`);
 
   // --- PHASE 1: COMPRENDRE (Retriever Intelligent & Query Analyzer) ---
-  console.log(`[AI][RAG][PHASE-1] Recherche multi-sources...`);
+  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-1] Recherche multi-sources...`);
   const retrievalResult = await retrieveContext(interaction.query, interaction.userId);
   const queryAnalysis = retrievalResult.analysis;
+  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-1] ${retrievalResult.contexts.length} sources trouvées.`);
 
   // --- PHASE 2: RAISONNER (Context Assembler & Metacognition) ---
-  console.log(`[AI][RAG][PHASE-2] Assemblage du contexte et raisonnement métacognitif...`);
+  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-2] Assemblage du contexte et raisonnement métacognitif...`);
   const assembledContext = await assembleContext(retrievalResult);
   
   // Utilisation de la méta-cognition pour valider si le contexte permet de répondre
@@ -52,7 +54,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     assembledContext.text,
     async (q, ctx) => {
       // --- PHASE 3: AGIR (Génération LLM Locale) ---
-      console.log(`[AI][RAG][PHASE-3] Génération de la réponse via LLM local...`);
+      console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-3] Génération de la réponse via LLM local...`);
       const llmResponse = await generateLLMResponse(q, {
         ...assembledContext,
         text: ctx 
@@ -65,7 +67,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
   await agirVector(interaction.query, { mode: 'standard' });
 
   // --- PHASE 4: APPRENDRE (Learning Loop & Vectorisation) ---
-  console.log(`[AI][RAG][PHASE-4] Consolidation et vectorisation dynamique...`);
+  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-4] Consolidation et vectorisation dynamique...`);
   await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
   
   // Enregistrement dans la boucle d'apprentissage RAG spécifique
@@ -92,7 +94,7 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     tags: queryAnalysis.concepts
   };
 
-  console.log(`[AI][RAG][CYCLE] Terminé. Confiance finale: ${Math.round(metaResult.confidence * 100)}%`);
+  console.log(`[AI][RAG][CYCLE][${cycleId}] TERMINÉ. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
 
   return {
     answer: metaResult.answer,
