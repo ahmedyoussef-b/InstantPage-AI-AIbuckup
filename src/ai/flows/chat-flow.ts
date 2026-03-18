@@ -7,6 +7,7 @@
 import { z } from 'genkit';
 import { comprendreVector, formatVectorContext } from '@/ai/integration/phase1-vector';
 import { raisonnerVector } from '@/ai/integration/phase2-vector';
+import { agirVector, formatActionInsight } from '@/ai/integration/phase3-vector';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
 import { modularReasoner } from '@/ai/reasoning/modular';
 import { latentTree } from '@/ai/reasoning/latent-tree';
@@ -72,7 +73,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     docContext += await getCurriculumDirective(pedaLevel);
 
-    // --- PHASE 3: AGIR (Act) - Commandes système & Workflows ---
+    // --- PHASE 3: AGIR (Act) - Vectorisation des patterns d'action ---
+    const actionInsight = await agirVector(input.text, { mode: 'standard' });
+    if (actionInsight) {
+      docContext += await formatActionInsight(actionInsight);
+    }
+
     if (input.text.toLowerCase().match(/audit complet|analyse massive/i)) {
       const taskId = await submitWorkflow('ANALYSIS_HEAVY', input.text);
       return { answer: `🚀 **Workflow Asynchrone** lancé. ID : \`${taskId}\`.`, confidence: 1.0, asyncTaskId: taskId };
