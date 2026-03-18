@@ -17,6 +17,7 @@ import { submitWorkflow } from '@/ai/actions/async-workflow';
 import { predictNextActions } from '@/ai/actions/predictive-engine';
 import { recall, remember, type Episode } from '@/ai/learning/episodic-memory';
 import { evaluatePedagogicalLevel, getCurriculumDirective, suggestNextTopic } from '@/ai/learning/curriculum';
+import { distillInteractions, getApplicableRules, type DistilledRule } from '@/ai/learning/knowledge-distillation';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -25,6 +26,7 @@ const ChatInputSchema = z.object({
   analogyMemory: z.array(z.any()).optional(),
   demonstrationHistory: z.array(z.any()).optional(),
   episodicMemory: z.array(z.any()).optional(),
+  distilledRules: z.array(z.any()).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -45,6 +47,8 @@ const ChatOutputSchema = z.object({
   undoAvailable: z.boolean().optional(),
   newMemoryEpisode: z.any().optional(),
   pedagogicalLevel: z.string().optional(),
+  distillationPerformed: z.boolean().optional(),
+  newDistilledRules: z.array(z.any()).optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -58,6 +62,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let multiAgentActive = false;
     let demoPolicyApplied = false;
     let undoAvailable = false;
+    let distillationPerformed = false;
+    let newDistilledRules: DistilledRule[] | undefined = undefined;
     let proactiveSuggestions: any[] = [];
 
     // 0. Innovation 25: Rappel de mémoire épisodique
@@ -66,7 +72,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       docContext += `\n[SOUVENIRS LIÉS : ${memory.summary}]`;
     }
 
-    // 0.1 Innovation 27: Curriculum Adaptatif (ZPD)
+    // 0.1 Innovation 28: Application des règles distillées
+    if (input.distilledRules && input.distilledRules.length > 0) {
+      const rulesContext = await getApplicableRules(input.text, input.distilledRules as DistilledRule[]);
+      if (rulesContext) docContext += ` ${rulesContext}`;
+    }
+
+    // 0.2 Innovation 27: Curriculum Adaptatif (ZPD)
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const pedaDirective = await getCurriculumDirective(pedaLevel);
     docContext += ` ${pedaDirective}`;
@@ -179,7 +191,16 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       tags: [metaResult.confidence > 0.8 ? 'important' : 'routine', pedaLevel.toLowerCase()]
     };
 
-    // 8. Innovation 27: Suggestion de la prochaine thématique pédagogique
+    // 8. Innovation 28: Déclenchement périodique de la distillation
+    if (input.episodicMemory && input.episodicMemory.length > 15 && Math.random() > 0.7) {
+      const distillation = await distillInteractions(input.episodicMemory as Episode[]);
+      if (distillation.rules.length > 0) {
+        distillationPerformed = true;
+        newDistilledRules = distillation.rules;
+      }
+    }
+
+    // 9. Innovation 27: Suggestion de la prochaine thématique pédagogique
     const nextStep = await suggestNextTopic(input.text + " " + metaResult.answer);
     const finalSuggestions = metaResult.suggestions || [];
     if (nextStep) finalSuggestions.push(nextStep);
@@ -195,7 +216,9 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       undoAvailable,
       actionTaken: actionDecision.type === 'use_tool' ? actionDecision : undefined,
       newMemoryEpisode,
-      pedagogicalLevel: pedaLevel
+      pedagogicalLevel: pedaLevel,
+      distillationPerformed,
+      newDistilledRules
     };
   };
 

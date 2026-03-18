@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client - Gestionnaire de la base de données locale persistante (VFS).
- * Intègre désormais l'Apprentissage par Renforcement Implicite (Innovation 26).
+ * Intègre désormais la Distillation des Connaissances (Innovation 28).
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -14,6 +14,7 @@ import { implicitRL } from '@/ai/learning/implicit-rl';
 const STORAGE_KEY = 'AGENTIC_VFS_STABLE_V13';
 const DEMO_KEY = 'AGENTIC_DEMOS_V1';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
+const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
 
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -40,6 +41,19 @@ const saveMemory = async (episodes: Episode[]) => {
   if (typeof window === 'undefined') return;
   const optimized = await applyForgetting(episodes);
   localStorage.setItem(MEMORY_KEY, JSON.stringify(optimized));
+};
+
+const loadDistilledRules = (): any[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(RULES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+};
+
+const saveDistilledRules = (rules: any[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(RULES_KEY, JSON.stringify(rules));
 };
 
 const loadDemonstrations = (): any[] => {
@@ -89,12 +103,13 @@ export const api = {
     const context = await hybridRAG.retrieve(query, files);
     const demonstrations = loadDemonstrations();
     const episodicMemory = loadMemory();
+    const distilledRules = loadDistilledRules();
     
     // --- INNOVATION 26: SIGNaux IMPLICITES ---
     implicitRL.loadProfile();
     const now = Date.now();
     
-    // 1. Détection de Reformulation (Même intention en < 30s)
+    // 1. Détection de Reformulation
     if (lastQueryText && query.length > 5 && now - lastQueryTime < 30000) {
       const similarity = query.toLowerCase().includes(lastQueryText.toLowerCase().substring(0, 10)) ? 0.8 : 0;
       if (similarity > 0.5) {
@@ -102,11 +117,6 @@ export const api = {
       }
     }
     
-    // 2. Détection d'Hésitation (Long délai entre deux messages techniques)
-    if (lastQueryTime > 0 && now - lastQueryTime > 300000) { // 5 mins
-       await implicitRL.processSignal('HESITATION', {});
-    }
-
     lastQueryTime = now;
     lastQueryText = query;
 
@@ -122,28 +132,19 @@ export const api = {
       history: genkitHistory,
       documentContext: context,
       demonstrationHistory: demonstrations,
-      episodicMemory: episodicMemory
+      episodicMemory: episodicMemory,
+      distilledRules: distilledRules
     });
 
     const correctedAnswer = continuousLearning.applyRules(response.answer);
     
-    // 3. Signal d'Acceptation tacite
-    if (history.length > 0 && query.length < 15) {
-      implicitRL.processSignal('ACCEPTANCE', { isLong: response.answer.length > 200 });
+    // 2. Innovation 28: Sauvegarde des nouvelles règles distillées
+    if (response.distillationPerformed && response.newDistilledRules) {
+      const mergedRules = [...response.newDistilledRules, ...distilledRules].slice(0, 30);
+      saveDistilledRules(mergedRules);
     }
 
-    // 4. Signal d'Usage (si l'IA a pris une action et que l'utilisateur continue)
-    if (response.actionTaken) {
-      saveDemonstration({
-        timestamp: Date.now(),
-        context: query,
-        action: response.actionTaken,
-        result: response.answer.substring(0, 100)
-      });
-      await implicitRL.processSignal('USAGE', { isTechnical: true });
-    }
-
-    // Mémorisation épisodique (Innovation 25)
+    // 3. Mémorisation épisodique
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -157,7 +158,6 @@ export const api = {
   },
 
   async submitCorrection(original: string, corrected: string): Promise<boolean> {
-    // --- INNOVATION 26: SIGNAL RL NÉGATIF ---
     await implicitRL.processSignal('CORRECTION', { isLong: original.length > 200 });
     return await continuousLearning.recordCorrection(original, corrected);
   },
