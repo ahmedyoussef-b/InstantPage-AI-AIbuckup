@@ -2,7 +2,7 @@
 /**
  * @fileOverview SelfImprovingAI - Innovation Elite Finale.
  * Orchestre le cycle d'auto-amélioration nocturne : consolidation sémantique, 
- * distillation de connaissances et optimisation des stratégies.
+ * distillation de connaissances et optimisation ML.
  */
 
 import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
@@ -10,11 +10,13 @@ import { detectCommunityPatterns } from '@/ai/learning/cross-user-learning';
 import { extractHierarchicalConcepts } from '@/ai/learning/concept-hierarchy';
 import { distillInteractions } from '@/ai/learning/knowledge-distillation';
 import { extractTaskFeatures, selectOptimalStrategy } from '@/ai/learning/meta-learning';
+import { trainingPipeline } from '@/ai/training/training-pipeline';
 
 export interface ImprovementResult {
   consolidatedDocs: number;
   newRules: number;
   communityPatterns: number;
+  mlCycle: any;
   strategyOptimized: boolean;
   timestamp: number;
 }
@@ -66,7 +68,13 @@ export async function runNighttimeImprovement(context: {
   const distillation = await distillInteractions(context.memory);
   newRulesCount = distillation.rules.length;
 
-  // 5. PHASE 31: Méta-optimisation de la stratégie
+  // 5. NOUVEAU : CYCLE D'ENTRAÎNEMENT ML LOCAL (Fine-Tuning)
+  const mlCycleResult = await trainingPipeline.runFullCycle({
+    memory: context.memory,
+    documents: context.documents
+  });
+
+  // 6. PHASE 31: Méta-optimisation de la stratégie
   if (context.memory.length > 0) {
     const lastTask = context.memory[0];
     const features = await extractTaskFeatures(lastTask.context, lastTask.content);
@@ -79,6 +87,7 @@ export async function runNighttimeImprovement(context: {
     consolidatedDocs,
     newRules: newRulesCount,
     communityPatterns: communityPatternsCount,
+    mlCycle: mlCycleResult,
     strategyOptimized: true,
     timestamp: Date.now()
   };
