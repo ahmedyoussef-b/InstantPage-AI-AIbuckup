@@ -43,6 +43,7 @@ const ChatOutputSchema = z.object({
   multiAgentActive: z.boolean().optional(),
   demoPolicyApplied: z.boolean().optional(),
   asyncTaskId: z.string().optional(),
+  undoAvailable: z.boolean().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -55,8 +56,9 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let planGenerated = false;
     let multiAgentActive = false;
     let demoPolicyApplied = false;
+    let undoAvailable = false;
 
-    // 1. Innovation 23: Détection de besoin de Workflow Asynchrone (Nouveau)
+    // 1. Innovation 23: Détection de besoin de Workflow Asynchrone
     if (q.match(/audit complet|analyse massive|traitement profond|générer tout|longue tâche/i)) {
       const taskId = await submitWorkflow('ANALYSIS_HEAVY', input.text);
       return {
@@ -84,11 +86,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       
       if (suggestedAction) {
         demoPolicyApplied = true;
-        docContext += `\n[NOTE SYSTÈME: Action automatique basée sur vos habitudes.]`;
+        docContext += `\n[NOTE SYSTÈME: Action automatique basée sur vos habitudes : ${suggestedAction.type}]`;
       }
     }
 
-    // 4. Innovation 20: Orchestration Multi-Agents
+    // 4. Innovation 20: Orchestration Multi-Agents (Requêtes complexes)
     if (q.match(/expertise complète|audit technique|analyse multi-domaine|complet/i) || q.length > 250) {
       const orchestration = await orchestrateMultiAgents(input.text, docContext);
       multiAgentActive = true;
@@ -100,35 +102,70 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 5. Planification Hiérarchique (Innovation 18)
-    if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || (q.length > 80 && !multiAgentActive)) {
+    // 5. Toolformer & Planification (Innovation 17 & 18)
+    const actionDecision = await toolformer.decideAction(input.text, docContext);
+    
+    // Si un plan complexe est requis
+    if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || q.length > 100) {
       const plan = await getHierarchicalPlan(input.text, docContext);
+      
+      // Innovation 21: Validation contextuelle
       const validation = await validateAction({ type: 'PLANIFICATION', task: input.text }, docContext);
+      
       if (!validation.valid) {
+        const alternative = await suggestAlternative({ type: 'PLANIFICATION', task: input.text }, validation.reason || "");
         return {
-          answer: `⚠️ **Sécurité (Innovation 21)**: ${validation.reason}`,
+          answer: `⚠️ **Sécurité (Innovation 21)**: ${validation.reason}\n\n${alternative ? `Alternative suggérée : ${JSON.stringify(alternative)}` : ""}`,
           confidence: 0.1
         };
       }
+
       prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
       planGenerated = true;
+      
+      // Innovation 19: Enregistrement pour réversibilité
       await recordAction('PLANIFICATION', { task: input.text }, docContext);
+      undoAvailable = true;
+    } 
+    // Sinon, si un outil spécifique est nécessaire
+    else if (actionDecision.type === 'use_tool') {
+      const validation = await validateAction(actionDecision, docContext);
+      
+      if (!validation.valid) {
+        return {
+          answer: `⚠️ **Action refusée**: ${validation.reason}. Veuillez reformuler votre demande de manière plus sûre.`,
+          confidence: 0.2
+        };
+      }
+
+      await recordAction(actionDecision.tool || 'tool_use', actionDecision.params, docContext);
+      undoAvailable = true;
+      prefixOutput = `🔧 **Action exécutée** : Utilisation de l'outil \`${actionDecision.tool}\` (Résultat attendu : ${actionDecision.expectedOutcome})\n\n`;
     }
 
+    // 6. Génération de la réponse avec Méta-cognition (Innovation 13)
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
+      // Innovation 12: Analogies
       if (input.analogyMemory && input.analogyMemory.length > 0) {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
       
+      // Innovation 9: Contraste (si applicable)
+      if (query.match(/différence|versus|vs|comparer/i)) {
+        return await contrastiveReasoning.reason(query, ctx);
+      }
+
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
+      
       const { ai } = await import('@/ai/genkit');
       const response = await ai.generate({
         model: `ollama/${targetModel}`,
         prompt: optimizedPrompt,
         config: { temperature: 0.4, num_ctx: 4096 }
       });
+      
       return response.text || "Désolé, je n'ai pas pu formuler de réponse.";
     };
 
@@ -141,11 +178,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       suggestions: metaResult.suggestions,
       planGenerated,
       demoPolicyApplied,
+      undoAvailable,
       isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0),
-      multiAgentActive: false
+      actionTaken: actionDecision.type === 'use_tool' ? actionDecision : undefined
     };
   };
 
+  // Cache sémantique (Innovation 2)
   const result = await semanticCache.getOrCompute(input.text, async () => {
     const res = await computeAnswer();
     return JSON.stringify(res);
