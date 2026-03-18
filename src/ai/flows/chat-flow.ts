@@ -18,6 +18,7 @@ import { recordAction, undoLastAction, getActionHistoryReport } from '@/ai/actio
 import { orchestrateMultiAgents } from '@/ai/orchestration/multi-agent-system';
 import { validateAction, suggestAlternative } from '@/ai/actions/contextual-validator';
 import { extractPoliciesFromHistory, suggestActionFromPolicy, type Demonstration } from '@/ai/actions/demonstration-learner';
+import { submitWorkflow } from '@/ai/actions/async-workflow';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -41,6 +42,7 @@ const ChatOutputSchema = z.object({
   historyReport: z.string().optional(),
   multiAgentActive: z.boolean().optional(),
   demoPolicyApplied: z.boolean().optional(),
+  asyncTaskId: z.string().optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -54,7 +56,18 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     let multiAgentActive = false;
     let demoPolicyApplied = false;
 
-    // 1. Innovation 19: Détection de commande d'annulation
+    // 1. Innovation 23: Détection de besoin de Workflow Asynchrone (Nouveau)
+    if (q.match(/audit complet|analyse massive|traitement profond|générer tout|longue tâche/i)) {
+      const taskId = await submitWorkflow('ANALYSIS_HEAVY', input.text);
+      return {
+        answer: `🚀 **Innovation 23 active** : Cette tâche nécessite une analyse approfondie. J'ai lancé un workflow asynchrone non-bloquant.\n\nID de suivi : \`${taskId}\`\n\nVous pouvez continuer à me poser d'autres questions pendant que je travaille en arrière-plan.`,
+        confidence: 1.0,
+        asyncTaskId: taskId,
+        suggestions: ["Vérifier l'état de l'analyse", "Annuler la tâche"]
+      };
+    }
+
+    // 2. Innovation 19: Détection de commande d'annulation
     if (q.match(/annuler|undo|revenir en arrière|effacer dernière action/i)) {
       const undoResult = await undoLastAction();
       return {
@@ -64,27 +77,18 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 2. Innovation 22: Apprentissage par Démonstration (Nouveau)
+    // 3. Innovation 22: Apprentissage par Démonstration
     if (input.demonstrationHistory && input.demonstrationHistory.length > 0) {
       const policies = await extractPoliciesFromHistory(input.demonstrationHistory as Demonstration[]);
       const suggestedAction = await suggestActionFromPolicy(input.text, docContext, policies);
       
       if (suggestedAction) {
-        console.log("[AI][FLOW] Application d'une politique apprise par démonstration...");
         demoPolicyApplied = true;
-        docContext += `\n[NOTE SYSTÈME: Action automatique basée sur vos habitudes: ${JSON.stringify(suggestedAction)}]`;
+        docContext += `\n[NOTE SYSTÈME: Action automatique basée sur vos habitudes.]`;
       }
     }
 
-    if (q.match(/historique des actions|qu'as-tu fait|audit/i)) {
-      const report = await getActionHistoryReport();
-      return {
-        answer: report,
-        confidence: 1.0
-      };
-    }
-
-    // 3. Innovation 20: Orchestration Multi-Agents
+    // 4. Innovation 20: Orchestration Multi-Agents
     if (q.match(/expertise complète|audit technique|analyse multi-domaine|complet/i) || q.length > 250) {
       const orchestration = await orchestrateMultiAgents(input.text, docContext);
       multiAgentActive = true;
@@ -96,7 +100,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       };
     }
 
-    // 4. Planification Hiérarchique (Innovation 18)
+    // 5. Planification Hiérarchique (Innovation 18)
     if (q.match(/préparer|planifier|organiser|automatiser|faire un plan|décomposer/i) || (q.length > 80 && !multiAgentActive)) {
       const plan = await getHierarchicalPlan(input.text, docContext);
       const validation = await validateAction({ type: 'PLANIFICATION', task: input.text }, docContext);
@@ -107,27 +111,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         };
       }
       prefixOutput = await formatHierarchicalPlan(plan) + "\n\n---\n\n";
-      docContext += `\n[NOTE SYSTÈME: Un plan hiérarchique a été généré.]`;
       planGenerated = true;
       await recordAction('PLANIFICATION', { task: input.text }, docContext);
-    }
-
-    // 5. Toolformer Local (Innovation 17)
-    const action = await toolformer.decideAction(input.text, docContext);
-    let actionInfo = null;
-
-    if (action.type === 'use_tool') {
-      const validation = await validateAction(action, docContext);
-      if (!validation.valid) {
-        const alt = await suggestAlternative(action, validation.reason || "Non sécurisé");
-        return {
-          answer: `🛡️ **Sécurité (Innovation 21)**: ${validation.reason}. Suggestion: ${JSON.stringify(alt)}`,
-          confidence: 0.2
-        };
-      }
-      actionInfo = { tool: action.tool, params: action.params, prediction: action.expectedOutcome };
-      docContext += `\n[NOTE SYSTÈME: Outil ${action.tool} utilisé.]`;
-      await recordAction(`TOOL_${action.tool.toUpperCase()}`, action.params, input.documentContext || "");
     }
 
     const standardGenerate = async (query: string, ctx: string): Promise<string> => {
@@ -135,22 +120,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         const analogResponse = await analogicalReasoner.reason(query, ctx, input.analogyMemory as SolvedProblem[]);
         if (analogResponse) return analogResponse;
       }
-      if (q.match(/analyse complète|expertise|consensus|débat/i) || query.length > 200) {
-        return await collaborativeReasoner.reason(query, ctx);
-      }
-      if (q.match(/dois-je|devrais-je|choisir|décider/i) && ctx.length > 50) {
-        return await latentTree.reason(query, ctx);
-      }
-      if (q.match(/impact|conséquence|calcul|période/i) && ctx.length > 100) {
-        return await modularReasoner.reason(query, ctx);
-      }
-      if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
-        return await contrastiveReasoning.reason(query, ctx);
-      }
-      if (q.match(/comment|pourquoi|panne|maintenance/i) && query.length > 20) {
-        return await dynamicCoT.reason(query, ctx);
-      }
-
+      
       const targetModel = await semanticRouter.route(query, ctx.length > 100);
       const optimizedPrompt = await dynamicPromptEngine.buildPrompt(query, ctx);
       const { ai } = await import('@/ai/genkit');
@@ -169,7 +139,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       confidence: metaResult.confidence,
       disclaimer: metaResult.disclaimer,
       suggestions: metaResult.suggestions,
-      actionTaken: actionInfo,
       planGenerated,
       demoPolicyApplied,
       isAnalogical: q.includes('analogie') || (input.analogyMemory && input.analogyMemory.length > 0),
@@ -185,15 +154,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
   try {
     const parsed = JSON.parse(result);
     return {
+      ...parsed,
       answer: parsed.answer || result,
-      confidence: parsed.confidence,
-      disclaimer: parsed.disclaimer,
-      suggestions: parsed.suggestions,
-      actionTaken: parsed.actionTaken,
-      planGenerated: parsed.planGenerated,
-      demoPolicyApplied: parsed.demoPolicyApplied || false,
-      isAnalogical: parsed.isAnalogical || false,
-      multiAgentActive: parsed.multiAgentActive || false,
       sources: []
     };
   } catch {

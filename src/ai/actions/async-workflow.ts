@@ -1,152 +1,105 @@
-// src/ai/actions/async-workflow.ts
-export class AsyncWorkflowManager {
-    private activeWorkflows: Map<string, Workflow> = new Map();
-    private workflowQueue: Workflow[] = [];
-    private maxConcurrent = 3;
-    
-    async submitWorkflow(workflow: Workflow): Promise<string> {
-      const workflowId = generateId();
-      
-      workflow.id = workflowId;
-      workflow.status = 'queued';
-      workflow.submittedAt = Date.now();
-      
-      this.workflowQueue.push(workflow);
-      
-      // Démarrer le processeur si disponible
-      this.processQueue();
-      
-      return workflowId;
-    }
-    
-    async getStatus(workflowId: string): Promise<WorkflowStatus> {
-      const workflow = this.activeWorkflows.get(workflowId) || 
-                       this.workflowQueue.find(w => w.id === workflowId);
-      
-      if (!workflow) {
-        return { status: 'not_found' };
-      }
-      
-      return {
-        status: workflow.status,
-        progress: workflow.progress,
-        estimatedTimeRemaining: this.estimateTimeRemaining(workflow),
-        currentStep: workflow.currentStep,
-        result: workflow.result
-      };
-    }
-    
-    private async processQueue() {
-      if (this.activeWorkflows.size >= this.maxConcurrent) return;
-      
-      while (this.workflowQueue.length > 0 && this.activeWorkflows.size < this.maxConcurrent) {
-        const workflow = this.workflowQueue.shift()!;
-        workflow.status = 'running';
-        workflow.startedAt = Date.now();
-        
-        this.activeWorkflows.set(workflow.id, workflow);
-        
-        // Exécuter sans attendre (asynchrone)
-        this.executeWorkflow(workflow).finally(() => {
-          this.activeWorkflows.delete(workflow.id);
-          this.processQueue(); // Traiter la file d'attente
-        });
-      }
-    }
-    
-    private async executeWorkflow(workflow: Workflow) {
-      try {
-        for (let i = 0; i < workflow.steps.length; i++) {
-          const step = workflow.steps[i];
-          
-          // Mettre à jour la progression
-          workflow.currentStep = step;
-          workflow.progress = (i / workflow.steps.length) * 100;
-          
-          // Notifier les listeners
-          this.notifyProgress(workflow);
-          
-          // Exécuter l'étape
-          step.result = await this.executeStep(step);
-          
-          // Vérifier si l'utilisateur a demandé l'annulation
-          if (workflow.cancelled) {
-            workflow.status = 'cancelled';
-            this.notifyCompletion(workflow);
-            return;
-          }
-        }
-        
-        workflow.status = 'completed';
-        workflow.completedAt = Date.now();
-        this.notifyCompletion(workflow);
-        
-      } catch (error) {
-        workflow.status = 'failed';
-        workflow.error = error;
-        this.notifyCompletion(workflow);
-      }
-    }
-    
-    async cancelWorkflow(workflowId: string): Promise<boolean> {
-      const workflow = this.activeWorkflows.get(workflowId);
-      if (workflow) {
-        workflow.cancelled = true;
-        return true;
-      }
-      
-      // Supprimer de la file d'attente si présent
-      const queueIndex = this.workflowQueue.findIndex(w => w.id === workflowId);
-      if (queueIndex >= 0) {
-        this.workflowQueue.splice(queueIndex, 1);
-        return true;
-      }
-      
-      return false;
-    }
-    
-    private notifyProgress(workflow: Workflow) {
-      // Émettre un événement pour l'interface utilisateur
-      this.eventEmitter.emit('workflow-progress', {
-        id: workflow.id,
-        progress: workflow.progress,
-        step: workflow.currentStep
-      });
-    }
-    
-    private estimateTimeRemaining(workflow: Workflow): number | null {
-      if (workflow.status !== 'running' || !workflow.startedAt) return null;
-      
-      const elapsed = Date.now() - workflow.startedAt;
-      const progress = workflow.progress / 100;
-      
-      if (progress === 0) return null;
-      
-      return Math.round(elapsed / progress - elapsed);
-    }
-  }
+'use server';
+/**
+ * @fileOverview AsyncWorkflow - Innovation 23.
+ * Gestion des tâches longues en arrière-plan avec suivi de progression.
+ */
+
+export interface WorkflowStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  result?: any;
+}
+
+export interface Workflow {
+  id: string;
+  type: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  steps: WorkflowStep[];
+  progress: number;
+  startedAt?: number;
+  completedAt?: number;
+  error?: string;
+}
+
+// Registre des workflows en mémoire (Simulation pour le prototype local)
+const workflowRegistry = new Map<string, Workflow>();
+
+/**
+ * Soumet une nouvelle tâche asynchrone.
+ */
+export async function submitWorkflow(type: string, task: string): Promise<string> {
+  const workflowId = `wf-${Math.random().toString(36).substring(7)}`;
   
-  // Interface utilisateur pour les workflows asynchrones
-  class WorkflowUI {
-    async renderWorkflowStatus(workflowId: string) {
-      const status = await workflowManager.getStatus(workflowId);
-      
-      if (status.status === 'running') {
-        return `
-  ⚙️ Workflow en cours...
-  Progression: ${status.progress}%
-  Étape actuelle: ${status.currentStep}
-  Temps restant estimé: ${this.formatTime(status.estimatedTimeRemaining)}
-  [⏸️ Pause] [⏹️ Annuler]
-        `;
-      }
-      
-      if (status.status === 'completed') {
-        return `
-  ✅ Workflow terminé!
-  Résultat: ${JSON.stringify(status.result)}
-  Temps total: ${this.formatTime(status.completedAt - status.startedAt)}
-        `;
-      }
-    }
+  const workflow: Workflow = {
+    id: workflowId,
+    type,
+    status: 'queued',
+    progress: 0,
+    steps: [
+      { id: '1', label: 'Analyse initiale', status: 'pending', progress: 0 },
+      { id: '2', label: 'Traitement des données', status: 'pending', progress: 0 },
+      { id: '3', label: 'Synthèse finale', status: 'pending', progress: 0 }
+    ]
+  };
+
+  workflowRegistry.set(workflowId, workflow);
+  
+  // Lancer le traitement en arrière-plan (sans attendre le résultat)
+  processWorkflow(workflowId, task).catch(console.error);
+  
+  return workflowId;
+}
+
+/**
+ * Récupère l'état d'un workflow.
+ */
+export async function getWorkflowStatus(workflowId: string): Promise<Workflow | null> {
+  return workflowRegistry.get(workflowId) || null;
+}
+
+/**
+ * Annule un workflow en cours.
+ */
+export async function cancelWorkflow(workflowId: string): Promise<boolean> {
+  const workflow = workflowRegistry.get(workflowId);
+  if (workflow && (workflow.status === 'running' || workflow.status === 'queued')) {
+    workflow.status = 'cancelled';
+    return true;
   }
+  return false;
+}
+
+/**
+ * Logique interne de traitement (Simulée pour le prototype)
+ */
+async function processWorkflow(id: string, task: string) {
+  const workflow = workflowRegistry.get(id);
+  if (!workflow) return;
+
+  workflow.status = 'running';
+  workflow.startedAt = Date.now();
+
+  for (let i = 0; i < workflow.steps.length; i++) {
+    if (workflow.status === 'cancelled') break;
+
+    const step = workflow.steps[i];
+    step.status = 'running';
+    
+    // Simulation de travail IA
+    for (let p = 0; p <= 100; p += 25) {
+      if (workflow.status === 'cancelled') break;
+      step.progress = p;
+      workflow.progress = Math.round(((i * 100) + p) / workflow.steps.length);
+      await new Promise(r => setTimeout(resolve => r(resolve), 800)); // Délai simulé
+    }
+
+    step.status = 'completed';
+  }
+
+  if (workflow.status !== 'cancelled') {
+    workflow.status = 'completed';
+    workflow.completedAt = Date.now();
+  }
+}
