@@ -2,14 +2,14 @@
 /**
  * @fileOverview Phase1VectorIntegration - Innovation Elite 32.
  * Architecture de recherche vectorielle multidimensionnelle.
- * Intègre désormais l'expansion hiérarchique et les patterns communautaires.
+ * Fusionne sémantique, hiérarchie et souvenirs.
  */
 
 import { ai } from '@/ai/genkit';
 import { expandHierarchicalContext } from '@/ai/learning/concept-hierarchy';
 
 export interface VectorSearchResult {
-  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY' | 'COMMUNITY';
+  collection: 'DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY';
   content: string;
   score: number;
   metadata: any;
@@ -22,15 +22,14 @@ export async function comprendreVector(question: string, context: {
   episodicMemory: any[], 
   distilledRules: any[],
   userProfile?: any,
-  hierarchyNodes?: any[],
-  communityInsights?: string
+  hierarchyNodes?: any[]
 }): Promise<VectorSearchResult[]> {
-  console.log(`[AI][PHASE-1] Fusion Sémantique, Hiérarchique et Collective...`);
+  console.log(`[AI][PHASE-1] Fusion Sémantique et Hiérarchique Elite 32...`);
 
   const results: VectorSearchResult[] = [];
 
-  // STRATE HIERARCHY : Expansion via Parent/Enfant (Innovation 32.1)
-  if (context.hierarchyNodes) {
+  // STRATE HIERARCHY : Expansion via Relations Parent/Enfant (Innovation 32.1)
+  if (context.hierarchyNodes && context.hierarchyNodes.length > 0) {
     const hierarchyContext = await expandHierarchicalContext(question, context.hierarchyNodes);
     if (hierarchyContext) {
       results.push({
@@ -40,16 +39,6 @@ export async function comprendreVector(question: string, context: {
         metadata: { type: 'taxonomy' }
       });
     }
-  }
-
-  // STRATE COMMUNITY : Sagesse collective (Innovation 32.2)
-  if (context.communityInsights) {
-    results.push({
-      collection: 'COMMUNITY',
-      content: context.communityInsights,
-      score: 0.92,
-      metadata: { source: 'COMMUNITY_PATTERNS' }
-    });
   }
 
   // STRATE CONCEPTS : Règles techniques distillées
@@ -70,18 +59,18 @@ export async function comprendreVector(question: string, context: {
     .forEach(epi => {
       results.push({
         collection: 'LESSONS',
-        content: `Rappel historique : Pour "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
+        content: `Expérience passée liée : Pour "${epi.context}", l'IA a conclu : "${epi.content.substring(0, 150)}..."`,
         score: 0.88,
         metadata: { timestamp: epi.timestamp }
       });
     });
 
-  // STRATE PATTERNS : Préférences utilisateur
+  // STRATE PATTERNS : Préférences apprises (Innovation 26)
   if (context.userProfile) {
     const p = context.userProfile;
     results.push({
       collection: 'PATTERNS',
-      content: `Profil Utilisateur : Préférence pour ${p.technicality > 0.7 ? 'une expertise brute' : 'la vulgarisation'} et ${p.conciseness > 0.7 ? 'la brièveté' : 'la pédagogie détaillée'}.`,
+      content: `Profil Utilisateur : Préfère ${p.technicality > 0.7 ? 'une expertise brute' : 'la vulgarisation'} et ${p.conciseness > 0.7 ? 'la brièveté' : 'la pédagogie détaillée'}.`,
       score: 1.0,
       metadata: { source: 'IMPLICIT_RL' }
     });
@@ -91,14 +80,14 @@ export async function comprendreVector(question: string, context: {
 }
 
 /**
- * Formate le contexte vectoriel fusionné pour le prompt de génération.
+ * Formate le contexte vectoriel fusionné pour le prompt final.
  */
 export async function formatVectorContext(results: VectorSearchResult[]): Promise<string> {
   if (results.length === 0) return "";
   
   let output = "\n--- MÉMOIRE SÉMANTIQUE CENTRALE (ELITE 32) ---\n";
   
-  const collections: ('DOCUMENTS' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS' | 'HIERARCHY' | 'COMMUNITY')[] = ['HIERARCHY', 'COMMUNITY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
+  const collections: ('HIERARCHY' | 'CONCEPTS' | 'LESSONS' | 'PATTERNS')[] = ['HIERARCHY', 'CONCEPTS', 'LESSONS', 'PATTERNS'];
   
   collections.forEach(col => {
     const filtered = results.filter(r => r.collection === col);

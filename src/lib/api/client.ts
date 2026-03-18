@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.1 Integrée : Support de l'indexation hiérarchique et re-vectorisation dynamique.
+ * Version 32.1 Intégrée : Support de l'indexation hiérarchique et re-vectorisation dynamique.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -40,6 +40,9 @@ const saveMemory = async (episodes: Episode[]) => {
 };
 
 export const api = {
+  /**
+   * Ingestion Elite 32 : Extrait métadonnées, graphe, hiérarchie et vectorise.
+   */
   async upload(file: File, parentId: string | null = null): Promise<any> {
     const fs = loadLocalFS();
     const text = await file.text();
@@ -65,6 +68,9 @@ export const api = {
     return { success: true, chunks: result.chunks };
   },
 
+  /**
+   * Chat Elite 32 : Exécute la boucle cognitive complète en 4 phases.
+   */
   async chat(query: string, history: any[] = []): Promise<any> {
     const fs = loadLocalFS();
     const files = fs.filter(i => i.type === 'file');
@@ -78,12 +84,12 @@ export const api = {
     const docContext = await hybridRAG.retrieve(query, searchableDocs);
     const episodicMemory = loadMemory();
     const distilledRules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
-    
     const allHierarchyNodes = searchableDocs.flatMap(f => (f as any).hierarchy?.nodes || []);
     
     implicitRL.loadProfile();
     const userProfile = implicitRL.getProfile();
 
+    // Orchestration via runCompleteEliteLoop (via chat-flow)
     const response = await serverChat({ 
       text: query, 
       history: history.map(msg => ({ 
@@ -97,6 +103,7 @@ export const api = {
       hierarchyNodes: allHierarchyNodes
     } as any);
 
+    // Mémorisation et vectorisation de la leçon extraite
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -105,6 +112,7 @@ export const api = {
       }, ...episodicMemory];
       await saveMemory(updatedMemory);
       
+      // Partage anonymisé si confiance haute (Innovation 32)
       if (response.confidence > 0.9) {
         const mockRule = { instruction: response.answer.substring(0, 100), domain: 'Technique', confidence: response.confidence, id: 'rule-auto', pattern: 'Automatic' };
         shareKnowledge(INSTANCE_ID, mockRule as any).catch(() => {});
@@ -117,21 +125,22 @@ export const api = {
     };
   },
 
+  /**
+   * Innovation 5.3 : Re-vectorisation dynamique avec contexte enrichi.
+   */
   async revectorizeDocument(docId: string): Promise<any> {
     const fs = loadLocalFS();
     const doc = fs.find(f => f.id === docId);
     if (!doc || doc.type !== 'file') throw new Error("Document introuvable.");
 
     const memory = loadMemory();
-    
-    // Extraire les apprentissages liés à ce document
     const relatedEpisodes = memory.filter(e => 
       e.content.toLowerCase().includes(doc.name.toLowerCase()) || 
       (doc.tags && doc.tags.some(t => e.content.toLowerCase().includes(t.toLowerCase())))
     );
 
     const { enhancedContent } = await enrichDocumentContent(doc.content || "", {
-      corrections: [], // Pourrait être récupéré de ContinuousLearning
+      corrections: [], 
       relatedQueries: relatedEpisodes.map(e => e.context),
       lessons: relatedEpisodes.map(e => e.content)
     });
