@@ -1,8 +1,6 @@
 /**
- * Nettoie le texte pour la synthèse vocale
- * - Supprime les marqueurs Markdown
- * - Convertit les symboles en mots
- * - Normalise la ponctuation
+ * Nettoie le texte pour la synthèse vocale (TTS).
+ * Supprime les marqueurs Markdown et les symboles techniques qui nuisent à l'écoute.
  */
 export function cleanTextForTTS(text: string): string {
   if (!text) return '';
@@ -36,36 +34,12 @@ export function cleanTextForTTS(text: string): string {
   // 8. Supprimer les lignes de séparation (---, ***, ___)
   cleaned = cleaned.replace(/^\s*[-*_]{3,}\s*$/gm, ' ');
   
-  // 9. Supprimer les caractères d'astérisques restants (souvent utilisés pour l'emphase ou listes)
+  // 9. Supprimer les astérisques isolés restants
   cleaned = cleaned.replace(/\*/g, ' ');
   
-  // 10. Convertir les symboles courants pour une meilleure lecture
-  const symbols: Record<string, string> = {
-    '&': ' et ',
-    '@': ' arobase ',
-    '%': ' pourcent ',
-    '#': ' dièse ',
-    '+': ' plus ',
-    '=': ' égal ',
-  };
-  
-  for (const [symbol, word] of Object.entries(symbols)) {
-    cleaned = cleaned.replace(new RegExp('\\' + symbol, 'g'), word);
-  }
-  
-  // 11. Normaliser les espaces et retours à la ligne
+  // 10. Normaliser les espaces et retours à la ligne
   cleaned = cleaned.replace(/\n/g, ' ');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   
   return cleaned;
-}
-
-/**
- * Version plus agressive pour les cas extrêmes
- */
-export function cleanTextAggressive(text: string): string {
-  return text
-    .replace(/[^\w\s.,!?;:()àâéèêëîïôûùçÀÂÉÈÊËÎÏÔÛÙÇ-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }

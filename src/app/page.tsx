@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -159,6 +159,9 @@ export default function HomePage() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Menu de Navigation</SheetTitle>
+                </SheetHeader>
                 <SidebarContent />
               </SheetContent>
             </Sheet>

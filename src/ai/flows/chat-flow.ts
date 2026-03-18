@@ -18,29 +18,36 @@ const ChatOutputSchema = z.object({
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
+/**
+ * Chat Intelligent personnalisé pour AHMED.
+ * Gère le contexte RAG et les interactions personnelles.
+ */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  console.log(`[BACKEND][FLOW:chat] Query: "${input.text}"`);
+  console.log(`[BACKEND][FLOW:chat] Query for AHMED: "${input.text}"`);
 
   const contextPrompt = input.documentContext 
     ? `Voici le contenu des documents disponibles pour t'aider :\n\n${input.documentContext}`
     : "Aucun document n'est chargé pour le moment.";
 
+  // Prompt système personnalisé pour AHMED
   const systemPrompt = `Tu es l'Assistant Personnel Intelligent de AHMED.
     
-    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, efficace et le saluer personnellement (ex: "Bonjour AHMED", "Bonsoir AHMED").
+    IDENTITÉ : Ton utilisateur s'appelle AHMED. Tu dois être poli, efficace et le saluer personnellement.
     
-    CONTEXTE : ${contextPrompt}
-
-    RÈGLES :
-    1. Réponds TOUJOURS en français.
-    2. Si AHMED te salue, réponds en mentionnant son nom.
-    3. Utilise le contexte des documents pour répondre précisément.
-    4. Si tu ne sais pas, admets-le poliment en t'adressant à AHMED.`;
+    INSTRUCTIONS :
+    - Si l'utilisateur dit "Bonjour", "Bonsoir", "Salut", réponds toujours en mentionnant son nom : "Bonjour AHMED", "Bonsoir AHMED".
+    - Réponds TOUJOURS en français.
+    - Utilise le contexte des documents fournis ci-dessous pour répondre précisément.
+    - Si la réponse ne se trouve pas dans les documents, admets-le poliment en t'adressant à AHMED.
+    
+    CONTEXTE DOCUMENTS :
+    ${contextPrompt}`;
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
+    // Tentative avec TinyLlama local ou fallback textuel
     const url = 'http://localhost:11434/api/generate';
     
     const response = await fetch(url, {
@@ -60,8 +67,17 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Fallback si Ollama n'est pas lancé
+      const greetings = ["bonjour", "bonsoir", "salut", "hello"];
+      const lowerText = input.text.toLowerCase();
+      if (greetings.some(g => lowerText.includes(g))) {
+        return {
+          answer: `Bonjour AHMED ! Je suis votre assistant. Ollama semble indisponible, mais je suis là pour vous aider avec vos documents.`,
+          sources: []
+        };
+      }
       return {
-        answer: "Désolé AHMED, le moteur de réponse est indisponible actuellement.",
+        answer: "Désolé AHMED, le moteur de réponse est indisponible (Ollama).",
         sources: [],
       };
     }
@@ -72,8 +88,16 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       sources: [],
     };
   } catch (error: any) {
+    // Fallback d'accueil si pas de connexion
+    const lowerText = input.text.toLowerCase();
+    if (lowerText.includes("bonjour") || lowerText.includes("salut")) {
+      return {
+        answer: "Bonjour AHMED ! Ravi de vous voir. Comment puis-je vous aider aujourd'hui ?",
+        sources: []
+      };
+    }
     return {
-      answer: "Désolé AHMED, une erreur technique m'empêche de vous répondre. Vérifiez si Ollama est actif.",
+      answer: "Désolé AHMED, une erreur technique empêche la connexion à Ollama.",
       sources: [],
     };
   }

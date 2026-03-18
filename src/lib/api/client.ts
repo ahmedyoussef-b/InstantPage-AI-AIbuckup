@@ -1,15 +1,15 @@
-// src/lib/api/client.ts
 'use client';
 
-import { FileSystemItem, Stats, ChunkMetadata } from '@/types';
+import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
 /**
  * Persistance locale pour éviter le reset au redémarrage.
+ * Utilise LocalStorage pour sauvegarder l'arborescence des fichiers.
  */
-const STORAGE_KEY = 'agentic_assistant_db_v3';
+const STORAGE_KEY = 'agentic_assistant_db_v4';
 
 const getInitialFileSystem = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -34,11 +34,14 @@ const getInitialFileSystem = (): FileSystemItem[] => {
   return defaultFS;
 };
 
+// Variable d'état interne
 let mockFileSystem: FileSystemItem[] = getInitialFileSystem();
 
 const saveToStorage = () => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(mockFileSystem));
+    // Déclencher un événement de mise à jour pour l'UI si nécessaire
+    window.dispatchEvent(new Event('storage-update'));
   }
 };
 
@@ -79,7 +82,9 @@ const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystem
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
-    // Vérification des doublons avant l'ingestion
+    // Re-charger depuis le storage pour être sûr d'avoir la dernière version
+    mockFileSystem = getInitialFileSystem();
+
     const checkDuplicate = (items: FileSystemItem[]): boolean => {
       for (const item of items) {
         if (item.type === 'file' && item.name === file.name && item.parentId === parentId) return true;
@@ -89,7 +94,7 @@ export const api = {
     };
 
     if (checkDuplicate(mockFileSystem)) {
-      throw new Error(`Désolé AHMED, le fichier "${file.name}" est déjà présent dans ce dossier.`);
+      throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
     }
 
     try {
@@ -126,13 +131,14 @@ export const api = {
       saveToStorage();
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
-      console.error("[API_CLIENT] Erreur Upload:", error.message);
+      console.error("[API_CLIENT] Upload failed:", error.message);
       throw error;
     }
   },
 
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
+      mockFileSystem = getInitialFileSystem();
       const fileNames = getAllFileNames(mockFileSystem);
       const allContent = getAllFileContents(mockFileSystem);
       
@@ -170,7 +176,9 @@ export const api = {
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
+    mockFileSystem = getInitialFileSystem();
     const filesToPurge = findFilesToPurge(mockFileSystem, id);
+    
     for (const file of filesToPurge) {
       await deleteDocument({ docId: file.id, fileName: file.name }).catch(() => {});
     }
@@ -189,6 +197,7 @@ export const api = {
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
+    mockFileSystem = getInitialFileSystem();
     const newFolder: FileSystemItem = {
       id: Math.random().toString(36).substring(7),
       name,
@@ -214,6 +223,7 @@ export const api = {
   },
 
   async getStats(): Promise<Stats> {
+    mockFileSystem = getInitialFileSystem();
     const stats = { docs: 0, chunks: 0, size: 0 };
     const traverse = (items: FileSystemItem[]) => {
       items.forEach(i => {
@@ -235,6 +245,6 @@ export const api = {
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
-    return [...mockFileSystem];
+    return getInitialFileSystem();
   }
 };
