@@ -13,8 +13,12 @@ class EdgeProvider {
 
   constructor() {
     this.tempPath = path.join(process.cwd(), 'data/tts/temp');
-    if (!fs.existsSync(this.tempPath)) {
-      fs.mkdirSync(this.tempPath, { recursive: true });
+    try {
+      if (!fs.existsSync(this.tempPath)) {
+        fs.mkdirSync(this.tempPath, { recursive: true });
+      }
+    } catch (e) {
+      console.warn("Impossible de créer le dossier temporaire Edge TTS:", e);
     }
   }
 

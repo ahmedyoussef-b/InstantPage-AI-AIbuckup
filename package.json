@@ -71,7 +71,6 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@types/recordrtc": "^5.6.15",
-    "@types/vosk": "^0.3.1",
     "genkit-cli": "^1.28.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
