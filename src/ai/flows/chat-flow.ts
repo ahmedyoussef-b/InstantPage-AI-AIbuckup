@@ -2,6 +2,7 @@
 /**
  * @fileOverview Elite 32 Orchestrator - Le cerveau central d'AGENTIC.
  * Version AI Complete : Architecture intégrée via CompleteLearningLoop.
+ * Intègre désormais les recommandations personnalisées basées sur le modèle ML local.
  */
 
 import { z } from 'genkit';
@@ -9,6 +10,7 @@ import { runCompleteEliteLoop } from '@/ai/integration/complete-loop';
 import { evaluatePedagogicalLevel } from '@/ai/learning/curriculum';
 import { learnFromNetwork } from '@/ai/learning/collaborative-network';
 import { semanticCache } from '@/ai/semantic-cache';
+import { personalizedRecommender } from '@/ai/ml/personalized-recommender';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -27,6 +29,7 @@ const ChatOutputSchema = z.object({
   confidence: z.number().optional(),
   disclaimer: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
+  recommendations: z.array(z.any()).optional(), // Objets de recommandation complets (Elite 32)
   newMemoryEpisode: z.any().optional(),
   pedagogicalLevel: z.string().optional(),
   collaborativeInsight: z.string().optional(),
@@ -55,6 +58,13 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       userProfile: input.userProfile
     });
 
+    // 3. Génération de recommandations personnalisées (Phase ML Inférence)
+    // Utilise le profil utilisateur et le contexte pour suggérer proactivement
+    const recommendations = await personalizedRecommender.recommend('default-user', {
+      domain: input.text.toLowerCase().includes('chaudière') ? 'Maintenance' : 'Général',
+      limit: 2
+    });
+
     return {
       answer: loopResult.answer,
       confidence: loopResult.confidence,
@@ -62,6 +72,8 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       newMemoryEpisode: loopResult.newMemoryEpisode,
       pedagogicalLevel: pedaLevel,
       collaborativeInsight,
+      recommendations,
+      suggestions: recommendations.map(r => r.title),
       sources: []
     };
   };

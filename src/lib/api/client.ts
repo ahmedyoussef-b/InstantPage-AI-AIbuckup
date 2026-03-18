@@ -1,6 +1,6 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
- * Version 32.2 Intégrée : Support du pipeline ML complet et des recommandations.
+ * Version 32.2 Intégrée : Support du pipeline ML complet, feedback et recommandations.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
@@ -12,6 +12,7 @@ import { implicitRL } from '@/ai/learning/implicit-rl';
 import { shareKnowledge } from '@/ai/learning/collaborative-network';
 import { enrichDocumentContent, revectorizeContent } from '@/ai/vector/dynamic-revectorization';
 import { runNighttimeImprovement } from '@/ai/integration/self-improvement';
+import { feedbackLoop } from '@/ai/ml/feedback-loop';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
 const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
@@ -71,6 +72,7 @@ export const api = {
 
   /**
    * Chat Elite 32 : Exécute la boucle cognitive complète en 4 phases.
+   * Intègre désormais l'enregistrement automatique dans la boucle de feedback ML.
    */
   async chat(query: string, history: any[] = []): Promise<any> {
     const fs = loadLocalFS();
@@ -102,6 +104,14 @@ export const api = {
       hierarchyNodes: allHierarchyNodes
     } as any);
 
+    // Enregistrement dans la boucle de feedback ML pour auto-amélioration
+    feedbackLoop.recordInteraction({
+      input: query,
+      prediction: response.answer,
+      modelVersion: 'v1-base',
+      context: { hasRelevantDocs: !!docContext }
+    });
+
     if (response.newMemoryEpisode) {
       const updatedMemory = [{
         ...response.newMemoryEpisode,
@@ -123,8 +133,23 @@ export const api = {
   },
 
   /**
-   * Innovation Finale : Exécute l'optimisation globale incluant le pipeline ML.
+   * Soumet un feedback explicite pour le pipeline ML (Phase 6).
    */
+  async submitFeedback(input: string, prediction: string, rating: number, correction?: string): Promise<void> {
+    feedbackLoop.recordInteraction({
+      input,
+      prediction,
+      feedback: { rating, correction },
+      modelVersion: 'v1-base'
+    });
+    
+    if (rating > 4) {
+      await implicitRL.processSignal('ACCEPTANCE', { isLong: prediction.length > 200 });
+    } else if (rating < 3) {
+      await implicitRL.processSignal('REFORMULATION', { isLong: prediction.length > 200 });
+    }
+  },
+
   async runGlobalOptimization(): Promise<any> {
     const fs = loadLocalFS();
     const memory = loadMemory();
@@ -140,9 +165,6 @@ export const api = {
     return result;
   },
 
-  /**
-   * Récupère les métriques d'apprentissage ML via le nouveau pipeline.
-   */
   async getTrainingDashboard(): Promise<any> {
     const res = await fetch('/api/ml/dashboard');
     return res.json();

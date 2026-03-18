@@ -1,8 +1,18 @@
-// components/chat/VoiceMessage.tsx (version avec Méta-cognition)
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Edit3, Check, X, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { 
+  Play, 
+  Pause, 
+  Edit3, 
+  Check, 
+  X, 
+  AlertTriangle, 
+  ShieldCheck, 
+  ThumbsUp, 
+  ThumbsDown,
+  Target
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useVoice } from '@/hooks/useVoice';
 import { api } from '@/lib/api/client';
@@ -24,6 +34,7 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState('');
   const [metadata, setMetadata] = useState<any>(null);
+  const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null);
   const { toast } = useToast();
   const { play, pause, stop, isPlaying: globalPlaying, currentText } = useVoice();
 
@@ -31,7 +42,7 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
     if (typeof text === 'string') {
       try {
         const parsed = JSON.parse(text);
-        if (role === 'ai') setMetadata(parsed);
+        if (role === 'ai' && !metadata) setMetadata(parsed);
         return parsed.answer || parsed.text || text;
       } catch {
         return text;
@@ -66,6 +77,19 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
     setIsEditing(true);
   };
 
+  const handleFeedback = async (type: 'up' | 'down') => {
+    setFeedbackGiven(type);
+    try {
+      await api.submitFeedback(displayText, displayText, type === 'up' ? 5 : 1);
+      toast({
+        title: type === 'up' ? "Merci !" : "Feedback enregistré",
+        description: type === 'up' ? "Votre satisfaction aide l'IA à progresser." : "Nous utiliserons ce signal pour corriger le modèle.",
+      });
+    } catch (e) {
+      console.error("Feedback error", e);
+    }
+  };
+
   const submitCorrection = async () => {
     if (!editedText.trim() || editedText === displayText) {
       setIsEditing(false);
@@ -76,7 +100,7 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
       await api.submitCorrection(displayText, editedText);
       toast({
         title: "Apprentissage enregistré",
-        description: "L'IA utilisera cette correction pour s'améliorer.",
+        description: "L'IA utilisera cette correction pour son prochain cycle ML nocturne.",
       });
       setIsEditing(false);
     } catch (e) {
@@ -112,7 +136,9 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
         `}>
           {isEditing ? (
             <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Corriger la réponse :</p>
+              <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest flex items-center gap-2">
+                <Target className="w-3 h-3" /> Correction ML Directe
+              </p>
               <Textarea 
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
@@ -123,18 +149,38 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
                   <X className="w-4 h-4 mr-1" /> Annuler
                 </Button>
                 <Button size="sm" onClick={submitCorrection} className="h-8 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-bold">
-                  <Check className="w-4 h-4 mr-1" /> Valider
+                  <Check className="w-4 h-4 mr-1" /> Valider l'Apprentissage
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               {role === 'ai' ? (
-                <ReactMarkdown className="prose prose-invert max-w-none text-sm leading-relaxed font-medium">
-                  {displayText}
-                </ReactMarkdown>
+                <div className="prose prose-invert max-w-none text-sm leading-relaxed font-medium">
+                  <ReactMarkdown>{displayText}</ReactMarkdown>
+                </div>
               ) : (
                 <p className="text-sm whitespace-pre-wrap leading-relaxed font-medium">{displayText}</p>
+              )}
+
+              {/* Recommendations contextuelles Elite 32 */}
+              {role === 'ai' && metadata?.recommendations && metadata.recommendations.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Target className="w-3 h-3" /> Recommandations IA Elite
+                  </p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {metadata.recommendations.map((rec: any, idx: number) => (
+                      <div key={idx} className="bg-blue-600/5 border border-blue-500/10 rounded-xl p-3 hover:bg-blue-600/10 transition-colors cursor-pointer group/rec">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-white">{rec.title}</span>
+                          <Badge className="bg-blue-600/20 text-blue-400 border-none text-[8px] px-1.5 h-4 font-black">{Math.round(rec.score * 100)}% Match</Badge>
+                        </div>
+                        <p className="text-[9px] text-gray-400 leading-tight line-clamp-1">{rec.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Disclaimer de Méta-cognition */}
@@ -147,16 +193,39 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
                 </div>
               )}
 
-              {/* Indicateur de Confiance */}
-              {role === 'ai' && metadata?.confidence !== undefined && (
+              {/* Barre d'outils et Confiance */}
+              {role === 'ai' && (
                 <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/5">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className={`w-3 h-3 ${metadata.confidence > 0.7 ? 'text-green-500' : 'text-yellow-500'}`} />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Fiabilité</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className={`w-3 h-3 ${metadata?.confidence > 0.7 ? 'text-green-500' : 'text-yellow-500'}`} />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Fiabilité {Math.round((metadata?.confidence || 0.75) * 100)}%</span>
+                    </div>
+                    
+                    {/* Feedback explicite (Phase 6) */}
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleFeedback('up')}
+                        className={`h-6 w-6 rounded-md transition-colors ${feedbackGiven === 'up' ? 'text-green-500 bg-green-500/10' : 'text-gray-500 hover:text-green-400 hover:bg-white/5'}`}
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleFeedback('down')}
+                        className={`h-6 w-6 rounded-md transition-colors ${feedbackGiven === 'down' ? 'text-red-500 bg-red-500/10' : 'text-gray-500 hover:text-red-400 hover:bg-white/5'}`}
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <Badge variant="outline" className={`text-[8px] font-black border-none px-0 ${metadata.confidence > 0.7 ? 'text-green-500' : 'text-yellow-500'}`}>
-                    {Math.round(metadata.confidence * 100)}%
-                  </Badge>
+                  
+                  {metadata?.pedagogicalLevel && (
+                    <Badge variant="outline" className="text-[8px] font-black border-white/10 text-blue-400 px-2 py-0 h-4 uppercase">Niveau: {metadata.pedagogicalLevel}</Badge>
+                  )}
                 </div>
               )}
             </div>
@@ -182,7 +251,7 @@ export default function VoiceMessage({ text, role, messageId, autoPlay }: VoiceM
               <button
                 onClick={startEditing}
                 className="w-8 h-8 bg-[#2f2f2f] border border-white/10 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors shadow-xl"
-                title="Corriger l'IA"
+                title="Corriger l'IA (Fine-tuning)"
               >
                 <Edit3 className="w-3.5 h-3.5 text-white" />
               </button>
