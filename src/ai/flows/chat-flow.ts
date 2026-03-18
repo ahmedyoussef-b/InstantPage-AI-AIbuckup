@@ -1,8 +1,7 @@
 'use server';
 /**
- * @fileOverview Elite 32 Orchestrator - Le cerveau central d'AGENTIC.
- * Version AI Complete : Architecture intégrée via CompleteLearningLoop.
- * Intègre désormais les recommandations personnalisées basées sur le modèle ML local.
+ * @fileOverview Elite 32 Orchestrator - Point d'entrée Chat (Version RAG Enhancée).
+ * Unifie l'accès au cerveau local via la boucle complète intégrée.
  */
 
 import { z } from 'genkit';
@@ -19,17 +18,18 @@ const ChatInputSchema = z.object({
   episodicMemory: z.array(z.any()).optional(),
   distilledRules: z.array(z.any()).optional(),
   userProfile: z.any().optional(),
+  hierarchyNodes: z.array(z.any()).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
 
 const ChatOutputSchema = z.object({
   answer: z.string(),
-  sources: z.array(z.string()).optional(),
+  sources: z.array(z.any()).optional(),
   confidence: z.number().optional(),
   disclaimer: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
-  recommendations: z.array(z.any()).optional(), // Objets de recommandation complets (Elite 32)
+  recommendations: z.array(z.any()).optional(),
   newMemoryEpisode: z.any().optional(),
   pedagogicalLevel: z.string().optional(),
   collaborativeInsight: z.string().optional(),
@@ -38,8 +38,7 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Orchestrateur central Elite 32.
- * Utilise runCompleteEliteLoop pour unifier les 4 phases cognitives.
+ * Orchestrateur central Elite 32 utilisant le RAG Enhancé.
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const computeAnswer = async () => {
@@ -47,7 +46,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     const pedaLevel = await evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0);
     const collaborativeInsight = await learnFromNetwork(input.text);
 
-    // 2. Exécution de la boucle complète intégrée (Elite 32 Core)
+    // 2. Exécution de la boucle complète RAG Enhancée
     const loopResult = await runCompleteEliteLoop({
       userId: 'default-user',
       query: input.text,
@@ -55,11 +54,11 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       history: input.history || [],
       episodicMemory: input.episodicMemory || [],
       distilledRules: input.distilledRules || [],
-      userProfile: input.userProfile
+      userProfile: input.userProfile,
+      hierarchyNodes: input.hierarchyNodes
     });
 
-    // 3. Génération de recommandations personnalisées (Phase ML Inférence)
-    // Utilise le profil utilisateur et le contexte pour suggérer proactivement
+    // 3. Génération de recommandations personnalisées
     const recommendations = await personalizedRecommender.recommend('default-user', {
       domain: input.text.toLowerCase().includes('chaudière') ? 'Maintenance' : 'Général',
       limit: 2
@@ -69,12 +68,12 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
       answer: loopResult.answer,
       confidence: loopResult.confidence,
       disclaimer: loopResult.disclaimer,
+      sources: loopResult.sources,
       newMemoryEpisode: loopResult.newMemoryEpisode,
       pedagogicalLevel: pedaLevel,
       collaborativeInsight,
       recommendations,
-      suggestions: recommendations.map(r => r.title),
-      sources: []
+      suggestions: recommendations.map(r => r.title)
     };
   };
 

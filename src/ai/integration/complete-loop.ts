@@ -1,15 +1,16 @@
 'use server';
 /**
- * @fileOverview Elite 32 - Architecture RAG Enhancée.
- * Orchestration unifiée en 4 phases : Comprendre -> Raisonner -> Agir -> Apprendre.
+ * @fileOverview Elite 32 - Orchestrateur RAG Enhancée (Version Finale).
+ * Unifie les 4 phases : Comprendre -> Raisonner -> Agir -> Apprendre.
  */
 
-import { comprendreVector, formatVectorContext } from './phase1-vector';
-import { raisonnerVector } from './phase2-vector';
-import { agirVector, formatActionInsight } from './phase3-vector';
-import { apprendreVector } from './phase4-vector';
+import { retrieveContext } from '@/ai/rag/intelligent-retriever';
+import { assembleContext } from '@/ai/rag/context-assembler';
+import { generateLLMResponse } from '@/ai/rag/local-llm';
+import { learnFromRAGInteraction } from '@/ai/rag/rag-learning-loop';
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
-import { dynamicPromptEngine } from '@/ai/dynamic-prompt';
+import { agirVector } from './phase3-vector';
+import { apprendreVector } from './phase4-vector';
 
 export interface LoopInteraction {
   userId: string;
@@ -26,75 +27,74 @@ export interface LoopResult {
   answer: string;
   confidence: number;
   disclaimer?: string;
-  lessons: any[];
-  actionInsight: any;
+  sources: any[];
   newMemoryEpisode: any;
 }
 
 /**
- * Exécute la boucle cognitive complète Elite 32 (Architecture RAG Enhancée).
+ * Exécute la boucle RAG Enhancée complète.
  */
 export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
-  console.log(`[AI][ELITE-RAG] Démarrage du cycle 4-Phases pour: ${interaction.query.substring(0, 30)}...`);
+  console.log(`[AI][ENHANCED-RAG] Cycle 4-Phases démarré pour: ${interaction.query.substring(0, 30)}...`);
 
-  // --- PHASE 1: COMPRENDRE (Retriever Intelligent Multi-Sources) ---
-  // On récupère les sources de savoir avec analyse sémantique initiale
-  const vectorInsights = await comprendreVector(interaction.query, {
-    episodicMemory: interaction.episodicMemory,
-    distilledRules: interaction.distilledRules,
-    userProfile: interaction.userProfile,
-    hierarchyNodes: interaction.hierarchyNodes
-  });
+  // --- PHASE 1: COMPRENDRE (Retriever Intelligent & Query Analyzer) ---
+  const retrievalResult = await retrieveContext(interaction.query, interaction.userId);
+  const queryAnalysis = retrievalResult.analysis;
+
+  // --- PHASE 2: RAISONNER (Context Assembler & Metacognition) ---
+  const assembledContext = await assembleContext(retrievalResult);
   
-  // --- PHASE 2: RAISONNER (Context Assembler & Pondération) ---
-  // Fusion pondérée : Documents (0.8), Interactions (0.7), Leçons (0.6)
-  let weightedContext = interaction.documentContext; // Base document
-  weightedContext += await formatVectorContext(vectorInsights);
-
-  // Raisonnement par chaîne de pensée et analogies
+  // Utilisation de la méta-cognition pour valider si le contexte permet de répondre
   const metaResult = await metacognitiveReasoner.reason(
-    interaction.query, 
-    weightedContext, 
+    interaction.query,
+    assembledContext.text,
     async (q, ctx) => {
-      // 1. Tentative d'analogie
-      const analogy = await raisonnerVector(q, ctx, []); 
-      if (analogy) return analogy;
-      
-      // 2. Fallback modulaire
-      const { modularReasoner } = await import('@/ai/reasoning/modular');
-      return await modularReasoner.reason(q, ctx);
+      // --- PHASE 3: AGIR (Génération LLM Locale) ---
+      const llmResponse = await generateLLMResponse(q, {
+        ...assembledContext,
+        text: ctx 
+      });
+      return llmResponse.text;
     }
   );
 
-  // --- PHASE 3: AGIR (Prompt Engineering Dynamique & LLM Local) ---
-  // Construction du prompt final optimisé par type de question
-  const finalPrompt = await dynamicPromptEngine.buildPrompt(interaction.query, metaResult.answer);
+  // Anticipation d'action
+  await agirVector(interaction.query, { mode: 'standard' });
+
+  // --- PHASE 4: APPRENDRE (Learning Loop & Vectorisation) ---
+  await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
   
-  // Anticipation d'action (Phase 3 Bonus)
-  const actionInsight = await agirVector(interaction.query, { mode: 'standard' });
+  // Enregistrement dans la boucle d'apprentissage RAG spécifique
+  await learnFromRAGInteraction(
+    {
+      query: interaction.query,
+      response: metaResult.answer,
+      context: assembledContext.text,
+      usedContexts: retrievalResult.contexts
+    },
+    {
+      rating: metaResult.confidence > 0.7 ? 4 : 3,
+      successfulSources: assembledContext.sources.map(s => s.source)
+    }
+  );
 
-  // --- PHASE 4: APPRENDRE (Feedback & Vectorisation) ---
-  // L'IA extrait les leçons pour enrichir la base de connaissances unifiée
-  const lessons = await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
-
-  // Création de l'épisode de mémoire pour le futur cycle "Comprendre"
+  // Création de l'épisode de mémoire
   const newMemoryEpisode = {
     type: 'interaction',
     content: metaResult.answer.substring(0, 500),
     context: interaction.query,
     importance: metaResult.confidence,
     timestamp: Date.now(),
-    tags: lessons.map(l => l.content.substring(0, 20))
+    tags: queryAnalysis.concepts
   };
 
-  console.log(`[AI][ELITE-RAG] Cycle terminé. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
+  console.log(`[AI][ENHANCED-RAG] Cycle terminé avec succès. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
 
   return {
     answer: metaResult.answer,
     confidence: metaResult.confidence,
     disclaimer: metaResult.disclaimer,
-    lessons,
-    actionInsight,
+    sources: assembledContext.sources,
     newMemoryEpisode
   };
 }
