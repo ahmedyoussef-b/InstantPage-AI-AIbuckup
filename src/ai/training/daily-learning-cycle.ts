@@ -1,10 +1,10 @@
+
 'use server';
 /**
- * @fileOverview DailyLearningCycle - Orchestration du cycle d'apprentissage quotidien.
- * Intègre le seuil de déclenchement et le reporting final.
+ * @fileOverview DailyLearningCycle - Point d'entrée pour le cycle nocturne.
  */
 
-import { runFullTrainingCycle } from './training-pipeline';
+import { continuousTraining } from './continuous-training';
 
 export interface DailyCycleResult {
   status: 'skipped' | 'completed' | 'failed';
@@ -14,38 +14,18 @@ export interface DailyCycleResult {
 }
 
 /**
- * Lance le cycle d'apprentissage quotidien basé sur les nouvelles données accumulées.
+ * Lance le cycle d'apprentissage basé sur l'IA continue.
  */
 export async function runDailyLearningCycle(context: { memory: any[], documents: any[] }): Promise<DailyCycleResult> {
-  console.log("🌅 [AI][DAILY-LEARNING] Analyse des opportunités d'optimisation...");
-  
-  // Seuil minimum de données pour garantir un fine-tuning de qualité
-  const MIN_SAMPLES = 50;
-  
-  if (context.memory.length < MIN_SAMPLES) {
-    console.log(`📊 [AI][DAILY-LEARNING] Données insuffisantes (${context.memory.length}/${MIN_SAMPLES}). Cycle reporté.`);
-    return { 
-      status: 'skipped', 
-      reason: `Besoin de ${MIN_SAMPLES - context.memory.length} exemples supplémentaires.` 
-    };
-  }
-
   try {
-    const result = await runFullTrainingCycle(context);
-    
-    if (result.deployed) {
-      console.log(`🚀 [AI][DAILY-LEARNING] Succès : Nouveau modèle actif (+${Math.round(result.gain * 100)}%).`);
-    } else {
-      console.log(`📉 [AI][DAILY-LEARNING] Cycle terminé : Le nouveau modèle n'a pas surpassé la production.`);
-    }
-
+    const result = await continuousTraining.runDailyTraining(context);
     return {
-      status: 'completed',
+      status: result.status as any,
+      reason: (result as any).reason,
       gain: result.gain,
       deployed: result.deployed
     };
   } catch (error) {
-    console.error("❌ [AI][DAILY-LEARNING] Échec critique du cycle ML :", error);
     return { status: 'failed', reason: "Erreur interne lors de l'entraînement." };
   }
 }
