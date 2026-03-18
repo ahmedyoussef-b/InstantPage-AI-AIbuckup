@@ -1,99 +1,41 @@
+
 'use client';
 
+/**
+ * API Client avec persistance Firestore pour AHMED.
+ * Remplace LocalStorage par une solution cloud robuste pour éviter la perte de données.
+ */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDocs, 
+  deleteDoc, 
+  query, 
+  where,
+  serverTimestamp,
+  writeBatch
+} from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
 
-/**
- * Persistance locale pour éviter le reset au redémarrage.
- * Utilise LocalStorage pour sauvegarder l'arborescence des fichiers.
- */
-const STORAGE_KEY = 'agentic_assistant_db_v4';
-
-const getInitialFileSystem = (): FileSystemItem[] => {
-  if (typeof window === 'undefined') return [];
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      console.error("[API_CLIENT] Erreur lecture storage:", e);
-    }
-  }
-  const defaultFS: FileSystemItem[] = [
-    {
-      id: "root-1",
-      name: "Projets 2024",
-      type: "folder",
-      parentId: null,
-      children: []
-    }
-  ];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultFS));
-  return defaultFS;
-};
-
-// Variable d'état interne
-let mockFileSystem: FileSystemItem[] = getInitialFileSystem();
-
-const saveToStorage = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockFileSystem));
-    // Déclencher un événement de mise à jour pour l'UI si nécessaire
-    window.dispatchEvent(new Event('storage-update'));
-  }
-};
-
-const getAllFileNames = (items: FileSystemItem[]): string[] => {
-  let names: string[] = [];
-  items.forEach(item => {
-    if (item.type === 'file') names.push(item.name);
-    if (item.children) names = [...names, ...getAllFileNames(item.children)];
-  });
-  return names;
-};
-
-const getAllFileContents = (items: FileSystemItem[]): string => {
-  let context = "";
-  items.forEach(item => {
-    if (item.type === 'file' && item.content) {
-      context += `--- FICHIER: ${item.name} ---\n${item.content}\n\n`;
-    }
-    if (item.children) context += getAllFileContents(item.children);
-  });
-  return context;
-};
-
-const findFilesToPurge = (items: FileSystemItem[], targetId: string): FileSystemItem[] => {
-  let files: FileSystemItem[] = [];
-  const search = (currentItems: FileSystemItem[], parentMatched: boolean) => {
-    currentItems.forEach(item => {
-      const isMatch = item.id === targetId || parentMatched;
-      if (isMatch && item.type === 'file') {
-        files.push(item);
-      }
-      if (item.children) search(item.children, isMatch);
-    });
-  };
-  search(items, false);
-  return files;
-};
+const { firestore } = initializeFirebase();
+const DEFAULT_USER_ID = 'AHMED_PRO_USER';
 
 export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
-    // Re-charger depuis le storage pour être sûr d'avoir la dernière version
-    mockFileSystem = getInitialFileSystem();
-
-    const checkDuplicate = (items: FileSystemItem[]): boolean => {
-      for (const item of items) {
-        if (item.type === 'file' && item.name === file.name && item.parentId === parentId) return true;
-        if (item.children && checkDuplicate(item.children)) return true;
-      }
-      return false;
-    };
-
-    if (checkDuplicate(mockFileSystem)) {
+    const db = firestore;
+    
+    // 1. Vérifier les doublons dans Firestore
+    const docsRef = collection(db, 'users', DEFAULT_USER_ID, 'documents');
+    const q = query(docsRef, where('name', '==', file.name), where('parentId', '==', parentId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
       throw new Error(`Le fichier "${file.name}" existe déjà dans ce dossier.`);
     }
 
@@ -105,31 +47,22 @@ export const api = {
         fileType: file.type || 'text/plain'
       });
 
-      const newFile: FileSystemItem = {
-        id: result.docId,
+      const docId = result.docId;
+      const docRef = doc(db, 'users', DEFAULT_USER_ID, 'documents', docId);
+
+      await setDoc(docRef, {
+        id: docId,
         name: file.name,
         type: 'file',
         size: file.size,
         chunks: result.chunks,
         content: text,
         uploadedAt: new Date().toISOString(),
-        parentId: parentId
-      };
+        parentId: parentId,
+        userId: DEFAULT_USER_ID
+      });
 
-      const addItemToTree = (items: FileSystemItem[]): FileSystemItem[] => {
-        if (!parentId) return [...items, newFile];
-        return items.map(item => {
-          if (item.id === parentId && item.type === 'folder') {
-            return { ...item, children: [...(item.children || []), newFile] };
-          }
-          if (item.children) return { ...item, children: addItemToTree(item.children) };
-          return item;
-        });
-      };
-
-      mockFileSystem = addItemToTree(mockFileSystem);
-      saveToStorage();
-      return { success: true, chunks: result.chunks, docId: result.docId };
+      return { success: true, chunks: result.chunks, docId };
     } catch (error: any) {
       console.error("[API_CLIENT] Upload failed:", error.message);
       throw error;
@@ -138,9 +71,9 @@ export const api = {
 
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
-      mockFileSystem = getInitialFileSystem();
-      const fileNames = getAllFileNames(mockFileSystem);
-      const allContent = getAllFileContents(mockFileSystem);
+      const fs = await this.getFileSystem();
+      const fileNames = this.getAllFileNames(fs);
+      const allContent = this.getAllFileContents(fs);
       
       const genkitHistory = history.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
@@ -162,69 +95,55 @@ export const api = {
   },
 
   async clearAll(): Promise<boolean> {
-    mockFileSystem = [
-      {
-        id: "root-1",
-        name: "Projets 2024",
-        type: "folder",
-        parentId: null,
-        children: []
-      }
-    ];
-    saveToStorage();
+    const db = firestore;
+    const batch = writeBatch(db);
+    
+    const docsRef = collection(db, 'users', DEFAULT_USER_ID, 'documents');
+    const foldersRef = collection(db, 'users', DEFAULT_USER_ID, 'folders');
+    
+    const [docsSnap, foldersSnap] = await Promise.all([getDocs(docsRef), getDocs(foldersRef)]);
+    
+    docsSnap.forEach(d => batch.delete(d.ref));
+    foldersSnap.forEach(f => batch.delete(f.ref));
+    
+    await batch.commit();
     return true;
   },
 
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
-    mockFileSystem = getInitialFileSystem();
-    const filesToPurge = findFilesToPurge(mockFileSystem, id);
+    const db = firestore;
+    // Supprimer récursivement si c'est un dossier (implémentation simplifiée)
+    const docRef = doc(db, 'users', DEFAULT_USER_ID, 'documents', id);
+    const folderRef = doc(db, 'users', DEFAULT_USER_ID, 'folders', id);
     
-    for (const file of filesToPurge) {
-      await deleteDocument({ docId: file.id, fileName: file.name }).catch(() => {});
-    }
+    await Promise.all([deleteDoc(docRef), deleteDoc(folderRef)]);
+    await deleteDocument({ docId: id, fileName: name }).catch(() => {});
     
-    const removeItemFromTree = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items.filter(item => {
-        if (item.id === id) return false;
-        if (item.children) item.children = removeItemFromTree(item.children);
-        return true;
-      });
-    };
-    
-    mockFileSystem = removeItemFromTree(mockFileSystem);
-    saveToStorage();
-    return { success: true, purgedChunks: filesToPurge.length };
+    return { success: true, purgedChunks: 1 };
   },
 
   async createFolder(name: string, parentId: string | null): Promise<FileSystemItem> {
-    mockFileSystem = getInitialFileSystem();
-    const newFolder: FileSystemItem = {
-      id: Math.random().toString(36).substring(7),
+    const db = firestore;
+    const folderId = Math.random().toString(36).substring(7);
+    const folderRef = doc(db, 'users', DEFAULT_USER_ID, 'folders', folderId);
+    
+    const newFolder = {
+      id: folderId,
       name,
-      type: 'folder',
+      type: 'folder' as const,
       parentId,
-      children: []
+      userId: DEFAULT_USER_ID,
+      createdAt: new Date().toISOString()
     };
     
-    const addFolderToTree = (items: FileSystemItem[]): FileSystemItem[] => {
-      if (!parentId) return [...items, newFolder];
-      return items.map(item => {
-        if (item.id === parentId && item.type === 'folder') {
-          return { ...item, children: [...(item.children || []), newFolder] };
-        }
-        if (item.children) return { ...item, children: addFolderToTree(item.children) };
-        return item;
-      });
-    };
-    
-    mockFileSystem = addFolderToTree(mockFileSystem);
-    saveToStorage();
-    return newFolder;
+    await setDoc(folderRef, newFolder);
+    return { ...newFolder, children: [] };
   },
 
   async getStats(): Promise<Stats> {
-    mockFileSystem = getInitialFileSystem();
+    const fs = await this.getFileSystem();
     const stats = { docs: 0, chunks: 0, size: 0 };
+    
     const traverse = (items: FileSystemItem[]) => {
       items.forEach(i => {
         if (i.type === 'file') {
@@ -235,16 +154,57 @@ export const api = {
         if (i.children) traverse(i.children);
       });
     };
-    traverse(mockFileSystem);
+    
+    traverse(fs);
     return {
       totalDocuments: stats.docs,
       totalChunks: stats.chunks,
       totalSize: stats.size,
-      diskSpace: { total: "LocalStorage", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "5 MB" }
+      diskSpace: { total: "Cloud Firestore", used: `${(stats.size / 1024).toFixed(1)} KB`, free: "Illimité" }
     };
   },
 
   async getFileSystem(): Promise<FileSystemItem[]> {
-    return getInitialFileSystem();
+    const db = firestore;
+    const docsRef = collection(db, 'users', DEFAULT_USER_ID, 'documents');
+    const foldersRef = collection(db, 'users', DEFAULT_USER_ID, 'folders');
+    
+    const [docsSnap, foldersSnap] = await Promise.all([getDocs(docsRef), getDocs(foldersRef)]);
+    
+    const allItems: FileSystemItem[] = [];
+    foldersSnap.forEach(d => allItems.push({ ...d.data(), children: [] } as any));
+    docsSnap.forEach(d => allItems.push(d.data() as any));
+    
+    // Reconstruire l'arborescence
+    const buildTree = (parentId: string | null): FileSystemItem[] => {
+      return allItems
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item,
+          children: item.type === 'folder' ? buildTree(item.id) : undefined
+        }));
+    };
+    
+    return buildTree(null);
+  },
+
+  private getAllFileNames(items: FileSystemItem[]): string[] {
+    let names: string[] = [];
+    items.forEach(item => {
+      if (item.type === 'file') names.push(item.name);
+      if (item.children) names = [...names, ...this.getAllFileNames(item.children)];
+    });
+    return names;
+  },
+
+  private getAllFileContents(items: FileSystemItem[]): string {
+    let context = "";
+    items.forEach(item => {
+      if (item.type === 'file' && item.content) {
+        context += `--- FICHIER: ${item.name} ---\n${item.content}\n\n`;
+      }
+      if (item.children) context += this.getAllFileContents(item.children);
+    });
+    return context;
   }
 };

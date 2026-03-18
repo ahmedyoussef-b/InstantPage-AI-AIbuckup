@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -21,8 +22,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
- * Main entry point for the Agentic Personal Assistant.
- * Consolidates the chat interface and document ingestion into a single, clean root route.
+ * Main entry point for the Agentic Personal Assistant for AHMED.
  */
 export default function HomePage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -39,7 +39,7 @@ export default function HomePage() {
         {!collapsed && (
           <div className="animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="font-bold text-white tracking-tighter text-lg leading-none">AGENTIC</div>
-            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Assistant Pro</div>
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">AHMED Pro Assistant</div>
           </div>
         )}
       </Link>
@@ -74,36 +74,6 @@ export default function HomePage() {
             {!collapsed && <span className="truncate">Base de Connaissances</span>}
           </Link>
         </div>
-
-        <div className="space-y-1">
-          {!collapsed && (
-            <div className="text-[10px] font-bold text-gray-600 px-3 py-2 uppercase tracking-[0.2em] mb-2 animate-in fade-in">
-              Support
-            </div>
-          )}
-          <Link 
-            href="/help" 
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all",
-              collapsed && "justify-center px-0"
-            )}
-            title="Centre d'Aide"
-          >
-            <HelpCircle className="w-4 h-4 shrink-0" />
-            {!collapsed && <span className="truncate">Centre d'Aide</span>}
-          </Link>
-          <Link 
-            href="/settings" 
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all",
-              collapsed && "justify-center px-0"
-            )}
-            title="Paramètres"
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            {!collapsed && <span className="truncate">Paramètres</span>}
-          </Link>
-        </div>
       </div>
 
       <div className="pt-6 mt-auto border-t border-white/5 space-y-4 shrink-0">
@@ -113,15 +83,11 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
                 <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
               </div>
-              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local</Badge>
-            </div>
-            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-2 animate-in slide-in-from-bottom-2">
-              <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Version Alpha</div>
-              <div className="text-[10px] text-gray-400 leading-tight">Moteur RAG + TTS Intégré.</div>
+              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Firestore</Badge>
             </div>
           </>
         ) : (
-          <div className="flex justify-center py-2" title="Mode Sécurisé Local">
+          <div className="flex justify-center py-2" title="Mode Sécurisé Firestore">
             <ShieldCheck className="w-5 h-5 text-green-500" />
           </div>
         )}
@@ -131,7 +97,6 @@ export default function HomePage() {
 
   return (
     <main className="h-screen flex bg-[#171717] overflow-hidden selection:bg-blue-500/30">
-      {/* Sidebar - Navigation and Branding (Desktop) */}
       <aside className={cn(
         "flex-col hidden lg:flex border-r border-white/5 bg-[#171717] transition-all duration-300 relative z-30",
         isCollapsed ? "w-20" : "w-72"
@@ -147,9 +112,7 @@ export default function HomePage() {
         <SidebarContent collapsed={isCollapsed} />
       </aside>
 
-      {/* Main Chat Interface Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
-        {/* Mobile Header */}
         <header className="h-16 border-b border-white/5 flex items-center px-4 justify-between lg:hidden bg-[#171717] sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <Sheet>
@@ -159,20 +122,13 @@ export default function HomePage() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 border-none w-72">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Menu de Navigation</SheetTitle>
+                <SheetHeader className="p-6">
+                  <SheetTitle className="text-white font-bold uppercase tracking-widest text-sm">AHMED Pro Assistant</SheetTitle>
                 </SheetHeader>
                 <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="font-bold text-white text-sm uppercase tracking-widest">Agentic Assistant</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="icon" asChild className="text-gray-400">
-              <Link href="/admin">
-                <HardDrive className="w-5 h-5" />
-              </Link>
-            </Button>
+            <h1 className="font-bold text-white text-sm uppercase tracking-widest">Agentic AHMED</h1>
           </div>
         </header>
         
@@ -180,7 +136,6 @@ export default function HomePage() {
           <Chat />
         </div>
         
-        {/* Document Ingestion Component */}
         <Upload />
       </div>
     </main>

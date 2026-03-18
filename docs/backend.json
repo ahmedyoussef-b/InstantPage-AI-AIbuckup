@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "DocumentMetadata": {
@@ -11,35 +12,24 @@
         "type": { "type": "string" },
         "chunks": { "type": "number" },
         "uploadedAt": { "type": "string", "format": "date-time" },
-        "userId": { "type": "string" }
-      },
-      "required": ["id", "name", "size", "uploadedAt", "userId"]
-    },
-    "ChatSession": {
-      "title": "ChatSession",
-      "description": "A conversation session between a user and the AI agent.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
         "userId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "lastMessageAt": { "type": "string", "format": "date-time" }
+        "parentId": { "type": "string" },
+        "content": { "type": "string" }
       },
-      "required": ["id", "userId", "createdAt"]
+      "required": ["id", "name", "uploadedAt", "userId"]
     },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "description": "An individual message within a chat session.",
+    "Folder": {
+      "title": "Folder",
+      "description": "A directory in the knowledge base.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "sessionId": { "type": "string" },
-        "role": { "type": "string", "enum": ["user", "ai"] },
-        "text": { "type": "string" },
+        "name": { "type": "string" },
+        "parentId": { "type": "string" },
+        "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "sessionId", "role", "text", "createdAt"]
+      "required": ["id", "name", "userId"]
     }
   },
   "auth": {
@@ -48,15 +38,11 @@
   "firestore": {
     "/users/{userId}/documents/{docId}": {
       "schema": "DocumentMetadata",
-      "description": "Collection of document metadata owned by a user."
+      "description": "Stored documents and their content."
     },
-    "/users/{userId}/chats/{chatId}": {
-      "schema": "ChatSession",
-      "description": "Conversations sessions for a specific user."
-    },
-    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
-      "schema": "ChatMessage",
-      "description": "Messages belonging to a specific chat session."
+    "/users/{userId}/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Directory structure for the user."
     }
   }
 }
