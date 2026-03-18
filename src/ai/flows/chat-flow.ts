@@ -12,6 +12,7 @@ import { analogicalReasoner, type SolvedProblem } from '@/ai/reasoning/analogica
 import { metacognitiveReasoner } from '@/ai/reasoning/metacognition';
 import { counterfactualReasoner } from '@/ai/reasoning/counterfactual';
 import { modularReasoner } from '@/ai/reasoning/modular';
+import { collaborativeReasoner } from '@/ai/reasoning/collaborative';
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -34,7 +35,7 @@ const ChatOutputSchema = z.object({
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 /**
- * Chat Intelligent intégrant les 15 Innovations Élite.
+ * Chat Intelligent intégrant les 16 Innovations Élite.
  * Version avec Pipeline de Raisonnement Avancé (Méta-cognition Prioritaire).
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
@@ -52,22 +53,28 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
       // 2. Sélection du mode de raisonnement dynamique
       
-      // CAS A : Arbre de Décision Latent (Innovation 11)
+      // CAS A : Raisonnement Collaboratif (Innovation 16 - Bonus)
+      // Activé pour les questions extrêmement complexes ou multi-facettes
+      if (q.match(/analyse complète|expertise|synthèse technique|consensus|débat/i) || query.length > 150) {
+        return await collaborativeReasoner.reason(query, ctx);
+      }
+
+      // CAS B : Arbre de Décision Latent (Innovation 11)
       if (q.match(/dois-je|devrais-je|choisir|décider|investissement|choix/i) && ctx.length > 50) {
         return await latentTree.reason(query, ctx);
       }
 
-      // CAS B : Raisonnement par Contraste (Innovation 9)
+      // CAS C : Raisonnement par Contraste (Innovation 9)
       if ((q.includes('définition') || q.includes('différence') || q.includes('vs')) && ctx.length > 100) {
         return await contrastiveReasoning.reason(query, ctx);
       }
 
-      // CAS C : Raisonnement Modulaire (Innovation 15)
+      // CAS D : Raisonnement Modulaire (Innovation 15)
       if (q.match(/impact|conséquence|calcul|période/i) && ctx.length > 100) {
         return await modularReasoner.reason(query, ctx);
       }
 
-      // CAS D : Chaîne de Pensée Dynamique (Innovation 6)
+      // CAS E : Chaîne de Pensée Dynamique (Innovation 6)
       if (q.match(/comment|pourquoi|panne|maintenance/i) && query.length > 20) {
         return await dynamicCoT.reason(query, ctx);
       }
