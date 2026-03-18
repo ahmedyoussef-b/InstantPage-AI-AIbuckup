@@ -2,7 +2,7 @@
 
 AGENTIC est un assistant intelligent de nouvelle génération conçu pour une exploitation technique et industrielle. Il repose sur une architecture **100% locale** garantissant une confidentialité totale des données et une résilience maximale.
 
-## 🚀 Les 9 Innovations Majeures
+## 🚀 Les 10 Innovations Majeures
 
 ### 1. Architecture Multi-Modèles & Routeur Sémantique
 Le système utilise un classificateur ultra-léger pour diriger chaque question vers le modèle le plus adapté (Phi-3 pour la technique, Llama-3 pour le légal, TinyLlama pour les tâches générales).
@@ -33,6 +33,9 @@ L'IA apprend de vos corrections. Si une réponse est rectifiée manuellement, le
 
 ### 9. Raisonnement par Contraste (Contrastive Reasoning)
 Pour clarifier les concepts ambigus, l'IA identifie systématiquement ce que le concept n'est pas en le comparant à des alternatives proches, évitant ainsi les confusions techniques majeures.
+
+### 10. Vérification Auto-Consistante (Self-Consistency)
+Résistance aux hallucinations par génération de multiples chemins de raisonnement indépendants. Un vote majoritaire et un indice de confiance garantissent la fiabilité des informations factuelles.
 
 ## 🛠️ Stack Technique
 
