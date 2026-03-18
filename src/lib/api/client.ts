@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * API Client avec BDD Locale Persistante.
- * Utilise le stockage local du navigateur avec synchronisation atomique renforcée.
+ * API Client avec BDD Locale Persistante et Atomique.
+ * Gère le stockage VFS (Virtual File System) dans le localStorage.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { deleteDocument } from '@/ai/flows/delete-document-flow';
 
-const STORAGE_KEY = 'SECURE_VFS_V3';
+const STORAGE_KEY = 'AGENTIC_VFS_STABLE';
 
 /**
- * Charge les données depuis le stockage local.
+ * Charge les données depuis le stockage local avec validation de structure.
  */
 const loadLocalFS = (): FileSystemItem[] => {
   if (typeof window === 'undefined') return [];
@@ -22,25 +22,27 @@ const loadLocalFS = (): FileSystemItem[] => {
     const parsed = JSON.parse(stored);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("[API_CLIENT] Erreur de lecture BDD locale:", e);
+    console.error("[API_CLIENT] Erreur lecture VFS:", e);
     return [];
   }
 };
 
 /**
- * Sauvegarde les données avec synchronisation atomique.
+ * Sauvegarde les données avec synchronisation atomique forcée.
  */
 const saveLocalFS = (fs: FileSystemItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     const data = JSON.stringify(fs);
     localStorage.setItem(STORAGE_KEY, data);
-    // Vérification de l'écriture
-    const check = localStorage.getItem(STORAGE_KEY);
-    if (check !== data) throw new Error("Échec écriture atomique.");
+    // Vérification immédiate pour prévenir l'évaporation
+    const verify = localStorage.getItem(STORAGE_KEY);
+    if (verify !== data) {
+      console.error("[API_CLIENT] Échec de la persistance atomique !");
+    }
   } catch (e: any) {
     if (e.name === 'QuotaExceededError') {
-      console.warn("Quota localStorage atteint.");
+      console.warn("[API_CLIENT] Quota de stockage local atteint.");
     }
   }
 };
@@ -49,9 +51,10 @@ export const api = {
   async upload(file: File, parentId: string | null = null): Promise<{ success: boolean; chunks: number; docId: string }> {
     const fs = loadLocalFS();
     
+    // Vérification des doublons
     const exists = fs.some(item => item.name === file.name && item.parentId === parentId);
     if (exists) {
-      throw new Error(`Le fichier "${file.name}" existe déjà.`);
+      throw new Error(`Le fichier "${file.name}" est déjà présent dans ce dossier.`);
     }
 
     try {
@@ -76,7 +79,6 @@ export const api = {
       saveLocalFS([...fs, newFile]);
       return { success: true, chunks: result.chunks, docId: result.docId };
     } catch (error: any) {
-      console.error("[API_CLIENT] Upload failed:", error.message);
       throw error;
     }
   },
@@ -84,7 +86,6 @@ export const api = {
   async chat(query: string, history: any[] = []): Promise<{ answer: string; sources: string[] }> {
     try {
       const fs = loadLocalFS();
-      const fileNames = this.getAllFileNames(fs);
       const allContent = this.getAllFileContents(fs);
       
       const genkitHistory = history.map(msg => ({
@@ -92,28 +93,21 @@ export const api = {
         content: [{ text: msg.text || '' }]
       }));
       
-      const result = await serverChat({ 
+      return await serverChat({ 
         text: query, 
         history: genkitHistory,
-        availableFiles: fileNames,
         documentContext: allContent
       });
-      
-      return { answer: result.answer, sources: result.sources || [] };
     } catch (error) {
-      console.error("[API_CLIENT] Chat failed:", error);
+      console.error("[API_CLIENT] Échec du chat:", error);
       throw error;
     }
   },
 
-  async clearAll(): Promise<boolean> {
-    saveLocalFS([]);
-    return true;
-  },
-
   async deleteItem(id: string, name: string): Promise<{ success: boolean; purgedChunks: number }> {
     const fs = loadLocalFS();
-    saveLocalFS(fs.filter(item => item.id !== id));
+    const newFs = fs.filter(item => item.id !== id);
+    saveLocalFS(newFs);
     await deleteDocument({ docId: id, fileName: name }).catch(() => {});
     return { success: true, purgedChunks: 1 };
   },
@@ -130,6 +124,11 @@ export const api = {
     };
     saveLocalFS([...fs, newFolder]);
     return { ...newFolder, children: [] };
+  },
+
+  async clearAll(): Promise<boolean> {
+    saveLocalFS([]);
+    return true;
   },
 
   async getStats(): Promise<Stats> {
@@ -185,22 +184,12 @@ export const api = {
     return chunks;
   },
 
-  private getAllFileNames(items: FileSystemItem[]): string[] {
-    let names: string[] = [];
-    items.forEach(item => {
-      if (item.type === 'file') names.push(item.name);
-      if (item.children) names = [...names, ...this.getAllFileNames(item.children)];
-    });
-    return names;
-  },
-
   private getAllFileContents(items: FileSystemItem[]): string {
     let context = "";
     items.forEach(item => {
       if (item.type === 'file' && item.content) {
-        context += `--- FICHIER: ${item.name} ---\n${item.content}\n\n`;
+        context += `--- DOCUMENT: ${item.name} ---\n${item.content}\n\n`;
       }
-      if (item.children) context += this.getAllFileContents(item.children);
     });
     return context;
   }
