@@ -1,9 +1,11 @@
 /**
  * @fileOverview API Client Elite - Orchestration AI Complete.
  * Version 32.2 Intégrée : Support du pipeline ML complet, feedback et recommandations.
+ * Ajout du support pour les missions Agentic complexes.
  */
 import { FileSystemItem, Stats } from '@/types';
 import { chat as serverChat } from '@/ai/flows/chat-flow';
+import { runAgentMission } from '@/ai/flows/agent-flow';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { hybridRAG } from '@/ai/hybrid-rag';
 import { continuousLearning } from '@/ai/continuous-learning';
@@ -15,7 +17,7 @@ import { runNighttimeImprovement } from '@/ai/integration/self-improvement';
 import { feedbackLoop } from '@/ai/ml/feedback-loop';
 
 const STORAGE_KEY = 'AGENTIC_VFS_ELITE_V32';
-const MEMORY_KEY = 'AGENTIC_EPISODIC_MEMORY_V1';
+const MEMORY_KEY = 'AGENTIC_EPisodic_MEMORY_V1';
 const RULES_KEY = 'AGENTIC_DISTILLED_RULES_V1';
 const REPETITION_KEY = 'AGENTIC_SPACED_REP_V1';
 const INSTANCE_ID = typeof window !== 'undefined' ? (localStorage.getItem('AGENTIC_INSTANCE_ID') || `inst-${Math.random().toString(36).substring(7)}`) : 'server-node';
@@ -72,18 +74,32 @@ export const api = {
 
   /**
    * Chat Elite 32 : Exécute la boucle cognitive complète en 4 phases.
-   * Intègre désormais l'enregistrement automatique dans la boucle de feedback ML.
+   * Détecte si une demande nécessite un Agent complexe ou une réponse RAG simple.
    */
   async chat(query: string, history: any[] = []): Promise<any> {
     const fs = loadLocalFS();
-    const files = fs.filter(i => i.type === 'file');
-    
-    const searchableDocs = files.map(f => ({
+    const searchableDocs = fs.filter(i => i.type === 'file').map(f => ({
       ...f,
       content: f.enhancedContent || f.content
     }));
 
     const docContext = await hybridRAG.retrieve(query, searchableDocs);
+    
+    // HEURISTIQUE AGENTIC: Si la demande contient des verbes d'action multiples
+    const isComplexMission = (query.match(/et|ensuite|puis|organise|prépare|envoie/gi) || []).length > 1;
+
+    if (isComplexMission) {
+      console.log("[API] Détection de mission complexe -> Activation Agent");
+      const agentRes = await runAgentMission({ text: query, context: docContext });
+      return {
+        answer: agentRes.answer,
+        sources: [],
+        confidence: 0.95,
+        isAgentMission: true,
+        steps: agentRes.steps
+      };
+    }
+
     const episodicMemory = loadMemory();
     const distilledRules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
     const allHierarchyNodes = searchableDocs.flatMap(f => (f as any).hierarchy?.nodes || []);
@@ -104,7 +120,6 @@ export const api = {
       hierarchyNodes: allHierarchyNodes
     } as any);
 
-    // Enregistrement dans la boucle de feedback ML pour auto-amélioration
     feedbackLoop.recordInteraction({
       input: query,
       prediction: response.answer,
@@ -119,11 +134,6 @@ export const api = {
         timestamp: Date.now()
       }, ...episodicMemory];
       await saveMemory(updatedMemory);
-      
-      if (response.confidence > 0.9) {
-        const mockRule = { instruction: response.answer.substring(0, 100), domain: 'Technique', confidence: response.confidence, id: 'rule-auto', pattern: 'Automatic' };
-        shareKnowledge(INSTANCE_ID, mockRule as any).catch(() => {});
-      }
     }
 
     return { 
@@ -132,9 +142,6 @@ export const api = {
     };
   },
 
-  /**
-   * Soumet un feedback explicite pour le pipeline ML (Phase 6).
-   */
   async submitFeedback(input: string, prediction: string, rating: number, correction?: string): Promise<void> {
     feedbackLoop.recordInteraction({
       input,
@@ -142,27 +149,13 @@ export const api = {
       feedback: { rating, correction },
       modelVersion: 'v1-base'
     });
-    
-    if (rating > 4) {
-      await implicitRL.processSignal('ACCEPTANCE', { isLong: prediction.length > 200 });
-    } else if (rating < 3) {
-      await implicitRL.processSignal('REFORMULATION', { isLong: prediction.length > 200 });
-    }
   },
 
   async runGlobalOptimization(): Promise<any> {
     const fs = loadLocalFS();
     const memory = loadMemory();
     const rules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
-
-    const result = await runNighttimeImprovement({
-      documents: fs,
-      memory,
-      currentRules: rules,
-      instanceId: INSTANCE_ID
-    });
-
-    return result;
+    return runNighttimeImprovement({ documents: fs, memory, currentRules: rules, instanceId: INSTANCE_ID });
   },
 
   async getTrainingDashboard(): Promise<any> {
@@ -174,28 +167,15 @@ export const api = {
     const fs = loadLocalFS();
     const doc = fs.find(f => f.id === docId);
     if (!doc || doc.type !== 'file') throw new Error("Document introuvable.");
-
     const memory = loadMemory();
-    const relatedEpisodes = memory.filter(e => 
-      e.content.toLowerCase().includes(doc.name.toLowerCase()) || 
-      (doc.tags && doc.tags.some(t => e.content.toLowerCase().includes(t.toLowerCase())))
-    );
-
+    const relatedEpisodes = memory.filter(e => e.content.toLowerCase().includes(doc.name.toLowerCase()));
     const { enhancedContent } = await enrichDocumentContent(doc.content || "", {
       corrections: [], 
       relatedQueries: relatedEpisodes.map(e => e.context),
       lessons: relatedEpisodes.map(e => e.content)
     });
-
     await revectorizeContent(enhancedContent);
-
-    const updatedFs = fs.map(f => f.id === docId ? {
-      ...f,
-      enhancedContent,
-      version: (f.version || 1) + 1,
-      lastRevectorized: new Date().toISOString()
-    } : f);
-
+    const updatedFs = fs.map(f => f.id === docId ? { ...f, enhancedContent, version: (f.version || 1) + 1, lastRevectorized: new Date().toISOString() } : f);
     saveLocalFS(updatedFs);
     return { success: true, version: (doc.version || 1) + 1 };
   },

@@ -1,4 +1,3 @@
-// src/components/chat/Chat.tsx (extrait corrigé)
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -13,9 +12,11 @@ import {
   HelpCircle, 
   Mic, 
   MicOff,
-  PlayCircle,
-  PauseCircle,
-  StepForward
+  Activity,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,12 +26,15 @@ import VoiceMessage from '@/components/chat/VoiceMessage';
 import VoiceControls from '@/components/chat/VoiceControls';
 import { useVoiceEnhanced } from '@/hooks/useVoiceEnhanced';
 import StepByStepGuide from '@/components/procedure/StepByStepGuide';
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   role: 'user' | 'ai';
   text: string;
   sources?: string[];
   id: string;
+  isAgentMission?: boolean;
+  steps?: any[];
 }
 
 export default function Chat() {
@@ -38,9 +42,9 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showVoiceTooltip, setShowVoiceTooltip] = useState(false);
+  const [expandedMissionId, setExpandedMissionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Mode selector (chat ou procédure)
   const [mode, setMode] = useState<'chat' | 'procedure'>('chat');
 
   const handleSendMessage = async (textOverride?: string) => {
@@ -59,9 +63,7 @@ export default function Chat() {
       const data = await api.chat(trimmed, messages);
       const aiMsgId = Math.random().toString(36).substring(7);
       
-      // ✅ CORRECTION: Utiliser data.answer au lieu de data.text
       let answerText = '';
-      
       if (typeof data === 'string') {
         try {
           const parsed = JSON.parse(data);
@@ -70,7 +72,6 @@ export default function Chat() {
           answerText = data;
         }
       } else if (data && typeof data === 'object') {
-        // ✅ Ici data a la structure { answer: string, sources: string[] }
         answerText = data.answer || JSON.stringify(data);
       } else {
         answerText = String(data);
@@ -80,8 +81,14 @@ export default function Chat() {
         role: 'ai', 
         text: answerText,
         sources: data.sources,
-        id: aiMsgId
+        id: aiMsgId,
+        isAgentMission: data.isAgentMission,
+        steps: data.steps
       }]);
+
+      if (data.isAgentMission) {
+        setExpandedMissionId(aiMsgId);
+      }
     } catch (error) {
       const errId = Math.random().toString(36).substring(7);
       setMessages(prev => [...prev, { 
@@ -101,15 +108,11 @@ export default function Chat() {
     volume,
     startListening,
     stopListening,
-    sendVoiceMessage,
     autoPlayResponse
   } = useVoiceEnhanced(handleSendMessage);
 
-  // Synchronisation de l'input avec la transcription
   useEffect(() => {
-    if (interimTranscript) {
-      setInput(interimTranscript);
-    }
+    if (interimTranscript) setInput(interimTranscript);
   }, [interimTranscript]);
 
   useEffect(() => {
@@ -117,39 +120,26 @@ export default function Chat() {
   }, [messages]);
 
   const handleMicClick = async () => {
-    if (isListening) {
-      await stopListening();
-    } else {
-      await startListening();
-    }
+    if (isListening) await stopListening();
+    else await startListening();
   };
-
-  const features = [
-    { icon: <FileText className="w-4 h-4 text-blue-400" />, title: "Analyse Docs", desc: "PDF, TXT, MD, JSON" },
-    { icon: <Brain className="w-4 h-4 text-purple-400" />, title: "Mémoire", desc: "Suivi contextuel" },
-    { icon: <ShieldCheck className="w-4 h-4 text-green-400" />, title: "100% Local", desc: "Confidentialité" },
-    { icon: <ListChecks className="w-4 h-4 text-orange-400" />, title: "Sources", desc: "Réponses citées" }
-  ];
 
   return (
     <div className="flex flex-col h-full bg-[#212121] relative">
-      {/* Mode Selector */}
       <div className="bg-[#2a2a2a] border-b border-gray-700 p-2 flex justify-center gap-2">
         <Button
           onClick={() => setMode('chat')}
           variant={mode === 'chat' ? 'default' : 'ghost'}
           className={mode === 'chat' ? 'bg-blue-600' : ''}
         >
-          <Brain className="w-4 h-4 mr-2" />
-          Mode Chat
+          <Brain className="w-4 h-4 mr-2" /> Chat Intelligent
         </Button>
         <Button
           onClick={() => setMode('procedure')}
           variant={mode === 'procedure' ? 'default' : 'ghost'}
           className={mode === 'procedure' ? 'bg-green-600' : ''}
         >
-          <ListChecks className="w-4 h-4 mr-2" />
-          Mode Procédure
+          <ListChecks className="w-4 h-4 mr-2" /> Mode Procédure
         </Button>
       </div>
 
@@ -158,72 +148,83 @@ export default function Chat() {
           {mode === 'chat' ? (
             <>
               {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 animate-in fade-in duration-700">
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
                   <div className="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center border border-blue-500/30">
-                    <Sparkles className="w-8 h-8 text-blue-400" />
+                    <Activity className="w-8 h-8 text-blue-400" />
                   </div>
-                  
                   <div className="space-y-2 px-4">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight">
-                      Bonjour, comment puis-je vous aider ?
-                    </h2>
-                    <p className="text-xs md:text-sm text-gray-400 max-w-lg mx-auto">
-                      Posez vos questions par écrit ou cliquez sur le micro pour parler.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full max-w-2xl px-4">
-                    {features.map((f, i) => (
-                      <Card key={i} className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
-                        <CardContent className="p-3 md:p-4 flex items-start gap-3 text-left">
-                          <div className="mt-1 shrink-0">{f.icon}</div>
-                          <div>
-                            <div className="text-[10px] md:text-xs font-bold text-white uppercase tracking-tighter">
-                              {f.title}
-                            </div>
-                            <div className="text-[10px] text-gray-500 leading-tight">{f.desc}</div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Bonjour, prêt pour une mission ?</h2>
+                    <p className="text-xs text-gray-400">Posez une question technique ou demandez à l'Agent d'organiser une tâche complexe.</p>
                   </div>
                 </div>
               )}
               
               <div className="space-y-6 md:space-y-8">
                 {messages.map((msg) => (
-                  <VoiceMessage 
-                    key={msg.id}
-                    text={msg.text}
-                    role={msg.role}
-                    messageId={msg.id}
-                    autoPlay={autoPlayResponse && msg.role === 'ai' && msg === messages[messages.length - 1]}
-                  />
+                  <div key={msg.id} className="space-y-4">
+                    <VoiceMessage 
+                      text={msg.text}
+                      role={msg.role}
+                      messageId={msg.id}
+                      autoPlay={autoPlayResponse && msg.role === 'ai' && msg === messages[messages.length - 1]}
+                    />
+                    
+                    {/* Visualisation du Plan Agentic */}
+                    {msg.isAgentMission && msg.steps && (
+                      <div className="ml-12 mr-12 bg-white/5 border border-white/10 rounded-2xl overflow-hidden animate-in slide-in-from-top-2">
+                        <button 
+                          onClick={() => setExpandedMissionId(expandedMissionId === msg.id ? null : msg.id)}
+                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Activity className="w-4 h-4 text-purple-400" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Rapport d'Exécution Agentic MCP</span>
+                          </div>
+                          {expandedMissionId === msg.id ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                        </button>
+                        
+                        {expandedMissionId === msg.id && (
+                          <div className="p-4 border-t border-white/5 space-y-3">
+                            {msg.steps.map((step, idx) => (
+                              <div key={idx} className="flex items-start gap-3 p-3 bg-black/20 rounded-xl">
+                                {step.status === 'completed' ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-gray-200">{step.description}</p>
+                                  {step.output && <p className="text-[10px] text-gray-500 mt-1 italic">{step.output}</p>}
+                                </div>
+                              </div>
+                            ))}
+                            <div className="pt-2 flex justify-end">
+                              <Badge className="bg-purple-600/20 text-purple-400 border-none text-[8px] font-black uppercase">Apprentissage démonstration actif</Badge>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
 
               {loading && (
-                <div className="flex gap-4 animate-in fade-in duration-300">
-                  <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" />
+                <div className="flex gap-4 animate-pulse">
+                  <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center shrink-0">
+                    <Activity className="w-4 h-4 text-blue-400" />
                   </div>
-                  <div className="flex items-center gap-1.5 px-4 py-3 bg-white/5 rounded-2xl">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
-                  </div>
+                  <div className="h-8 w-24 bg-white/5 rounded-2xl" />
                 </div>
               )}
             </>
           ) : (
-            // Mode Procédure
             <StepByStepGuide />
           )}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
-      {/* Zone de saisie - uniquement en mode chat */}
       {mode === 'chat' && (
         <div className="p-4 md:p-8 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent sticky bottom-0">
           <div className="max-w-3xl mx-auto">
@@ -237,59 +238,22 @@ export default function Chat() {
                     handleSendMessage();
                   }
                 }}
-                placeholder={isListening ? "🎤 Écoute en cours..." : "Posez une question..."}
+                placeholder={isListening ? "🎤 Écoute en cours..." : "Posez une question ou demandez une mission..."}
                 className="flex-1 bg-transparent border-none focus-visible:ring-0 min-h-[48px] md:min-h-[52px] max-h-[200px] py-2 md:py-3 px-3 md:px-4 resize-none text-white placeholder:text-gray-500 text-sm"
                 rows={1}
               />
-              
               <div className="relative flex items-center gap-2">
-                <Button
-                  onClick={handleMicClick}
-                  variant="ghost"
-                  size="icon"
-                  onMouseEnter={() => setShowVoiceTooltip(true)}
-                  onMouseLeave={() => setShowVoiceTooltip(false)}
-                  className={`
-                    relative w-9 h-9 md:w-10 md:h-10 rounded-xl shrink-0 transition-all
-                    ${isListening 
-                      ? 'bg-red-600 text-white hover:bg-red-500' 
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }
-                  `}
-                >
-                  {isListening ? (
-                    <>
-                      <MicOff className="w-4 h-4" />
-                      <span 
-                        className="absolute inset-0 rounded-xl border-2 border-red-500 animate-ping opacity-75"
-                        style={{ transform: `scale(${1 + volume * 0.5})` }}
-                      />
-                    </>
-                  ) : (
-                    <Mic className="w-4 h-4" />
-                  )}
+                <Button onClick={handleMicClick} variant="ghost" size="icon" className={`relative w-9 h-9 rounded-xl shrink-0 transition-all ${isListening ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
-
-                <Button
-                  onClick={() => handleSendMessage()}
-                  disabled={loading || !input.trim()}
-                  size="icon"
-                  className="bg-blue-600 text-white hover:bg-blue-500 rounded-xl disabled:opacity-30 transition-all w-9 h-9 md:w-10 md:h-10 shrink-0 shadow-lg"
-                >
+                <Button onClick={() => handleSendMessage()} disabled={loading || !input.trim()} size="icon" className="bg-blue-600 text-white hover:bg-blue-500 rounded-xl w-9 h-9 shrink-0 shadow-lg">
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-
-            <p className="mt-2 text-center text-[9px] md:text-[10px] text-gray-500 font-medium uppercase tracking-[0.2em] px-4 flex items-center justify-center gap-4">
-              <span>STT & TTS Actifs</span>
-              <span className="w-1 h-1 bg-gray-600 rounded-full" />
-              <span>Mode Local Sécurisé</span>
-            </p>
           </div>
         </div>
       )}
-
       <VoiceControls />
     </div>
   );
