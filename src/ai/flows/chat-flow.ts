@@ -8,8 +8,8 @@ import { z } from 'genkit';
 import { runCompleteEliteLoop } from '@/ai/integration/complete-loop';
 import { evaluatePedagogicalLevel } from '@/ai/learning/curriculum';
 import { learnFromNetwork } from '@/ai/learning/collaborative-network';
-import { semanticCache } from '@/ai/semantic-cache';
 import { personalizedRecommender } from '@/ai/ml/personalized-recommender';
+import { SemanticCache } from '@/ai/semantic-cache'; // ← IMPORT AJOUTÉ
 
 const ChatInputSchema = z.object({
   text: z.string(),
@@ -36,6 +36,9 @@ const ChatOutputSchema = z.object({
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
+
+// Initialisation du cache sémantique (instance unique)
+const semanticCache = new SemanticCache(); // ← INSTANCE CRÉÉE
 
 /**
  * Orchestrateur central Elite 32 utilisant le RAG Enhancé.

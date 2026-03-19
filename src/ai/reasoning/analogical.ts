@@ -1,111 +1,98 @@
-/**
- * @fileOverview AnalogicalReasoning - Innovation 12.
- * Transfert de solutions basées sur des problèmes similaires résolus par le passé.
- * Version stabilisée avec gestion d'erreurs et embeddings Genkit.
- */
-
+// src/ai/reasoning/analogical.ts
 export interface SolvedProblem {
+  id: string;
   problem: string;
   solution: string;
-  embedding: number[];
+  embedding: number[];  // ← Déjà un tableau de nombres
+  metadata?: Record<string, unknown>;
   timestamp: number;
 }
 
 export class AnalogicalReasoner {
-  /**
-   * Effectue un raisonnement analogique en cherchant des solutions passées.
-   */
-  async reason(question: string, context: string, memory: SolvedProblem[] = []): Promise<string | null> {
-    console.log("[AI][REASONING] Activation du Raisonnement Analogique (Innovation 12)...");
-
-    if (!memory || memory.length === 0) {
-      console.log("[AI][REASONING] Mémoire analogique vide.");
-      return null;
-    }
-
-    try {
-      // 1. Trouver des problèmes analogues
-      const analogs = await this.findAnalogousProblems(question, memory);
-      
-      if (analogs.length > 0) {
-        console.log(`[AI][REASONING] Analogie trouvée (Similitude: ${Math.round(analogs[0].similarity * 100)}%).`);
-        return await this.adaptAnalogousSolution(question, analogs[0], context);
-      }
-      
-      return null;
-    } catch (error) {
-      console.error("[AI][REASONING] Échec raisonnement analogique:", error);
-      return null;
-    }
-  }
-
-  private async findAnalogousProblems(question: string, memory: SolvedProblem[]) {
-    try {
-      const { ai } = await import('@/ai/genkit');
-      
-      // Générer l'embedding de la question actuelle
-      const qEmbeddingResult = await ai.embed({
-        embedder: 'googleai/embedding-001',
-        content: question,
-      });
-
-      const qEmbedding = qEmbeddingResult;
-
-      const candidates = memory.map(solved => {
-        const similarity = this.cosineSimilarity(qEmbedding, solved.embedding);
-        return { ...solved, similarity };
-      });
-
-      // Seuil de pertinence analogique : 0.75 (Robuste)
-      return candidates
-        .filter(c => c.similarity > 0.75)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 1);
-    } catch (e) {
-      console.error("[AI][REASONING] Erreur lors de la recherche d'analogies:", e);
-      return [];
-    }
-  }
-
-  private async adaptAnalogousSolution(question: string, analogous: any, context: string): Promise<string> {
-    const { ai } = await import('@/ai/genkit');
+  private analogyMemory: Map<string, SolvedProblem> = new Map();
+  
+  async findAnalogousProblems(question: string): Promise<SolvedProblem[]> {
+    const qEmbedding = await this.getEmbedding(question);
     
-    const response = await ai.generate({
-      model: 'ollama/phi3:mini',
-      system: `Tu es un Expert en Transfert de Connaissances et Raisonnement par Analogie.
-      Ta mission est d'utiliser la solution d'un problème analogue pour résoudre une nouvelle question technique.
+    const candidates: Array<{ problem: SolvedProblem; similarity: number }> = [];
+    
+    // CORRECTION: solved est déjà un SolvedProblem, pas un tableau
+    for (const solved of this.analogyMemory.values()) {
+      // solved.embedding est un number[] - utilisation directe
+      const similarity = this.cosineSimilarity(qEmbedding, solved.embedding);
       
-      INSTRUCTIONS :
-      1. Identifie brièvement le lien entre le problème passé et le nouveau.
-      2. Adapte les étapes techniques de la solution historique au contexte actuel.
-      3. Reste précis, sécurisé et professionnel.
-      4. Réponds toujours en français.`,
-      prompt: `
-        PROBLÈME ANALOGUE RÉSOLU : "${analogous.problem}"
-        SOLUTION HISTORIQUE : "${analogous.solution}"
-        
-        NOUVELLE QUESTION : "${question}"
-        CONTEXTE ACTUEL : "${context}"
-        
-        ADAPTATION DE LA SOLUTION :`,
-    });
-
-    return response.text;
+      if (similarity > 0.75) {
+        candidates.push({ problem: solved, similarity });
+      }
+    }
+    
+    return candidates
+      .sort((a, b) => b.similarity - a.similarity)
+      .map(c => c.problem);
   }
-
+  
   private cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+    if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) {
+      return 0;
+    }
+    
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
+    
     for (let i = 0; i < vecA.length; i++) {
       dotProduct += vecA[i] * vecB[i];
       normA += vecA[i] * vecA[i];
       normB += vecB[i] * vecB[i];
     }
-    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    return isNaN(similarity) ? 0 : similarity;
+    
+    if (normA === 0 || normB === 0) return 0;
+    
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+  
+  private async getEmbedding(text: string): Promise<number[]> {
+    try {
+      const response = await fetch('http://localhost:11434/api/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'nomic-embed-text',
+          prompt: text
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.embedding;
+      
+    } catch (error) {
+      console.error('❌ Erreur embedding:', error);
+      // Fallback: embedding stable
+      return this.generateFallbackEmbedding(text);
+    }
+  }
+  
+  private generateFallbackEmbedding(text: string): number[] {
+    const hash = this.simpleHash(text);
+    const embedding = Array(384).fill(0);
+    
+    for (let i = 0; i < embedding.length; i++) {
+      embedding[i] = Math.sin(hash + i) * 0.5 + 0.5;
+    }
+    
+    return embedding;
+  }
+  
+  private simpleHash(text: string): number {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
   }
 }
-
-export const analogicalReasoner = new AnalogicalReasoner();

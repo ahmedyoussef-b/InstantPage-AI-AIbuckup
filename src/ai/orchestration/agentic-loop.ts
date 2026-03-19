@@ -1,67 +1,169 @@
-'use server';
-/**
- * @fileOverview AgenticLoop - Orchestrateur de missions complexes.
- * Gère le cycle : Intention -> Plan -> Exécution (MCP) -> Apprentissage.
- */
+// src/ai/orchestration/agentic-loop.ts
+import { executeMCPTool, type MCPTool } from '@/ai/mcp/service';
 
-import { getHierarchicalPlan, formatHierarchicalPlan } from '@/ai/actions/hierarchical-planner';
-import { executeMCPTool } from '@/ai/mcp/service';
-import { extractPoliciesFromHistory } from '@/ai/actions/demonstration-learner';
-
-export interface AgentMissionResult {
-  mission: string;
-  stepsTaken: any[];
-  finalResponse: string;
-  plan: any;
-  learnedPatternsCount: number;
+export interface Step {
+  id: string;
+  tool: MCPTool;  // ← Utiliser le type MCPTool au lieu de string
+  action: string;
+  params: Record<string, any>;
+  description?: string;
 }
 
-/**
- * Exécute une boucle agentic complète.
- */
-export async function runAgenticLoop(query: string, context: string): Promise<AgentMissionResult> {
-  console.log(`[AGENT] Démarrage de la mission : "${query.substring(0, 50)}..."`);
+export interface LoopContext {
+  userId: string;
+  request: string;
+  [key: string]: any;
+}
 
-  // PHASE 1 & 2 : Compréhension et Planification Hiérarchique
-  const plan = await getHierarchicalPlan(query, context);
-  const formattedPlan = await formatHierarchicalPlan(plan);
+export interface StepResult {
+  stepId: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  timestamp: number;
+}
 
-  const stepsTaken = [];
+export interface LoopResult {
+  success: boolean;
+  request: string;
+  results: StepResult[];
+  summary: string;
+  error?: string;
+}
+
+export class AgenticLoop {
   
-  // PHASE 3 : Exécution séquencée (MCP Tools)
-  // Note: Dans ce prototype, on simule l'exécution des étapes du plan
-  for (const step of plan.steps) {
-    console.log(`[AGENT] Exécution de l'étape : ${step.description}`);
-    
-    // Identification de l'outil nécessaire via heuristique
-    let toolName = 'search';
-    if (step.description.toLowerCase().includes('calcul')) toolName = 'calculate';
-    if (step.description.toLowerCase().includes('résum')) toolName = 'summarize';
-
-    const result = await executeMCPTool(toolName, { query: step.description }, context);
-    stepsTaken.push({
-      description: step.description,
-      status: result.success ? 'completed' : 'failed',
-      output: result.output,
-      error: result.error
-    });
+  async executeStep(step: Step, context: LoopContext): Promise<StepResult> {
+    try {
+      // Maintenant step.tool est de type MCPTool, donc compatible
+      const result = await executeMCPTool({
+        tool: step.tool,
+        action: step.action,
+        parameters: {
+          ...step.params,
+          context
+        },
+        userId: context.userId
+      });
+      
+      return {
+        stepId: step.id,
+        success: true,
+        result,
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      return {
+        stepId: step.id,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now()
+      };
+    }
   }
 
-  // PHASE 4 : Apprentissage par Démonstration
-  // Simulation d'extraction de pattern
-  const demoHistory = stepsTaken.map(s => ({
-    timestamp: Date.now(),
-    context: { query },
-    action: { tool: 'multi-step-agent' },
-    result: s
-  }));
-  const learnedPolicies = await extractPoliciesFromHistory(demoHistory);
+  async runAgenticLoop(request: string, userId: string): Promise<LoopResult> {
+    try {
+      const steps = await this.decomposeRequest(request);
+      const results: StepResult[] = [];
+      const context: LoopContext = { userId, request };
+      
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const stepResult = await this.executeStep(step, context);
+        results.push(stepResult);
+        
+        if (stepResult.success && stepResult.result) {
+          context[`step_${step.id}`] = stepResult.result;
+        }
+      }
+      
+      const summary = `Traitement terminé en ${results.length} étapes`;
+      
+      return {
+        success: true,
+        request,
+        results,
+        summary
+      };
+    } catch (error) {
+      return {
+        success: false,
+        request,
+        results: [],
+        summary: "Erreur lors de l'exécution",
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
 
-  return {
-    mission: query,
-    stepsTaken,
-    plan,
-    learnedPatternsCount: learnedPolicies.length,
-    finalResponse: `Mission terminée. ${stepsTaken.filter(s => s.status === 'completed').length}/${stepsTaken.length} étapes réussies.\n\n${formattedPlan}`
-  };
+  private async decomposeRequest(request: string): Promise<Step[]> {
+    const steps: Step[] = [];
+    
+    // Maintenant les valeurs doivent correspondre au type MCPTool
+    if (request.toLowerCase().includes('recherche') || request.toLowerCase().includes('trouve')) {
+      steps.push({
+        id: 'search',
+        tool: 'search',  // ← Doit être une valeur valide de MCPTool
+        action: 'web',
+        params: { query: request },
+        description: 'Recherche d\'information'
+      });
+    }
+    
+    if (request.toLowerCase().includes('email') || request.toLowerCase().includes('envoie')) {
+      steps.push({
+        id: 'email',
+        tool: 'email',  // ← Doit être une valeur valide de MCPTool
+        action: 'draft',
+        params: { content: request },
+        description: 'Préparation d\'email'
+      });
+    }
+    
+    if (request.toLowerCase().includes('document') || request.toLowerCase().includes('fichier')) {
+      steps.push({
+        id: 'document',
+        tool: 'documents',  // ← Doit être une valeur valide de MCPTool
+        action: 'read',
+        params: { query: request },
+        description: 'Consultation de document'
+      });
+    }
+    
+    if (request.toLowerCase().includes('calendrier') || request.toLowerCase().includes('rendez-vous')) {
+      steps.push({
+        id: 'calendar',
+        tool: 'calendar',  // ← Doit être une valeur valide de MCPTool
+        action: 'checkAvailability',
+        params: { query: request },
+        description: 'Vérification calendrier'
+      });
+    }
+    
+    if (request.toLowerCase().includes('calcul') || request.toLowerCase().includes('math')) {
+      steps.push({
+        id: 'calculator',
+        tool: 'calculator',  // ← Doit être une valeur valide de MCPTool
+        action: 'calculate',
+        params: { expression: request.replace(/calcul/g, '') },
+        description: 'Calcul mathématique'
+      });
+    }
+    
+    // Valeur par défaut
+    if (steps.length === 0) {
+      steps.push({
+        id: 'default',
+        tool: 'search',  // ← Doit être une valeur valide de MCPTool
+        action: 'web',
+        params: { query: request },
+        description: 'Traitement général'
+      });
+    }
+    
+    return steps;
+  }
 }
+
+export const agenticLoop = new AgenticLoop();

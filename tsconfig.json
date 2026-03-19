@@ -1,16 +1,37 @@
+// tsconfig.json - Configuration complète
 {
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
+    // Cibler ES2020 pour supporter les fonctionnalités modernes
+    "target": "ES2020",
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    // Activer l'itération sur Map/Set même avec target plus bas
+    "downlevelIteration": true,
+    // Modules
+    "module": "commonjs",
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    // Strictness
+    "strict": true,
+    "skipLibCheck": true, // ← CRITIQUE: ignore les erreurs dans node_modules
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    // Paths
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    // JavaScript support
+    "allowJs": true,
+    "checkJs": false,
+    // Next.js spécifique
     "jsx": "preserve",
     "incremental": true,
     "plugins": [
@@ -18,10 +39,15 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "isolatedModules": true
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
