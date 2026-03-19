@@ -33,6 +33,11 @@ const saveMemory = async (episodes: Episode[]) => {
 
 async function safeJsonParse(res: Response) {
   const contentType = res.headers.get("content-type");
+  
+  if (res.status === 504) {
+    throw new Error("Délai d'attente dépassé (504). Le traitement de ce document est trop lourd pour le service IA actuel.");
+  }
+
   if (contentType && contentType.includes("application/json")) {
     try {
       return await res.json();
@@ -40,6 +45,7 @@ async function safeJsonParse(res: Response) {
       throw new Error("La réponse du serveur est malformée.");
     }
   }
+  
   const text = await res.text();
   if (text.includes('<html>')) {
     throw new Error(`Erreur serveur (${res.status}). Veuillez vérifier que le backend est opérationnel.`);

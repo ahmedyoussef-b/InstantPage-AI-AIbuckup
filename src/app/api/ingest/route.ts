@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
+export const maxDuration = 60; // Autorise jusqu'à 60 secondes pour le traitement IA lourd
+
 /**
  * Gère l'upload et le traitement intelligent d'un document.
  * Intègre la boucle de profilage pour l'apprentissage adaptatif.
@@ -22,14 +24,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucun fichier valide n'a été détecté dans la requête." }, { status: 400 });
     }
 
-    console.log(`[API][INGEST_START] Received request to ingest file: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-
+    console.log(`[API][INGEST_START] Traitement du fichier : ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
 
     // PHASE 1: Extraction du texte brut
     let text = "";
     try {
       text = await file.text();
-      console.log(`[API][TEXT_EXTRACT] Successfully extracted ${text.length} characters.`);
     } catch (e) {
       return NextResponse.json({ error: "Impossible de lire le contenu du fichier." }, { status: 400 });
     }
@@ -38,16 +38,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Le fichier est vide ou corrompu." }, { status: 400 });
     }
 
-    // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite
-    // Gère le chunking, les embeddings, le graphe et la hiérarchie (Innovation 32.1)
-    console.log(`[API][FLOW_CALL] Calling ingestDocumentFlow for ${file.name}...`);
+    // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite (Chunking, Graphe, Hiérarchie, Embeddings)
+    // Les tâches lourdes sont parallélisées dans le flow pour éviter le timeout
     const result = await ingestDocument({
       fileName: file.name,
       fileContent: text,
       fileType: file.type
     });
-    console.log(`[API][FLOW_SUCCESS] ingestDocumentFlow completed. Doc ID: ${result.docId}, Chunks: ${result.chunks}`);
 
+    console.log(`[API][INGEST_SUCCESS] Flux terminé. Doc ID: ${result.docId}, Chunks: ${result.chunks}`);
 
     // PHASE 5: Signal d'apprentissage pour le profilage utilisateur (Innovation 26)
     const isTechnical = (result.concepts?.length || 0) > 5;
@@ -59,8 +58,6 @@ export async function POST(req: NextRequest) {
 
     // Génération de suggestions contextuelles
     const suggestions = generateInitialSuggestions(file.name, result.concepts || []);
-
-    console.log(`[API][RESPONSE] Sending successful ingest response to client for ${file.name}.`);
 
     return NextResponse.json({
       success: true,
@@ -81,10 +78,9 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("[API][INGEST] Échec du pipeline d'ingestion :", error);
-    // On s'assure de TOUJOURS retourner du JSON, même en cas d'erreur fatale
+    console.error("[API][INGEST] Échec critique du pipeline :", error);
     return NextResponse.json({ 
-      error: "Une erreur critique est survenue lors du traitement du document. Vérifiez que le service Ollama est actif.",
+      error: "Le traitement a pris trop de temps ou le service IA est indisponible.",
       details: error.message 
     }, { status: 500 });
   }

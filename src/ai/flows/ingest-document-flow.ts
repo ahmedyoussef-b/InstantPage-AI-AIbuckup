@@ -2,6 +2,7 @@
 /**
  * @fileOverview Flux d'ingestion et de construction du graphe de connaissances (Logique Serveur).
  * Intègre désormais l'indexation hiérarchique des concepts (Innovation 32.1).
+ * Optimisé pour la performance via exécution parallèle des analyses LLM.
  */
 
 import { ai } from '@/ai/genkit';
@@ -97,41 +98,32 @@ const ingestDocumentFlow = ai.defineFlow(
     console.log(`[FLOW][INGEST][1/4] Transformation du texte : ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
-    console.log(`[FLOW][INGEST][2/4] Segmentation terminée : ${chunks.length} segments générés.`);
-    
     const docId = Math.random().toString(36).substring(7);
 
-    // 1. Extraction du Graphe
-    console.log(`[FLOW][INGEST][3/4] Extraction des nœuds de graphe et concepts hiérarchiques...`);
-    const { nodes, relations } = await extractKnowledgeFromText(docId, input.fileContent);
+    console.log(`[FLOW][INGEST][2/4] Segmentation : ${chunks.length} segments générés.`);
+    
+    // EXÉCUTION PARALLÈLE DES ANALYSES LOURDES POUR ÉVITER LE TIMEOUT 504
+    console.log(`[FLOW][INGEST][3/4] Analyses sémantiques parallèles (Graphe, Hiérarchie, Embeddings)...`);
+    
+    const [knowledge, hierarchy] = await Promise.all([
+      extractKnowledgeFromText(docId, input.fileContent),
+      extractHierarchicalConcepts(input.fileContent.substring(0, 1500)).catch(() => null),
+      // Embeddings limités pour la rapidité du prototype
+      chunks.length > 0 ? ai.embedMany({
+        embedder: 'googleai/embedding-001',
+        content: chunks.slice(0, 3),
+      }).catch(() => null) : Promise.resolve(null)
+    ]);
 
-    // 2. Hiérarchie (Innovation 32.1)
-    let hierarchy = null;
-    try {
-      hierarchy = await extractHierarchicalConcepts(input.fileContent.substring(0, 1500));
-    } catch (e) {}
+    console.log(`[FLOW][INGEST][4/4] Finalisation de l'indexation.`);
 
-    // 3. Embeddings
-    if (chunks.length > 0) {
-      try {
-        console.log(`[FLOW][INGEST][4/4] Vectorisation locale (embeddings) en cours pour ${Math.min(chunks.length, 3)} segments...`);
-        await ai.embedMany({
-          embedder: 'googleai/embedding-001',
-          content: chunks.slice(0, 3),
-        });
-      } catch (e) {
-        console.warn(`[FLOW][INGEST][WARN] Service d'embedding indisponible.`);
-      }
-    }
-
-    console.log(`[FLOW][INGEST][OK] Document indexé avec succès. ID: ${docId}`);
     return {
       docId,
       chunks: chunks.length,
       embeddingModel: 'embedding-001',
       processedAt: new Date().toISOString(),
-      concepts: nodes.map(n => n.label),
-      graphData: { nodes, relations },
+      concepts: knowledge.nodes.map(n => n.label),
+      graphData: knowledge,
       hierarchy
     };
   }
