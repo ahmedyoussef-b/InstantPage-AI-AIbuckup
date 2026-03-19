@@ -1,3 +1,4 @@
+// src/app/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -11,7 +12,8 @@ import {
   Menu, 
   ChevronLeft, 
   ChevronRight,
-  Cpu
+  Cpu,
+  Camera // ← AJOUTÉ
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +58,24 @@ export default function HomePage() {
             <MessageSquare className="w-4 h-4 text-blue-400 shrink-0" />
             {!collapsed && <span className="truncate">Chat Intelligent</span>}
           </Link>
+          
+          {/* 🔥 NOUVEAU : Lien vers Vision */}
+          <Link 
+            href="/vision" 
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <Camera className="w-4 h-4 group-hover:text-purple-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Recherche par Image</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-purple-500/10 text-purple-400 border-none text-[8px] font-black uppercase">
+                NOUVEAU
+              </Badge>
+            )}
+          </Link>
+          
           <Link 
             href="/admin" 
             className={cn(
