@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 /**
  * @fileOverview Ingest API Route - Phase 1 de l'Architecture Elite 32.
- * Orchestre le pipeline complet d'intégration documentaire avec suggestions proactives.
+ * Orchestre le pipeline complet d'intégration documentaire avec protection contre les timeouts.
  */
 import { ingestDocument } from '@/ai/flows/ingest-document-flow';
 import { implicitRL } from '@/ai/learning/implicit-rl';
 
-export const maxDuration = 60; // Autorise jusqu'à 60 secondes pour le traitement IA lourd
+export const maxDuration = 60; // Limite Next.js maximale
 
-/**
- * Gère l'upload et le traitement intelligent d'un document.
- * Intègre la boucle de profilage pour l'apprentissage adaptatif.
- */
 export async function POST(req: NextRequest) {
-  console.log("[API][INGEST] Démarrage du pipeline d'ingestion Elite...");
+  console.group("[API][INGEST] Pipeline Ingest");
 
   try {
     const formData = await req.formData();
@@ -21,44 +17,36 @@ export async function POST(req: NextRequest) {
     const userId = formData.get('userId') as string || 'default-user';
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "Aucun fichier valide n'a été détecté dans la requête." }, { status: 400 });
+      console.error("[API][INGEST] Fichier manquant ou invalide");
+      return NextResponse.json({ error: "Aucun fichier valide n'a été détecté." }, { status: 400 });
     }
 
-    console.log(`[API][INGEST_START] Traitement du fichier : ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+    console.log(`[API][INGEST] Fichier: ${file.name} | Taille: ${(file.size / 1024).toFixed(2)} KB`);
 
-    // PHASE 1: Extraction du texte brut
-    let text = "";
-    try {
-      text = await file.text();
-    } catch (e) {
-      return NextResponse.json({ error: "Impossible de lire le contenu du fichier." }, { status: 400 });
-    }
+    const text = await file.text().catch(e => {
+      throw new Error("Impossible de lire le texte du fichier.");
+    });
     
     if (!text || text.trim().length === 0) {
-      return NextResponse.json({ error: "Le fichier est vide ou corrompu." }, { status: 400 });
+      return NextResponse.json({ error: "Le fichier est vide." }, { status: 400 });
     }
 
-    // PHASE 2, 3 & 4: Traitement via le flux Genkit Elite (Chunking, Graphe, Hiérarchie, Embeddings)
-    // Les tâches lourdes sont parallélisées dans le flow pour éviter le timeout
+    // Exécution du flux avec une marge de sécurité par rapport au timeout 504
     const result = await ingestDocument({
       fileName: file.name,
       fileContent: text,
       fileType: file.type
     });
 
-    console.log(`[API][INGEST_SUCCESS] Flux terminé. Doc ID: ${result.docId}, Chunks: ${result.chunks}`);
+    console.log(`[API][INGEST] Succès | Doc ID: ${result.docId} | Concepts: ${result.concepts.length}`);
 
-    // PHASE 5: Signal d'apprentissage pour le profilage utilisateur (Innovation 26)
-    const isTechnical = (result.concepts?.length || 0) > 5;
-    try {
-      await implicitRL.processSignal('USAGE', { isTechnical, modelUsed: result.embeddingModel });
-    } catch (e) {
-      console.warn("[API][INGEST] Échec signal ImplicitRL, non bloquant.");
-    }
+    // Mise à jour asynchrone du profil (non bloquante pour la réponse)
+    implicitRL.processSignal('USAGE', { 
+      isTechnical: result.concepts.length > 3,
+      modelUsed: result.embeddingModel 
+    }).catch(() => {});
 
-    // Génération de suggestions contextuelles
-    const suggestions = generateInitialSuggestions(file.name, result.concepts || []);
-
+    console.groupEnd();
     return NextResponse.json({
       success: true,
       documentId: result.docId,
@@ -70,34 +58,25 @@ export async function POST(req: NextRequest) {
       },
       stats: {
         chunks: result.chunks,
-        conceptsIdentified: result.concepts?.length || 0,
+        conceptsIdentified: result.concepts.length,
         embeddingModel: result.embeddingModel
       },
       hierarchy: result.hierarchy,
-      suggestions
+      suggestions: generateSuggestions(file.name, result.concepts)
     });
 
   } catch (error: any) {
-    console.error("[API][INGEST] Échec critique du pipeline :", error);
+    console.error("[API][INGEST] Erreur fatale:", error.message);
+    console.groupEnd();
     return NextResponse.json({ 
-      error: "Le traitement a pris trop de temps ou le service IA est indisponible.",
+      error: "Le service d'ingestion est temporairement surchargé. Veuillez réessayer avec un fichier plus petit.",
       details: error.message 
     }, { status: 500 });
   }
 }
 
-/**
- * Génère des suggestions de questions basées sur les concepts extraits.
- */
-function generateInitialSuggestions(filename: string, concepts: string[]): string[] {
-  const baseSuggestions = [
-    `Fais-moi une synthèse technique de ${filename}.`,
-    `Quels sont les points critiques identifiés dans ce document ?`
-  ];
-
-  if (concepts && concepts.length > 0) {
-    baseSuggestions.push(`Explique-moi le concept de "${concepts[0]}" mentionné ici.`);
-  }
-
-  return baseSuggestions;
+function generateSuggestions(filename: string, concepts: string[]): string[] {
+  const base = [`Analyse ${filename}.`, `Points critiques de ${filename}.`];
+  if (concepts && concepts.length > 0) base.push(`Explique ${concepts[0]}.`);
+  return base;
 }

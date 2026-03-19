@@ -2,7 +2,7 @@
 /**
  * @fileOverview Flux d'ingestion et de construction du graphe de connaissances (Logique Serveur).
  * Intègre désormais l'indexation hiérarchique des concepts (Innovation 32.1).
- * Optimisé pour la performance via exécution parallèle des analyses LLM.
+ * Optimisé pour la performance via exécution parallèle avec timeouts.
  */
 
 import { ai } from '@/ai/genkit';
@@ -28,15 +28,28 @@ const IngestOutputSchema = z.object({
 export type IngestOutput = z.infer<typeof IngestOutputSchema>;
 
 /**
+ * Utilitaire pour limiter le temps d'exécution d'une promesse.
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  const timeoutPromise = new Promise<T>((resolve) =>
+    setTimeout(() => {
+      console.warn(`[INGEST] Timeout atteint après ${timeoutMs}ms. Utilisation du fallback.`);
+      resolve(fallback);
+    }, timeoutMs)
+  );
+  return Promise.race([promise, timeoutPromise]);
+}
+
+/**
  * Extrait les concepts et entités d'un texte via LLM.
  */
 async function extractKnowledgeFromText(docId: string, text: string) {
   try {
-    const slice = text.substring(0, 2000);
+    const slice = text.substring(0, 1500); // Réduit pour la vitesse
     
     const response = await ai.generate({
       model: 'ollama/tinyllama:latest',
-      system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 relations les plus importantes entre les concepts.",
+      system: "Tu es un extracteur de graphe de connaissances technique. Analyse le texte et identifie les 3 relations les plus importantes.",
       prompt: `Analyse ce document technique et extrait au maximum 3 relations clés sous le format "Sujet -> Relation -> Objet".
       Contenu : "${slice}"`,
     });
@@ -66,10 +79,7 @@ async function extractKnowledgeFromText(docId: string, text: string) {
     return { nodes, relations };
   } catch (e) {
     return { 
-      nodes: [
-        { id: docId, label: 'Document', type: 'document' },
-        { id: 'base_info', label: 'Information Générale', type: 'concept' }
-      ], 
+      nodes: [{ id: docId, label: 'Document', type: 'document' }], 
       relations: [] 
     };
   }
@@ -95,34 +105,36 @@ const ingestDocumentFlow = ai.defineFlow(
     outputSchema: IngestOutputSchema,
   },
   async (input) => {
-    console.log(`[FLOW][INGEST][1/4] Transformation du texte : ${input.fileName}`);
+    console.log(`[FLOW][INGEST][1/4] Début du traitement : ${input.fileName}`);
     
     const chunks = chunkText(input.fileContent, 1000);
     const docId = Math.random().toString(36).substring(7);
 
-    console.log(`[FLOW][INGEST][2/4] Segmentation : ${chunks.length} segments générés.`);
+    console.log(`[FLOW][INGEST][2/4] Segmentation : ${chunks.length} segments.`);
     
-    // EXÉCUTION PARALLÈLE DES ANALYSES LOURDES POUR ÉVITER LE TIMEOUT 504
-    console.log(`[FLOW][INGEST][3/4] Analyses sémantiques parallèles (Graphe, Hiérarchie, Embeddings)...`);
+    // ANALYSES SÉMANTIQUES PARALLÈLES AVEC TIMEOUTS (Max 15s par tâche)
+    console.log(`[FLOW][INGEST][3/4] Activation des analyses IA (Graphe, Hiérarchie, Embeddings)...`);
     
-    const [knowledge, hierarchy] = await Promise.all([
-      extractKnowledgeFromText(docId, input.fileContent),
-      extractHierarchicalConcepts(input.fileContent.substring(0, 1500)).catch(() => null),
-      // Embeddings limités pour la rapidité du prototype
-      chunks.length > 0 ? ai.embedMany({
-        embedder: 'googleai/embedding-001',
-        content: chunks.slice(0, 3),
-      }).catch(() => null) : Promise.resolve(null)
+    const results = await Promise.allSettled([
+      withTimeout(extractKnowledgeFromText(docId, input.fileContent), 15000, { nodes: [], relations: [] }),
+      withTimeout(extractHierarchicalConcepts(input.fileContent.substring(0, 1000)), 12000, { nodes: [], relations: [] }),
+      chunks.length > 0 ? withTimeout(ai.embedMany({
+        embedder: 'ollama/nomic-embed-text',
+        content: chunks.slice(0, 5),
+      }), 15000, null) : Promise.resolve(null)
     ]);
 
-    console.log(`[FLOW][INGEST][4/4] Finalisation de l'indexation.`);
+    const knowledge = results[0].status === 'fulfilled' ? results[0].value : { nodes: [], relations: [] };
+    const hierarchy = results[1].status === 'fulfilled' ? results[1].value : null;
+
+    console.log(`[FLOW][INGEST][4/4] Indexation finale.`);
 
     return {
       docId,
       chunks: chunks.length,
-      embeddingModel: 'embedding-001',
+      embeddingModel: 'ollama/nomic-embed-text',
       processedAt: new Date().toISOString(),
-      concepts: knowledge.nodes.map(n => n.label),
+      concepts: (knowledge as any).nodes?.map((n: any) => n.label) || [],
       graphData: knowledge,
       hierarchy
     };
