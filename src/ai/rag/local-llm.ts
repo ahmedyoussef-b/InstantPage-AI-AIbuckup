@@ -1,8 +1,6 @@
 'use server';
 /**
  * @fileOverview Phase 3: AGIR - Génération via LLM Local (Ollama).
- * Version refactorisée pour Next.js 15 (Architecture fonctionnelle).
- * Utilise le contexte assemblé pour produire une réponse technique précise.
  */
 
 import { AssembledContext } from './context-assembler';
@@ -21,7 +19,6 @@ export interface LLMResponse {
 
 /**
  * Génère une réponse via le modèle local Ollama.
- * Gère la communication API, le prompt système dynamique et le nettoyage des sorties.
  */
 export async function generateLLMResponse(
   userPrompt: string, 
@@ -32,9 +29,8 @@ export async function generateLLMResponse(
   const model = options.model || 'phi3:mini';
   const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
 
-  console.log(`[AI][PHASE-3] Génération via ${model} (${context.tokenCount} tokens contextuels)`);
+  console.log(`[RAG][GENERATOR] Génération de la réponse avec citations. Modèle: ${model}`);
 
-  // Construction du prompt final (System + Context + User)
   const fullPrompt = buildFinalPrompt(userPrompt, context);
 
   try {
@@ -46,34 +42,31 @@ export async function generateLLMResponse(
         prompt: fullPrompt,
         stream: false,
         options: {
-          temperature: calculateOptimalTemperature(context),
-          top_p: 0.9,
-          num_predict: 1000,
-          stop: ["### FIN", "Question:", "User:"]
+          temperature: 0.3,
+          num_predict: 1000
         }
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`Ollama indisponible (${response.status})`);
-    }
+    if (!response.ok) throw new Error(`Ollama Error: ${response.status}`);
 
     const data = await response.json();
-    
-    // Post-traitement: Nettoyage et vérification des citations
     const processedText = postProcessLLMOutput(data.response, context);
+
+    const latency = Date.now() - startTime;
+    console.log(`[RAG][GENERATOR][OK] Réponse générée en ${latency}ms.`);
 
     return {
       text: processedText,
       tokens: data.eval_count || 0,
-      latency: Date.now() - startTime,
+      latency,
       model: model,
       sources: context.sources
     };
   } catch (error) {
-    console.error("[AI][PHASE-3] Échec critique génération LLM:", error);
+    console.error("[RAG][GENERATOR][ERROR] Échec génération locale.", error);
     return {
-      text: "ERREUR SYSTÈME: L'assistant local est momentanément indisponible. Vérifiez que le service Ollama est actif.",
+      text: "Désolé, l'assistant local est momentanément indisponible.",
       tokens: 0,
       latency: Date.now() - startTime,
       model: model,
@@ -82,9 +75,6 @@ export async function generateLLMResponse(
   }
 }
 
-/**
- * Construit le prompt système final incluant le contexte technique.
- */
 function buildFinalPrompt(userPrompt: string, context: AssembledContext): string {
   return `
 ${context.text}
@@ -92,39 +82,13 @@ ${context.text}
 ### DEMANDE UTILISATEUR
 Question: ${userPrompt}
 
-### INSTRUCTIONS DE RÉPONSE
-1. Réponds EXCLUSIVEMENT en français de manière professionnelle.
-2. Base-toi scrupuleusement sur le CONTEXTE TECHNIQUE DE RÉFÉRENCE fourni ci-dessus.
-3. Cite tes sources entre crochets [Source X] pour chaque fait technique important.
-4. Si l'information est absente du contexte, admets-le : "Désolé, je ne trouve pas cette précision dans la base locale."
-5. Structure ta réponse avec du Markdown (gras, listes) pour la lisibilité.
-
-Réponse:`;
+Réponse (en français, précise, avec citations [Source X]):`;
 }
 
-/**
- * Ajuste la température selon la fiabilité des sources.
- * Température basse (0.2) pour les documents officiels, plus haute (0.5) pour les échanges.
- */
-function calculateOptimalTemperature(context: AssembledContext): number {
-  const hasOfficialDocs = context.sources.some(s => s.source === 'document');
-  return hasOfficialDocs ? 0.2 : 0.5;
-}
-
-/**
- * Nettoie la sortie et s'assure que la réponse reste dans le cadre du RAG.
- */
 function postProcessLLMOutput(text: string, context: AssembledContext): string {
   let cleaned = text.trim();
-  
-  // Suppression des préfixes de type "Réponse:" si générés
-  cleaned = cleaned.replace(/^Réponse:\s*/i, '');
-
-  // S'assurer qu'au moins une source est citée si le contexte n'était pas vide
   if (context.sources.length > 0 && !cleaned.includes('[') && cleaned.length > 50) {
-    const topSource = context.sources[0];
-    cleaned += `\n\n[Basé sur: ${topSource.title}]`;
+    cleaned += `\n\n[Basé sur: ${context.sources[0].title}]`;
   }
-  
   return cleaned;
 }

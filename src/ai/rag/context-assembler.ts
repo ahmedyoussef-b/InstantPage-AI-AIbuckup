@@ -1,7 +1,6 @@
 'use server';
 /**
- * @fileOverview ContextAssembler - Phase 2: RAISONNER.
- * Fusionne, pondère et structure le contexte pour le LLM local.
+ * @fileOverview Phase 2: RAISONNER.
  */
 
 import { RetrievalResult, FusedResult } from './intelligent-retriever';
@@ -20,20 +19,23 @@ export interface AssembledContext {
  * Assemble le contexte final pour la génération.
  */
 export async function assembleContext(retrievalResult: RetrievalResult): Promise<AssembledContext> {
-  console.log(`[AI][PHASE-2] Assemblage du contexte avec ${retrievalResult.contexts.length} sources.`);
+  console.log(`[RAG][ASSEMBLER] Fusion du savoir documentaire et de l'expérience mémorisée...`);
 
-  // 1. Trier par pertinence finale (score pondéré)
+  // 1. Trier par pertinence finale
   const sorted = [...retrievalResult.contexts].sort((a, b) => b.finalScore - a.finalScore);
   
-  // 2. Limiter la taille du contexte pour respecter la fenêtre de tokens
+  // 2. Limiter la taille
   const limited = limitContextSize(sorted);
   
-  // 3. Formater les sources pour une lecture optimale par le LLM
+  // 3. Formater
   const formatted = formatForLLM(limited);
   
-  // 4. Ajouter des méta-instructions basées sur l'analyse sémantique
+  // 4. Ajouter des méta-instructions
   const withMetadata = addMetadata(formatted, retrievalResult);
   
+  const tokenCount = countTokens(withMetadata);
+  console.log(`[RAG][ASSEMBLER][OK] Contexte assemblé (${tokenCount} tokens).`);
+
   return {
     text: withMetadata,
     sources: limited.map(c => ({
@@ -41,7 +43,7 @@ export async function assembleContext(retrievalResult: RetrievalResult): Promise
       title: c.metadata?.title || getDefaultTitle(c.source),
       relevance: c.finalScore
     })),
-    tokenCount: countTokens(withMetadata)
+    tokenCount
   };
 }
 
@@ -64,16 +66,13 @@ function limitContextSize(contexts: FusedResult[]): FusedResult[] {
 }
 
 function formatForLLM(contexts: FusedResult[]): string {
-  if (contexts.length === 0) return "NOTE: Aucun contexte spécifique n'a été trouvé dans la base locale.";
+  if (contexts.length === 0) return "NOTE: Aucun contexte spécifique trouvé.";
 
   let formatted = "### CONTEXTE TECHNIQUE DE RÉFÉRENCE\n\n";
-  
   contexts.forEach((ctx, i) => {
-    const sourceLabel = ctx.source.toUpperCase();
-    formatted += `[Source ${i + 1} (${sourceLabel}) - Confiance: ${(ctx.finalScore * 100).toFixed(0)}%]\n`;
+    formatted += `[Source ${i + 1} (${ctx.source.toUpperCase()}) - Confiance: ${(ctx.finalScore * 100).toFixed(0)}%]\n`;
     formatted += `${ctx.content}\n\n`;
   });
-  
   formatted += "### FIN DU CONTEXTE\n";
   return formatted;
 }
@@ -82,21 +81,8 @@ function addMetadata(text: string, retrievalResult: RetrievalResult): string {
   const analysis = retrievalResult.analysis;
   let instructions = "";
   
-  if (analysis.type === 'procedural') {
-    instructions += "DIRECTIVE: L'utilisateur demande une procédure. Détaille chaque étape avec précision et numérotation.\n";
-  }
-  
-  if (analysis.complexity > 0.65) {
-    instructions += "DIRECTIVE: La problématique est complexe. Décompose ton raisonnement et explique les causes possibles.\n";
-  }
-
-  if (analysis.intent === 'summarize') {
-    instructions += "DIRECTIVE: Fournis une synthèse concise en points clés.\n";
-  }
-
-  if (analysis.intent === 'calculate') {
-    instructions += "DIRECTIVE: Vérifie scrupuleusement les unités et les seuils de mesure cités.\n";
-  }
+  if (analysis.type === 'procedural') instructions += "DIRECTIVE: Détailler la procédure étape par étape.\n";
+  if (analysis.complexity > 0.65) instructions += "DIRECTIVE: Problématique complexe, décomposer le raisonnement.\n";
   
   return instructions ? `${instructions}\n${text}` : text;
 }
@@ -110,6 +96,6 @@ function getDefaultTitle(source: string): string {
     case 'document': return 'Manuel technique';
     case 'lesson': return 'Leçon apprise';
     case 'interaction': return 'Historique chat';
-    default: return 'Information système';
+    default: return 'Info Système';
   }
 }

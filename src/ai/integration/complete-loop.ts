@@ -1,7 +1,6 @@
 'use server';
 /**
  * @fileOverview Elite 32 - Orchestrateur RAG Enhancée (Version Finale).
- * Unifie les 4 phases : Comprendre -> Raisonner -> Agir -> Apprendre.
  */
 
 import { retrieveContext } from '@/ai/rag/intelligent-retriever';
@@ -36,25 +35,21 @@ export interface LoopResult {
  */
 export async function runCompleteEliteLoop(interaction: LoopInteraction): Promise<LoopResult> {
   const cycleId = Math.random().toString(36).substring(7);
-  console.log(`[AI][RAG][CYCLE][${cycleId}] DÉMARRAGE : "${interaction.query.substring(0, 30)}..."`);
+  console.log(`[ELITE-LOOP][CYCLE][START] Cycle ID: ${cycleId} | Requête: "${interaction.query.substring(0, 30)}..."`);
 
-  // --- PHASE 1: COMPRENDRE (Retriever Intelligent & Query Analyzer) ---
-  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-1] Recherche multi-sources...`);
+  // --- PHASE 1: COMPRENDRE ---
   const retrievalResult = await retrieveContext(interaction.query, interaction.userId);
-  const queryAnalysis = retrievalResult.analysis;
-  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-1] ${retrievalResult.contexts.length} sources trouvées.`);
 
-  // --- PHASE 2: RAISONNER (Context Assembler & Metacognition) ---
-  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-2] Assemblage du contexte et raisonnement métacognitif...`);
+  // --- PHASE 2: RAISONNER ---
   const assembledContext = await assembleContext(retrievalResult);
   
-  // Utilisation de la méta-cognition pour valider si le contexte permet de répondre
+  // Raisonnement métacognitif
+  console.log(`[ELITE-LOOP][METACOGNITION] Auto-évaluation de la capacité à répondre...`);
   const metaResult = await metacognitiveReasoner.reason(
     interaction.query,
     assembledContext.text,
     async (q, ctx) => {
-      // --- PHASE 3: AGIR (Génération LLM Locale) ---
-      console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-3] Génération de la réponse via LLM local...`);
+      // --- PHASE 3: AGIR ---
       const llmResponse = await generateLLMResponse(q, {
         ...assembledContext,
         text: ctx 
@@ -63,14 +58,10 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     }
   );
 
-  // Anticipation d'action (Phase 3.1)
-  await agirVector(interaction.query, { mode: 'standard' });
-
-  // --- PHASE 4: APPRENDRE (Learning Loop & Vectorisation) ---
-  console.log(`[AI][RAG][CYCLE][${cycleId}][PHASE-4] Consolidation et vectorisation dynamique...`);
+  // --- PHASE 4: APPRENDRE ---
+  console.log(`[ELITE-LOOP][LEARNING] Consolidation et ré-indexation de l'interaction...`);
   await apprendreVector(interaction.query, metaResult.answer, metaResult.confidence);
   
-  // Enregistrement dans la boucle d'apprentissage RAG spécifique
   await learnFromRAGInteraction(
     {
       query: interaction.query,
@@ -84,17 +75,16 @@ export async function runCompleteEliteLoop(interaction: LoopInteraction): Promis
     }
   );
 
-  // Création de l'épisode de mémoire pour stockage VFS
   const newMemoryEpisode = {
     type: 'interaction',
     content: metaResult.answer.substring(0, 500),
     context: interaction.query,
     importance: metaResult.confidence,
     timestamp: Date.now(),
-    tags: queryAnalysis.concepts
+    tags: retrievalResult.analysis.concepts
   };
 
-  console.log(`[AI][RAG][CYCLE][${cycleId}] TERMINÉ. Confiance: ${Math.round(metaResult.confidence * 100)}%`);
+  console.log(`[ELITE-LOOP][CYCLE][FINISH] ID: ${cycleId} | Confiance finale: ${Math.round(metaResult.confidence * 100)}%`);
 
   return {
     answer: metaResult.answer,
