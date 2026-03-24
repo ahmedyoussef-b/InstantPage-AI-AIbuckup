@@ -1,7 +1,9 @@
 // lib/services/visionService.ts
 import sharp from 'sharp';
-import * as tf from '@tensorflow/tfjs-node';
-import * as mobilenet from '@tensorflow-models/mobilenet';
+// import * as tf from '@tensorflow/tfjs-node';
+// import * as mobilenet from '@tensorflow-models/mobilenet';
+let tf: any;
+let mobilenet: any;
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -14,11 +16,17 @@ class VisionService {
   private featuresCache: Map<string, number[]> = new Map();
 
   constructor() {
-    this.init();
+    // Initialization is now lazy
   }
 
   async init() {
+    if (this.initialized) return;
+    
     try {
+      console.log('🔄 Chargement dynamique de TensorFlow et MobileNet...');
+      tf = await import('@tensorflow/tfjs-node');
+      mobilenet = await import('@tensorflow-models/mobilenet');
+      
       console.log('🔄 Initialisation du modèle vision MobileNet...');
       
       // Charger MobileNet pour l'extraction de features
@@ -77,6 +85,7 @@ class VisionService {
    * Extraire les features d'une image avec MobileNet
    */
   async extractFeatures(imageBuffer: Buffer): Promise<number[]> {
+    await this.init();
     try {
       // Prétraiter l'image
       const processed = await sharp(imageBuffer)
@@ -120,6 +129,7 @@ class VisionService {
     threshold: number = 0.7,
     maxResults: number = 5
   ): Promise<VisionSearchResult> {
+    await this.init();
     try {
       // 1. Extraire les features de l'image requête
       const queryFeatures = await this.extractFeatures(imageBuffer);

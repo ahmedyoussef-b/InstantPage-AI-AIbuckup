@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview ContextualValidator - Innovation 21.
  * Validation de la sécurité et de la pertinence des actions avant exécution.

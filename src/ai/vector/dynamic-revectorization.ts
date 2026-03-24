@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview DynamicRevectorization - Innovation 5.3.
  * Enrichit le contenu des documents avec les apprentissages accumulés pour une recherche sémantique supérieure.

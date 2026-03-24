@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview KnowledgeDistillation - Innovation 28.
  * Synthétise les interactions passées en règles compactes et modèles par domaine.

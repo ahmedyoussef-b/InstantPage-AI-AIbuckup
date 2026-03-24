@@ -1,10 +1,9 @@
-'use server';
+// src/ai/rag/query-analyzer.ts
+
 /**
  * @fileOverview QueryAnalyzer - Intelligence sémantique de la Phase 1.
  * Analyse et structure les demandes utilisateur pour optimiser le processus RAG.
  */
-
-import { ai } from '@/ai/genkit';
 
 export type QueryType = 'factual' | 'procedural' | 'comparative' | 'explanatory' | 'action' | 'general';
 export type Intent = 'inform' | 'help' | 'explain' | 'summarize' | 'calculate';
@@ -18,17 +17,19 @@ export interface QueryAnalysis {
   original: string;
 }
 
+// Récupérer les variables d'environnement
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'phi:2.7b';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+
 /**
  * Analyse complète d'une requête via LLM local et heuristiques.
  */
 export async function analyzeQuery(query: string): Promise<QueryAnalysis> {
   console.log(`[AI][ANALYZER] Analyse sémantique : "${query.substring(0, 50)}..."`);
+  console.log(`[AI][ANALYZER] Modèle: ${OLLAMA_MODEL}, URL: ${OLLAMA_URL}`);
 
   try {
-    // 1. Extraction intelligente via LLM (Ollama/Phi3)
     const llmAnalysis = await performLLMAnalysis(query);
-    
-    // 2. Calcul de complexité heuristique
     const complexity = assessComplexity(query, llmAnalysis.concepts);
 
     return {
@@ -39,53 +40,90 @@ export async function analyzeQuery(query: string): Promise<QueryAnalysis> {
       complexity,
       original: query
     };
-  } catch (error) {
-    console.warn("[AI][ANALYZER] Échec analyse IA, repli sur mode basique.");
+  } catch (error: any) {
+    console.warn("[AI][ANALYZER] Échec analyse IA, repli sur mode basique.", error.message);
     return fallbackAnalysis(query);
   }
 }
 
-async function performLLMAnalysis(query: string) {
-  // Wrap in a 15-second timeout to allow model swapping into RAM
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error("LLM Analysis Timeout")), 15000);
-  });
-  
-  const generatePromise = ai.generate({
-    model: 'ollama/tinyllama:latest',
-    system: `Tu es un Analyste Sémantique expert en maintenance industrielle. 
-    Analyse la requête et extrait les informations au format JSON STRICT.
-    TYPES: factual, procedural, comparative, explanatory, action.
-    INTENTS: inform, help, explain, summarize, calculate.`,
-    prompt: `Analyse cette requête : "${query}"
-    Réponds en JSON: 
-    {
-      "type": "type_détecté",
-      "intent": "intention_détectée",
-      "concepts": ["concept1", "concept2"],
-      "entities": ["équipement", "code_erreur"]
-    }`,
-  });
+async function performLLMAnalysis(query: string): Promise<any> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
 
-  const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-
-  const match = response.text.match(/\{.*\}/s);
-  if (match) {
-    return JSON.parse(match[0]);
+  if (OLLAMA_URL.includes('ngrok-free.dev')) {
+    headers['ngrok-skip-browser-warning'] = 'true';
   }
-  throw new Error("Réponse LLM invalide");
+
+  const prompt = `Tu es un Analyste Sémantique expert en maintenance industrielle.
+Analyse la requête et extrait les informations au format JSON STRICT.
+
+Requête: "${query}"
+
+Réponds UNIQUEMENT en JSON (sans texte avant ou après):
+{
+  "type": "factual",
+  "intent": "inform",
+  "concepts": ["concept1"],
+  "entities": ["equipement1"]
+}
+
+Types possibles: factual, procedural, comparative, explanatory, action, general
+Intents possibles: inform, help, explain, summarize, calculate`;
+
+  console.log(`[AI][ANALYZER] Appel à ${OLLAMA_URL}/api/generate avec modèle ${OLLAMA_MODEL}`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.1,
+          num_predict: 200
+        }
+      })
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[AI][ANALYZER] Réponse brute reçue (${data.response?.length || 0} chars)`);
+
+    // Extraire le JSON de la réponse
+    const match = data.response.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      console.log(`[AI][ANALYZER] Analyse réussie: type=${parsed.type}, intent=${parsed.intent}`);
+      return parsed;
+    }
+
+    throw new Error("Aucun JSON trouvé dans la réponse");
+
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error(`[AI][ANALYZER] Erreur: ${error.message}`);
+    throw error;
+  }
 }
 
 function assessComplexity(query: string, concepts: string[]): number {
-  let score = 0.2; // Base
+  let score = 0.2;
 
-  // Longueur de la requête
   score += Math.min(query.length / 300, 0.3);
-
-  // Densité de concepts techniques
   score += Math.min(concepts.length * 0.15, 0.4);
 
-  // Présence de connecteurs logiques (Si, Alors, Pourquoi, Comment)
   if (query.match(/si|alors|pourquoi|comment|différence|comparer/i)) {
     score += 0.1;
   }
@@ -104,8 +142,9 @@ function fallbackAnalysis(query: string): QueryAnalysis {
   } else if (q.includes('pourquoi') || q.includes('explique')) {
     type = 'explanatory';
     intent = 'explain';
-  } else if (q.match(/\d+[\+\-\*\/]\d+/)) {
-    intent = 'calculate';
+  } else if (q.includes('puissance') || q.includes('valeur') || q.includes('quel')) {
+    type = 'factual';
+    intent = 'inform';
   }
 
   return {

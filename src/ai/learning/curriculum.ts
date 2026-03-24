@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview AdaptiveCurriculum - Innovation 27.
  * Gère la progression pédagogique de l'utilisateur du simple au complexe.

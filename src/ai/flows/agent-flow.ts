@@ -1,5 +1,5 @@
 // src/ai/flows/agent-flow.ts - Version simplifiée temporaire
-'use server';
+
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';

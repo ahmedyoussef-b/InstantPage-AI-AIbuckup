@@ -1,4 +1,4 @@
-// src/ai/genkit.ts - VERSION CORRIGÉE
+// src/ai/genkit.ts - MIGRATION OLLAMA
 
 import { genkit } from 'genkit';
 import { ollama } from 'genkitx-ollama';
@@ -6,19 +6,13 @@ import { ollama } from 'genkitx-ollama';
 export const ai = genkit({
   plugins: [
     ollama({
-      // La configuration du serveur se fait via variable d'environnement
+      // @ts-ignore
+      serverAddress: (process.env.OLLAMA_URL || 'http://localhost:11434').trim(),
       models: [
-        {
-          name: 'tinyllama:latest',
-          type: 'generate'
-        },
-        {
-          name: 'nomic-embed-text',
-          type: 'embedding'
-        }
+        { name: 'phi:2.7b', type: 'chat' },
+        { name: 'tinyllama:latest', type: 'chat' }
       ],
-      // Pas de propriété 'server' ici
     }),
   ],
-  model: 'ollama/tinyllama:latest',
+  model: 'ollama/phi:2.7b',
 });

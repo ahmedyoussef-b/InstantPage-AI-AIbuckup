@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview ContinuousTraining - Innovation Elite 32.3.
  * Orchestration du cycle d'auto-amélioration continue.

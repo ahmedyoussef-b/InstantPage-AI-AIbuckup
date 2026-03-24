@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview DemonstrationLearner - Innovation 22.
  * L'IA apprend des actions de l'utilisateur pour suggérer des workflows automatisés.

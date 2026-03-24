@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview TaskExecutor - Phase 3 de l'Architecture Agentic.
  * Exécution résiliente du plan via MCP.

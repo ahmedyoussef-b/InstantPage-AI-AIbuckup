@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview SelfImprovingAI - Innovation Elite Finale.
  * Orchestre le cycle d'auto-amélioration nocturne.

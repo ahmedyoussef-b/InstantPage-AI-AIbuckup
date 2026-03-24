@@ -1,125 +1,67 @@
+﻿// src/app/api/chat/route.ts
+// Version modifiée pour utiliser le provider hybride
+
 import { NextRequest, NextResponse } from 'next/server';
-/**
- * @fileOverview Chat API Route - Orchestrateur de l'Intelligence Hybride Elite 32.
- * Route hybride basculant dynamiquement entre le RAG Enhancée et l'Agent Autonome (MCP).
- */
-import { analyzeQuery } from '@/ai/rag/query-analyzer';
-import { chat } from '@/ai/flows/chat-flow';
-import { processAgentMission } from '@/ai/agent/agent-core';
-import { getCurrentActiveModel } from '@/ai/training/model-registry';
-import { implicitRL } from '@/ai/learning/implicit-rl';
+import { callHybridProvider } from '@/ai/providers/hybrid-provider';
 
-export async function POST(req: NextRequest) {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[API][CHAT][${requestId}] Nouvelle requête reçue.`);
-
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
-    const { prompt, history = [], userId = 'default-user', mode = 'auto' } = await req.json();
-
-    if (!prompt) {
-      console.warn(`[API][CHAT][${requestId}] Erreur: Message manquant.`);
-      return NextResponse.json({ error: "Le message est requis." }, { status: 400 });
-    }
-
-    // 🔥 BYPASS URGENT POUR LES SALUTATIONS ET MOTS COURTS (Évite 40s+ de latence)
-    const greetings = [
-      'bonjour', 'bonsoir', 'salut', 'coucou', 'hello', 'hi', 'hey', 'bjr',
-      'bonjour?', 'bonsoir?', 'salut?', 'coucou?', 'hello?', 'hi?', 'hey?', 'bjr?',
-      'bonjour !', 'bonsoir !', 'salut !', 'coucou !', 'hello !', 'hi !', 'hey !',
-      'slaut', 'slt', 'cc', 'yo', 'salutations'
-    ];
+    const body = await request.json();
     
-    const promptLower = prompt.toLowerCase().trim();
-    const isGreeting = greetings.some(g => promptLower.includes(g) && promptLower.length < 30) || promptLower.length < 7;
+    // Extraire la question (supporte plusieurs formats)
+    const query = body.prompt || body.text || body.message || body.query;
     
-    if (isGreeting) {
-      console.log(`[API][CHAT][${requestId}] ✅ Salutation/Mot très court détecté - BYPASS TOTAL`);
-      const hour = new Date().getHours();
-      const greeting = (hour >= 18 || hour < 6) ? "Bonsoir" : "Bonjour";
-      
-      return NextResponse.json({
-        answer: `${greeting} ! Comment puis-je vous aider aujourd'hui ?`,
-        sources: [],
-        suggestions: ["Que puis-je faire pour vous ?", "Posez-moi une question technique"],
-        confidence: 0.98,
-        isAgentMission: false,
-        learning: { recorded: false, timestamp: Date.now() }
-      });
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json(
+        { 
+          error: 'Requête invalide. La requête doit contenir "prompt", "text", "message" ou "query"',
+          answer: "Veuillez poser une question valide."
+        },
+        { status: 400 }
+      );
     }
-
-    // PHASE 1: COMPRENDRE - Analyse sémantique de l'intention
-    console.log(`[API][CHAT][${requestId}] Analyse de l'intention...`);
-    const analysis = await analyzeQuery(prompt);
-    console.log(`[API][CHAT][${requestId}] Type détecté: ${analysis.type}, Complexité: ${analysis.complexity.toFixed(2)}`);
     
-    // Logique de routage : Agent vs Chat RAG
-    const useAgent = mode === 'agent' || (mode === 'auto' && (analysis.complexity > 0.75 || analysis.type === 'action'));
-    console.log(`[API][CHAT][${requestId}] Stratégie de routage : ${useAgent ? 'AGENT AUTONOME (MCP)' : 'CHAT RAG ENHANCÉ'}`);
-
-    let responseData;
-
-    if (useAgent) {
-      // --- BRANCHE 1: AGENT INTELLIGENT (Mission Autonome MCP) ---
-      console.log(`[API][CHAT][${requestId}][AGENT] Déclenchement de la mission...`);
-      const agentRes = await processAgentMission(prompt, userId);
-      
-      responseData = {
-        answer: agentRes.summary,
-        details: agentRes.details,
-        sources: [],
-        suggestions: agentRes.suggestions,
-        isAgentMission: true,
-        steps: agentRes.steps,
-        confidence: agentRes.confidence,
-        patternsLearned: agentRes.patternsLearned
-      };
-      console.log(`[API][CHAT][${requestId}][AGENT] Mission accomplie.`);
-    } else {
-      // --- BRANCHE 2: CHAT RAG ENHANCÉE (Raisonnement Métacognitif) ---
-      console.log(`[API][CHAT][${requestId}][RAG] Lancement du flux RAG Elite...`);
-      
-      // Charger le profil utilisateur pour adapter la réponse (Implicit RL)
-      implicitRL.loadProfile();
-      
-      const chatRes = await chat({
-        text: prompt,
-        history: history,
-        userProfile: implicitRL.getProfile()
-      } as any);
-
-      responseData = {
-        answer: chatRes.answer,
-        sources: chatRes.sources || [],
-        suggestions: chatRes.suggestions || [],
-        confidence: chatRes.confidence || 0.8,
-        isAgentMission: false,
-        pedagogicalLevel: chatRes.pedagogicalLevel,
-        collaborativeInsight: chatRes.collaborativeInsight,
-        recommendations: chatRes.recommendations,
-        disclaimer: chatRes.disclaimer,
-        newMemoryEpisode: chatRes.newMemoryEpisode
-      };
-      console.log(`[API][CHAT][${requestId}][RAG] Réponse RAG prête.`);
-    }
-
-    // Récupérer le modèle actif pour le reporting
-    const activeModel = await getCurrentActiveModel();
-    console.log(`[API][CHAT][${requestId}] Succès (Modèle: ${activeModel.id}).`);
-
+    console.log(`[API] Requête reçue: "${query.substring(0, 100)}${query.length > 100 ? '...' : ''}"`);
+    
+    // Appel au provider hybride (RAG + Fallback)
+    const result = await callHybridProvider(query);
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`[API] Réponse en ${processingTime}ms (source: ${result.source}, confidence: ${result.confidence})`);
+    
+    // Retourner la réponse avec métadonnées
     return NextResponse.json({
-      ...responseData,
-      learning: {
-        recorded: true,
-        modelVersion: activeModel.id,
-        timestamp: Date.now()
-      }
+      answer: result.answer,
+      source: result.source,
+      confidence: result.confidence,
+      sources: result.sources || [],
+      processingTime: result.processingTime || processingTime,
+      timestamp: new Date().toISOString()
     });
-
+    
   } catch (error: any) {
-    console.error(`[API][CHAT][${requestId}][FATAL]`, error);
-    return NextResponse.json({ 
-      error: "L'assistant a rencontré une difficulté technique lors de l'analyse.",
-      details: error.message 
+    console.error('[API] Erreur:', error.message);
+    console.error(error.stack);
+    
+    return NextResponse.json({
+      answer: `❌ Erreur: ${error.message}`,
+      source: 'error',
+      confidence: 0,
+      error: error.message,
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
+}
+
+// Option GET pour tester si l'API est disponible
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'API Chat - Mode hybride RAG + Fallback',
+    version: '2.0',
+    providers: ['rag', 'fallback', 'generic'],
+    timestamp: new Date().toISOString()
+  });
 }

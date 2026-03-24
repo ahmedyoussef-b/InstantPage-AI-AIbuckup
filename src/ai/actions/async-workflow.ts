@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview AsyncWorkflow - Innovation 23.
  * Gestion des tâches longues en arrière-plan avec suivi de progression.

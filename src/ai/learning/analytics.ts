@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview LearningAnalytics - Innovation Elite 32.
  * Agrégation des métriques de performance pour le RAG, l'Agent et l'Apprentissage.

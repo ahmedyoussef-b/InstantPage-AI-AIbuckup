@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview PredictiveActionEngine - Innovation 24 (Bonus).
  * Analyse les patterns pour suggérer des actions proactives à l'utilisateur.

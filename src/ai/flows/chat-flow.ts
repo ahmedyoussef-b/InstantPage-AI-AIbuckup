@@ -1,18 +1,18 @@
-'use server';
 /**
- * @fileOverview Elite 32 Orchestrator - Point d'entrée Chat (Version RAG Enhancée)
- * @version 3.1.0
- * @lastUpdated 2026-03-20
+ * @fileOverview Elite 32 Orchestrator - Point d'entrée Chat (Version DeepSeek)
+ * @version 4.0.0
+ * @lastUpdated 2026-03-23
  */
 
 import { z } from 'genkit';
-import { runCompleteEliteLoop } from '@/ai/integration/complete-loop';
+import { runCompleteEliteLoop, runCompleteEliteLoopStream } from '@/ai/integration/complete-loop';
 import { evaluatePedagogicalLevel } from '@/ai/learning/curriculum';
 import { learnFromNetwork } from '@/ai/learning/collaborative-network';
 import { personalizedRecommender } from '@/ai/ml/personalized-recommender';
 import { SemanticCache } from '@/ai/semantic-cache';
 import { generateMetaPrompt } from '@/ai/prompts/meta-prompt-generator';
 import { validateResponseAgainstContext } from '@/ai/validation/context-validator';
+import { callDeepSeek } from '@/ai/providers/deepseek';
 
 // ============================================
 // SCHÉMAS DE VALIDATION
@@ -76,62 +76,25 @@ const semanticCache = new SemanticCache({
 });
 
 // ============================================
-// ORCHESTRATEUR PRINCIPAL
+// ORCHESTRATEUR PRINCIPAL AVEC DEEPSEEK
 // ============================================
 
 /**
- * Orchestrateur central Elite 32
+ * Orchestrateur central Elite 32 utilisant DeepSeek
  */
 export async function chat(input: ChatInput): Promise<ChatOutput> {
   const startTime = Date.now();
   console.log(`[ELITE-32][START] Requête: "${input.text.substring(0, 50)}..."`);
 
-  // 🔥 BYPASS ABSOLU POUR LES SALUTATIONS
-  const greetings = [
-    'bonjour', 'bonsoir', 'salut', 'coucou', 'hello', 'hi', 'hey', 'bjr',
-    'bonjour?', 'bonsoir?', 'salut?', 'coucou?', 'hello?', 'hi?', 'hey?', 'bjr?'
-  ];
-
-  const isGreeting = greetings.some(g =>
-    input.text.toLowerCase().trim() === g ||
-    input.text.toLowerCase().includes(g) && input.text.length < 30
-  );
-
-  if (isGreeting) {
-    console.log('[CHAT] ✅ Salutation détectée - BYPASS TOTAL');
-
-    // Réponse adaptée à l'heure
-    const hour = new Date().getHours();
-    let greeting = "Bonjour";
-    if (hour >= 18 || hour < 6) greeting = "Bonsoir";
-
-    return {
-      answer: `${greeting} ! Comment puis-je vous aider aujourd'hui ?`,
-      confidence: 0.98,
-      sources: [],
-      suggestions: [
-        "Que puis-je faire pour vous ?",
-        "Avez-vous des documents à analyser ?",
-        "Posez-moi une question technique"
-      ],
-      recommendations: [],
-      warnings: [],
-      pedagogicalLevel: "débutant",
-      collaborativeInsight: "Interaction sociale détectée",
-      processingTime: Date.now() - startTime
-    };
-  }
-
-  // Fonction de calcul principale
   const computeAnswer = async (): Promise<ChatOutput> => {
     try {
-      // 1. Analyse pré-générative
+      // Évaluation pédagogique et apprentissage réseau
       const [pedaLevel, collaborativeInsight] = await Promise.all([
         evaluatePedagogicalLevel(input.text, 0.7, input.history?.length || 0),
         learnFromNetwork(input.text)
       ]);
 
-      // 2. Générer le prompt
+      // Génération du prompt méta
       const metaPrompt = generateMetaPrompt(input.text, {
         userExpertise: input.userProfile?.expertise,
         domain: input.userProfile?.domain,
@@ -140,106 +103,125 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
         hasDocuments: !!input.documentContext
       });
 
-      // 3. Exécution de la boucle
-      const loopResult = await runCompleteEliteLoop({
-        userId: input.userProfile?.id || 'default-user',
-        query: input.text,
-        systemPrompt: metaPrompt,
-        documentContext: input.documentContext || "",
-        history: input.history || [],
-        episodicMemory: input.episodicMemory || [],
-        distilledRules: input.distilledRules || [],
-        userProfile: input.userProfile || {
-          id: 'default-user',
-          expertise: 'intermédiaire',
-          preferences: {},
-          domain: 'général'
-        },
-        hierarchyNodes: input.hierarchyNodes || [],
-        temperature: input.temperature,
-        maxTokens: input.maxTokens
-      });
+      // Construction du prompt complet
+      const fullPrompt = `
+${metaPrompt}
 
-      // 4. Validation de la réponse
-      const validation = await validateResponseAgainstContext(
-        loopResult.answer,
-        input.documentContext || ""
-      );
+## CONTEXTE DOCUMENTAIRE
+${input.documentContext || "Aucun document spécifique disponible."}
 
-      // 5. Recommandations
+## HISTORIQUE DE CONVERSATION
+${input.history?.map(m => `${m.role || 'user'}: ${m.content}`).join('\n') || "Aucun historique."}
+
+## QUESTION UTILISATEUR
+${input.text}
+
+## RÉPONSE
+`;
+
+      // Appel à DeepSeek (remplace l'ancien runCompleteEliteLoop)
+      console.log(`[ELITE-32][DEEPSEEK] Appel à l'API DeepSeek...`);
+      let answer: string;
+      let confidence = 0.85;
+      let warnings: string[] = [];
+
+      try {
+        answer = await callDeepSeek(fullPrompt, {
+          temperature: input.temperature,
+          maxTokens: input.maxTokens
+        });
+
+        // Évaluation de la confiance
+        if (answer.length < 20) {
+          confidence = 0.4;
+          warnings.push("⚠️ Réponse très courte");
+        } else if (answer.toLowerCase().includes("je ne sais pas") || answer.toLowerCase().includes("désolé")) {
+          confidence = 0.5;
+          warnings.push("⚠️ Réponse avec incertitude");
+        }
+
+      } catch (error: any) {
+        console.error('[ELITE-32][DEEPSEEK] Erreur:', error.message);
+        answer = `Désolé, une erreur est survenue avec l'API DeepSeek: ${error.message}`;
+        confidence = 0.1;
+        warnings.push(`❌ Erreur technique: ${error.message}`);
+      }
+
+      // Validation du contexte (si disponible)
+      let validation = { relevanceScore: confidence, hasHallucinations: false };
+      if (input.documentContext) {
+        validation = await validateResponseAgainstContext(answer, input.documentContext);
+        confidence = validation.relevanceScore;
+        if (validation.hasHallucinations) {
+          warnings.push("⚠️ Risque d'hallucination détecté");
+        }
+      }
+
+      // Recommandations personnalisées
       const recommendations = await personalizedRecommender.recommend(
         input.userProfile?.id || 'default-user',
         {
-          domain: input.text.toLowerCase().includes('chaudière') ? 'Maintenance' : 'Général',
+          domain: input.text.toLowerCase().includes('turbine') ? 'Turbine' : 'Général',
           limit: 2
         }
       );
 
       const processingTime = Date.now() - startTime;
 
-      console.log(`[ELITE-32][SUCCESS] Confiance: ${Math.round(validation.relevanceScore * 100)}%, Temps: ${processingTime}ms`);
+      console.log(`[ELITE-32][SUCCESS] Confiance: ${Math.round(confidence * 100)}%, Temps: ${processingTime}ms`);
 
       return {
-        answer: loopResult.answer,
-        confidence: validation.relevanceScore,
-        disclaimer: validation.relevanceScore < 0.5
-          ? "⚠️ Réponse avec fiabilité limitée"
-          : undefined,
-        sources: loopResult.sources?.map((s: any) => ({
-          id: s.id || 'unknown',
-          title: s.title || "Document source",
-          relevance: s.relevance || 0.8,
-          excerpt: s.excerpt
-        })) || [],
-        warnings: validation.hasHallucinations ? ["⚠️ Risque d'hallucination détecté"] : [],
+        answer: answer,
+        confidence: confidence,
+        disclaimer: confidence < 0.5 ? "⚠️ Réponse avec fiabilité limitée" : undefined,
+        sources: [],
+        warnings: warnings,
         suggestions: recommendations.map((r: any) => r.title || "Suggestion"),
         recommendations,
-        newMemoryEpisode: loopResult.newMemoryEpisode,
+        newMemoryEpisode: {
+          type: 'interaction',
+          content: answer.substring(0, 500),
+          context: input.text,
+          importance: confidence,
+          timestamp: Date.now()
+        },
         pedagogicalLevel: pedaLevel,
         collaborativeInsight,
         processingTime
       };
-    } catch (error) {
-      console.error('[ELITE-32][ERROR]', error);
 
+    } catch (error: any) {
+      console.error('[ELITE-32][ERROR]', error);
+      
       return {
-        answer: "Désolé, une erreur technique est survenue.",
+        answer: `Désolé, une erreur technique est survenue: ${error.message}`,
         confidence: 0.1,
         warnings: ["❌ Erreur système"],
         processingTime: Date.now() - startTime,
         sources: [],
-        suggestions: [],
+        suggestions: ["Réessayer plus tard"],
         recommendations: []
       };
     }
   };
 
-  // Cache sémantique
+  // Utilisation du cache sémantique
   const cacheKey = `${input.text}:${input.documentContext?.substring(0, 100)}:${input.userProfile?.expertise || 'default'}`;
-
-  const cached = await semanticCache.getOrCompute(cacheKey, async () => {
-    const result = await computeAnswer();
-    return JSON.stringify(result);
-  });
-
+  
   try {
-    const parsed = JSON.parse(cached);
+    const cached = await semanticCache.getOrCompute(cacheKey, async () => {
+      const result = await computeAnswer();
+      return JSON.stringify(result);
+    });
 
+    const parsed = JSON.parse(cached);
     if (!parsed.processingTime) {
       parsed.processingTime = 0;
       parsed.warnings = [...(parsed.warnings || []), "💡 Réponse du cache"];
     }
-
     return parsed;
   } catch {
-    return {
-      answer: cached,
-      sources: [],
-      warnings: ["⚠️ Format non standard"],
-      processingTime: Date.now() - startTime,
-      suggestions: [],
-      recommendations: []
-    };
+    return await computeAnswer();
   }
 }
 
@@ -247,23 +229,14 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 // FONCTIONS UTILITAIRES
 // ============================================
 
-/**
- * Vide le cache sémantique
- */
 export async function clearCache(): Promise<void> {
   await semanticCache.clear();
 }
 
-/**
- * Obtient les statistiques du cache
- */
 export async function getCacheStats() {
   return semanticCache.getStats();
 }
 
-/**
- * Version simplifiée pour les tests rapides
- */
 export async function chatSimple(query: string): Promise<string> {
   const result = await chat({
     text: query,
@@ -279,4 +252,30 @@ export async function chatSimple(query: string): Promise<string> {
     responseFormat: 'détaillé'
   });
   return result.answer;
+}
+
+/**
+ * Version streaming pour le client
+ */
+export async function* generateResponseStream(query: string, options: any = {}): AsyncIterable<string> {
+  console.log(`[ELITE-32][STREAM] Nouvelle session pour: ${query.substring(0, 30)}...`);
+  
+  try {
+    // Utiliser DeepSeek directement pour le streaming
+    const fullPrompt = `Tu es un expert en centrale électrique. Réponds: ${query}`;
+    const answer = await callDeepSeek(fullPrompt, {
+      temperature: options.temperature || 0.3,
+      maxTokens: options.maxTokens || 500
+    });
+    
+    // Simuler le streaming caractère par caractère
+    const chunkSize = 20;
+    for (let i = 0; i < answer.length; i += chunkSize) {
+      yield answer.substring(i, Math.min(i + chunkSize, answer.length));
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  } catch (error: any) {
+    console.error('[STREAM] Erreur:', error.message);
+    yield `Erreur: ${error.message}`;
+  }
 }

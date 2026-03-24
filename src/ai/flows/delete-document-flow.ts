@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Flux de suppression des documents et de leurs vecteurs.
  * 

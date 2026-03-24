@@ -8,11 +8,24 @@ export interface CacheEntry {
   metadata?: Record<string, unknown>;
 }
 
+export interface CacheStats {
+  size: number;
+  oldestEntry: number;
+  newestEntry: number;
+  hitRate?: number;
+  hits?: number;
+  misses?: number;
+}
+
 export class SemanticCache {
   private cache: Map<string, CacheEntry> = new Map();
   private similarityThreshold = 0.85;
   private maxCacheSize = 1000;
   private timer: NodeJS.Timeout | null = null;
+  private hits = 0;
+  private misses = 0;
+  private ollamaUrl: string;
+  private embeddingModel: string;
 
   constructor(options?: {
     similarityThreshold?: number;
@@ -25,6 +38,12 @@ export class SemanticCache {
     if (options?.maxCacheSize) {
       this.maxCacheSize = options.maxCacheSize;
     }
+
+    // ✅ Récupérer la configuration Ollama
+    this.ollamaUrl = process.env.OLLAMA_URL || 'https://ilse-counterpaned-disruptively.ngrok-free.dev';
+    this.embeddingModel = process.env.EMBEDDING_MODEL || 'nomic-embed-text';
+
+    console.log(`[CACHE] Initialisé avec Ollama: ${this.ollamaUrl}, modèle embedding: ${this.embeddingModel}`);
 
     // Nettoyage périodique
     if (typeof setInterval !== 'undefined') {
@@ -53,11 +72,13 @@ export class SemanticCache {
           entry.timestamp = Date.now();
         }
 
+        this.hits++;
         console.log(`[CACHE] ✅ Hit - Similarité: ${Math.round(similar.similarity * 100)}%`);
         return similar.response;
       }
 
       // 3. Pas dans le cache - calculer
+      this.misses++;
       console.log(`[CACHE] ❌ Miss - Calcul de nouvelle réponse`);
       const response = await computeFn();
 
@@ -78,26 +99,50 @@ export class SemanticCache {
     }
 
     try {
-      // Version réelle
-      const response = await fetch('http://127.0.0.1:11434/api/embeddings', {
+      // ✅ CORRIGÉ: Utiliser l'URL Ollama depuis la config avec le header ngrok
+      console.log(`[CACHE] Appel embedding: ${this.ollamaUrl}/api/embeddings`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondes timeout
+
+      const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true' // ✅ Header requis pour ngrok
+        },
         body: JSON.stringify({
-          model: 'nomic-embed-text',
+          model: this.embeddingModel,
           prompt: text
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Embedding API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
+
+      if (!data.embedding || !Array.isArray(data.embedding)) {
+        throw new Error('Invalid embedding response format');
+      }
+
+      console.log(`[CACHE] Embedding généré avec succès (dimensions: ${data.embedding.length})`);
       return data.embedding;
 
-    } catch (error) {
-      console.error('❌ Erreur embedding:', error);
-      // Fallback: embedding stable
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('❌ Erreur embedding: timeout après 30 secondes');
+      } else {
+        console.error('❌ Erreur embedding:', error.message);
+      }
+
+      // Fallback: embedding stable pour ne pas bloquer
+      console.log('[CACHE] Utilisation du fallback embedding');
       return this.generateStableEmbedding(text);
     }
   }
@@ -210,7 +255,10 @@ export class SemanticCache {
     }
   }
 
-  getStats(): { size: number; oldestEntry: number; newestEntry: number } {
+  /**
+   * Retourne les statistiques du cache
+   */
+  getStats(): CacheStats {
     let oldest = Date.now();
     let newest = 0;
 
@@ -219,23 +267,74 @@ export class SemanticCache {
       newest = Math.max(newest, entry.timestamp);
     }
 
+    const totalQueries = this.hits + this.misses;
+    const hitRate = totalQueries > 0 ? this.hits / totalQueries : 0;
+
     return {
       size: this.cache.size,
       oldestEntry: oldest,
-      newestEntry: newest
+      newestEntry: newest,
+      hits: this.hits,
+      misses: this.misses,
+      hitRate
     };
   }
 
+  /**
+   * Réinitialise les compteurs de hits/misses
+   */
+  resetStats(): void {
+    this.hits = 0;
+    this.misses = 0;
+    console.log('[CACHE] Statistiques réinitialisées');
+  }
+
+  /**
+   * Vide complètement le cache
+   */
   clear(): void {
     this.cache.clear();
+    this.resetStats();
     console.log('[CACHE] Vidé');
   }
 
+  /**
+   * Détruit le cache et arrête le timer
+   */
   destroy(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
+    this.clear();
+  }
+
+  /**
+   * Retourne la taille actuelle du cache
+   */
+  get size(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * Vérifie si une entrée existe dans le cache
+   */
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+
+  /**
+   * Récupère une entrée du cache par sa clé
+   */
+  get(key: string): CacheEntry | undefined {
+    return this.cache.get(key);
+  }
+
+  /**
+   * Supprime une entrée du cache
+   */
+  delete(key: string): boolean {
+    return this.cache.delete(key);
   }
 }
 

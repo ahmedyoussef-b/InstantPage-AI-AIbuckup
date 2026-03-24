@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview IntelligentAgent Core - Orchestrateur central Elite 32.
  * Unifie les phases : Comprendre -> Raisonner -> Agir -> Apprendre.

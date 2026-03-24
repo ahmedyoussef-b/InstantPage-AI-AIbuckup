@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Model Context Protocol (MCP) - Innovation Elite 32.
  * Gère l'unification du contexte et l'accès sécurisé aux outils pour l'agent.

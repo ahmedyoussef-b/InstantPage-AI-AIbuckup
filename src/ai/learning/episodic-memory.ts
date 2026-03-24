@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview EpisodicMemory - Innovation 25.
  * Gestion de la mémoire à horizons temporels : Travail, Court terme, Long terme.

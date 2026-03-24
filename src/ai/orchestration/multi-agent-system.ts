@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview MultiAgentSystem - Innovation 20.
  * Orchestration de plusieurs agents IA spécialisés collaborant sur une tâche.

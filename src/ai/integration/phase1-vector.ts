@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Phase 1: COMPRENDRE - Retriever Intelligent Multi-Sources.
  */

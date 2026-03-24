@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview ModelEvaluator - Innovation Elite 32.
  * Évalue la performance du nouveau modèle fine-tuné.

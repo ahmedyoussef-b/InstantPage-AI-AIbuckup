@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview CrossDomainTransfer - Innovation 30.
  * Permet d'appliquer des connaissances d'un domaine source à un domaine cible.

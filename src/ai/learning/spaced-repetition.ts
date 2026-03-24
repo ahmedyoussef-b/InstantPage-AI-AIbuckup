@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview SpacedRepetition - Innovation 29.
  * Gère la planification des révisions pour optimiser la rétention à long terme.

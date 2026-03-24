@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview A Genkit flow for generating a draft of homepage content for the 'InstantPage' application.
  *

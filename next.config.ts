@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ['@mapbox/node-pre-gyp', 'pnpapi', 'sqlite3'],
   typescript: {
     ignoreBuildErrors: true,
   },

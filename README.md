@@ -36,21 +36,74 @@ Lorsqu'une question est posée :
 
 ```text
 📁 RACINE DU PROJET
-├── 📁 data/                    # 🗄️ BASE VECTORIELLE & PERSISTANCE (Local)
-│   ├── 📁 chromadb/            # Index vectoriel ChromaDB
+├── 📁 data/                    # 🗄️ PERSISTANCE & CACHE (Local)
 │   ├── 📁 procedures/          # Guides techniques JSON
-│   ├── 📁 images/              # Base de données Vision (MobileNet)
+│   ├── 📁 stt/                 # Modèles et cache Speech-to-Text
 │   └── 📁 tts/                 # Modèles et cache vocal
+├── 📁 models/                  # 🤖 MODÈLES IA LOCAUX (NER, etc.)
 ├── 📁 src/
 │   ├── 📁 ai/                  # 🧠 LE CERVEAU (Elite 32 Logic)
-│   │   ├── 📁 agent/           # Orchestration Agentic & MCP
-│   │   ├── 📁 rag/             # Intelligent Retriever & Context Assembler
-│   │   ├── 📁 reasoning/       # CoT, Méta-cognition, Arbre Latent
-│   │   ├── 📁 learning/        # Mémoire Épisodique & RL Implicite
-│   │   └── 📁 training/        # Pipeline ML (LoRA, Fine-tuning local)
-│   ├── 📁 app/                 # 📱 ROUTAGE & INTERFACE (Next.js 15)
-│   └── 📁 components/          # 🧩 COMPOSANTS UI (Shadcn + Features)
+│   │   ├── 📁 actions/         # (toolformer-local.ts, async-workflow.ts, predictive-engine.ts, etc.)
+│   │   ├── 📁 agent/           # (agent-core.ts, task-planner.ts, task-executor.ts, agent-learner.ts)
+│   │   ├── 📁 flows/           # (chat-flow.ts, ingest-document-flow.ts, agent-flow.ts)
+│   │   ├── 📁 integration/     # (complete-loop.ts, self-improvement.ts, phase-vectors)
+│   │   ├── 📁 learning/        # (episodic-memory.ts, implicit-rl.ts, meta-learning.ts)
+│   │   ├── 📁 mcp/             # (service.ts)
+│   │   ├── 📁 ml/              # (inference-engine.ts, model-trainer.ts, recommender.ts)
+│   │   ├── 📁 orchestration/   # (agentic-loop.ts, multi-agent-system.ts)
+│   │   ├── 📁 rag/             # (intelligent-retriever.ts, context-assembler.ts, local-llm.ts)
+│   │   ├── 📁 reasoning/       # (dynamic-cot.ts, metacognition.ts, confidence-scorer.ts)
+│   │   ├── 📁 training/        # (training-pipeline.ts, model-evaluator.ts, continuous-training.ts)
+│   │   └── 📁 vector/          # (complete-schema.ts, dynamic-revectorization.ts, chroma-manager.ts [PLANNED])
+│   ├── 📁 app/                 # 📱 ROUTAGE & PAGES (Next.js 15 App Router)
+│   ├── 📁 components/          # 🧩 COMPOSANTS UI & FEATURE-BASED
+│   ├── 📁 hooks/               # 🎣 HOOKS REACT PERSONNALISÉS
+│   ├── 📁 lib/                 # 🛠️ UTILITAIRES & CONFIGURATION
+│   └── 📁 types/               # 🏷️ DÉFINITIONS TYPESCRIPT GLOBAL
 ```
+
+## 🧠 Architecture d'Intégration ChromaDB (Évolution)
+
+### 1. Points d'Extension Nécessaires
+Actuellement, AGENTIC utilise probablement un système vectoriel interne. Nous allons ajouter ChromaDB comme couche de persistance unifiée tout en conservant l'architecture existante.
+
+### 2. Vue d'Ensemble de l'Intégration
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           AGENTIC - ELITE 32 CORE                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────────┐ │
+│  │   Chat Flow     │    │  Ingest Flow    │    │     Agent Flow          │ │
+│  │ (chat-flow.ts) │───▶│(ingest-doc...) │───▶│  (agent-core.ts)        │ │
+│  └────────┬────────┘    └────────┬────────┘    └───────────┬─────────────┘ │
+│           │                      │                         │               │
+│           ▼                      ▼                         ▼               │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    ChromaDB Adapter Layer (NEW)                     │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
+│  │  │  ChromaDBManager.ts - Gestionnaire unifié                   │   │   │
+│  │  │  • Collections Manager                                      │   │   │
+│  │  │  • Metadata Schema Validator                                │   │   │
+│  │  │  • Connection Pool                                          │   │   │
+│  │  └─────────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                      │
+│                                      ▼                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        ChromaDB (Local)                             │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐               │   │
+│  │  │   Documents  │ │   Episodic   │ │   Knowledge  │               │   │
+│  │  │  Collection  │ │   Memory     │ │    Graph     │               │   │
+│  │  │              │ │  Collection  │ │  Collection  │               │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │              Ollama (Local Embeddings)                               │   │
+│  │  • nomic-embed-text (Document embeddings)                           │   │
+│  │  • llm (Mistral/Llama pour raisonnement)                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 
 ---
 *AGENTIC - Propulsé par l'innovation Elite AI. 100% Local. 100% Privé.*

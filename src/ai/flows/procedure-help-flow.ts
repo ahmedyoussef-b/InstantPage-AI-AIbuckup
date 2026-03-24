@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Flux d'aide contextuelle pour les procédures techniques.
  * 

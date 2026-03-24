@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview ToolRegistry - Gestionnaire intelligent des outils.
  */

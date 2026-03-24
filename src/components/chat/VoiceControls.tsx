@@ -1,188 +1,225 @@
+// src/app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useVoice } from '@/hooks/useVoice';
-import { VoiceInfo } from '@/types/voice';
-import { 
-  Volume2, 
-  Settings2, 
-  X, 
-  PlayCircle, 
-  PauseCircle, 
-  StopCircle, 
-  Trash2, 
-  Mic, 
-  ChevronRight,
-  UserCircle
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
+import Chat from '@/components/chat/Chat';
+import Upload from '@/components/upload/DocumentUploader';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Bot,
+  MessageSquare,
+  ShieldCheck,
+  HardDrive,
+  Menu,
+  ChevronLeft,
+  ChevronRight,
+  Cpu,
+  Camera,
+  UploadCloud,
+  Database,
+  BookOpen
+} from 'lucide-react';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-export default function VoiceControls() {
-  const {
-    isPlaying,
-    isPaused,
-    queue,
-    volume,
-    speed,
-    pause,
-    resume,
-    stop,
-    setVolume,
-    setSpeed,
-    clearQueue
-  } = useVoice();
+export default function HomePage() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const [voices, setVoices] = useState<VoiceInfo[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>('fr-FR-female-1');
-  const [showSettings, setShowSettings] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/voice/voices')
-      .then(res => res.json())
-      .then(data => setVoices(data.voices || []))
-      .catch(err => console.error("Erreur chargement voix:", err));
-  }, []);
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
-      {/* Panneau de contrôle */}
-      {showSettings && (
-        <div className="w-80 bg-[#171717] rounded-3xl shadow-2xl border border-white/10 p-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-blue-400" />
-              <h3 className="text-sm font-black uppercase tracking-widest text-white">Synthèse Vocale</h3>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings(false)} className="h-8 w-8 rounded-full hover:bg-white/10">
-              <X className="w-4 h-4 text-gray-500" />
-            </Button>
+  const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
+    <div className="p-4 md:p-6 flex flex-col h-full bg-[#171717] overflow-hidden">
+      <Link href="/" className={cn(
+        "flex items-center gap-3 px-2 py-1 mb-10 hover:opacity-80 transition-all group shrink-0",
+        collapsed && "justify-center px-0"
+      )}>
+        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/20 shrink-0">
+          <Bot className="w-6 h-6 text-white" />
+        </div>
+        {!collapsed && (
+          <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+            <div className="font-bold text-white tracking-tighter text-lg leading-none">AGENTIC</div>
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Hybrid RAG AI</div>
           </div>
-          
-          {/* État de lecture */}
-          {(isPlaying || isPaused) && (
-            <div className="mb-6 p-4 bg-blue-600/10 border border-blue-500/20 rounded-2xl">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                  {isPlaying ? '• Lecture active' : '• En pause'}
-                </span>
-                <div className="flex gap-1">
-                  {isPlaying ? (
-                    <Button variant="ghost" size="icon" onClick={pause} className="h-7 w-7 text-white hover:bg-white/10">
-                      <PauseCircle className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="icon" onClick={resume} className="h-7 w-7 text-white hover:bg-white/10">
-                      <PlayCircle className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={stop} className="h-7 w-7 text-red-400 hover:bg-red-400/10">
-                    <StopCircle className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              {queue.length > 0 && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-                  <span className="text-[10px] text-gray-500 font-medium">File d'attente: {queue.length}</span>
-                  <Button variant="ghost" size="sm" onClick={clearQueue} className="h-6 px-2 text-[9px] font-black uppercase text-red-400">
-                    <Trash2 className="w-3 h-3 mr-1" /> Vider
-                  </Button>
-                </div>
-              )}
+        )}
+      </Link>
+
+      <div className="flex-1 space-y-6 overflow-y-auto no-scrollbar">
+        <div className="space-y-1">
+          {!collapsed && (
+            <div className="text-[10px] font-bold text-gray-600 px-3 py-2 uppercase tracking-[0.2em] mb-2 animate-in fade-in">
+              Navigation
             </div>
           )}
 
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Volume</label>
-                <span className="text-[10px] text-blue-400 font-mono">{Math.round(volume * 100)}%</span>
-              </div>
-              <Slider
-                value={[volume]}
-                min={0}
-                max={1}
-                step={0.01}
-                onValueChange={(vals) => setVolume(vals[0])}
-                className="py-2"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Vitesse</label>
-                <span className="text-[10px] text-blue-400 font-mono">{speed.toFixed(1)}x</span>
-              </div>
-              <Slider
-                value={[speed]}
-                min={0.5}
-                max={2}
-                step={0.1}
-                onValueChange={(vals) => setSpeed(vals[0])}
-                className="py-2"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Voix & Moteur</label>
-              <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white h-11 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <UserCircle className="w-4 h-4 text-blue-400" />
-                    <SelectValue placeholder="Choisir une voix" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#1e1e1e] border-white/10 text-white">
-                  {voices.map(voice => (
-                    <SelectItem key={voice.id} value={voice.id} className="focus:bg-blue-600 focus:text-white">
-                      {voice.name} ({voice.language})
-                    </SelectItem>
-                  ))}
-                  {voices.length === 0 && (
-                    <SelectItem value="default" disabled className="text-gray-500 italic">Chargement des voix...</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
-            <Badge variant="outline" className="text-[8px] border-white/10 text-gray-500 uppercase font-black">Moteur: Piper (Local)</Badge>
-            <span className="text-[8px] text-gray-600 uppercase font-black">Version 1.2</span>
-          </div>
-        </div>
-      )}
-
-      {/* Bouton Trigger Principal */}
-      <Button
-        onClick={() => setShowSettings(!showSettings)}
-        className={`w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all duration-500 group ${
-          showSettings ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-500'
-        }`}
-      >
-        {showSettings ? (
-          <X className="w-6 h-6 text-white" />
-        ) : (
-          <div className="relative">
-            <Volume2 className={`w-6 h-6 text-white transition-transform ${isPlaying ? 'animate-pulse scale-110' : ''}`} />
-            {isPlaying && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-              </span>
+          {/* Chat Intelligent */}
+          <Link
+            href="/"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-blue-600/10 border border-blue-500/20 rounded-xl transition-all",
+              collapsed && "justify-center px-0 border-none bg-transparent hover:bg-blue-600/10"
             )}
+          >
+            <MessageSquare className="w-4 h-4 text-blue-400 shrink-0" />
+            {!collapsed && <span className="truncate">Chat Intelligent</span>}
+          </Link>
+
+          {/* Recherche par Image */}
+          <Link
+            href="/vision"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <Camera className="w-4 h-4 group-hover:text-purple-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Recherche par Image</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-purple-500/10 text-purple-400 border-none text-[8px] font-black uppercase">
+                NOUVEAU
+              </Badge>
+            )}
+          </Link>
+
+          {/* Base de Connaissances */}
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <HardDrive className="w-4 h-4 group-hover:text-purple-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Base de Connaissances</span>}
+          </Link>
+
+          {/* Upload de Documents */}
+          <Link
+            href="/documents/upload"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <UploadCloud className="w-4 h-4 group-hover:text-green-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Upload Documents</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-green-500/10 text-green-400 border-none text-[8px] font-black uppercase">
+                IMPORT
+              </Badge>
+            )}
+          </Link>
+
+          {/* Gestion des Documents */}
+          <Link
+            href="/documents/manage"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <Database className="w-4 h-4 group-hover:text-blue-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Gérer Documents</span>}
+          </Link>
+
+          {/* Documentation */}
+          <Link
+            href="/docs"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <BookOpen className="w-4 h-4 group-hover:text-orange-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Documentation</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-orange-500/10 text-orange-400 border-none text-[8px] font-black uppercase">
+                GUIDE
+              </Badge>
+            )}
+          </Link>
+        </div>
+
+        {!collapsed && (
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-yellow-400" />
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">Innovation AI</span>
+            </div>
+            <p className="text-[9px] text-gray-500 leading-relaxed">
+              Le RAG Hybride combine sémantique et graphe de relations pour une précision maximale.
+            </p>
           </div>
         )}
-      </Button>
+      </div>
+
+      <div className="pt-6 mt-auto border-t border-white/5 space-y-4 shrink-0">
+        {!collapsed ? (
+          <>
+            <div className="px-3 py-2 flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
+                <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
+              </div>
+              <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local VFS</Badge>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-center py-2" title="Mode Sécurisé Local">
+            <ShieldCheck className="w-5 h-5 text-green-500" />
+          </div>
+        )}
+      </div>
     </div>
+  );
+
+  return (
+    <main className="h-screen flex bg-[#171717] overflow-hidden selection:bg-blue-500/30">
+      {/* Desktop Sidebar */}
+      <aside className={cn(
+        "flex-col hidden lg:flex border-r border-white/5 bg-[#171717] transition-all duration-300 relative z-30",
+        isCollapsed ? "w-20" : "w-72"
+      )}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-4 top-12 z-50 bg-[#171717] border border-white/5 rounded-full h-8 w-8 hover:bg-blue-600 hover:text-white shadow-xl transition-all"
+        >
+          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </Button>
+        <SidebarContent collapsed={isCollapsed} />
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
+        {/* Mobile Header */}
+        <header className="h-16 border-b border-white/5 flex items-center px-4 justify-between lg:hidden bg-[#171717] sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-white" aria-label="Ouvrir le menu">
+                  <Menu className="w-6 h-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 border-none w-72 bg-[#171717]">
+                <SheetHeader className="p-6">
+                  <SheetTitle className="text-white text-sm uppercase font-black tracking-widest">Menu de Navigation</SheetTitle>
+                </SheetHeader>
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
+            <h1 className="font-bold text-white text-sm uppercase tracking-widest text-center flex-1">Assistant Professionnel</h1>
+          </div>
+        </header>
+
+        {/* Chat Interface */}
+        <div className="flex-1 overflow-hidden relative">
+          <Chat />
+        </div>
+
+        {/* Document Ingestion Bar */}
+        <Upload />
+      </div>
+    </main>
   );
 }

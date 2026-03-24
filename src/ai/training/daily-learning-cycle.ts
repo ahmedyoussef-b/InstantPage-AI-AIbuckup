@@ -1,5 +1,5 @@
 
-'use server';
+
 /**
  * @fileOverview DailyLearningCycle - Point d'entrée pour le cycle nocturne.
  */

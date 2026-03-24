@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Phase3VectorIntegration - Innovation Elite 32.
  * Utilise la base vectorielle pour guider et adapter les actions de l'IA.

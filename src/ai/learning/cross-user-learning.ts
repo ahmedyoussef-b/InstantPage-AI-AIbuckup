@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview CrossUserLearning - Innovation 32.2.
  * Apprentissage des patterns communs entre utilisateurs via clustering anonymisé.

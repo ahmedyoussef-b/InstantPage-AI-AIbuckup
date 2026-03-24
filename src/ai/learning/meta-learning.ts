@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview MetaLearning - Innovation 31.
  * L'IA apprend à optimiser son propre processus d'apprentissage.

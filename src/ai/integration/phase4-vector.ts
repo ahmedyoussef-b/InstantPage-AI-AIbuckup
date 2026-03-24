@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Phase4VectorIntegration - Innovation Elite 32.
  */
@@ -39,11 +39,11 @@ export async function apprendreVector(
 async function extractLessons(query: string, answer: string): Promise<Lesson[]> {
   try {
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("LLM Extraction Timeout")), 15000);
+      setTimeout(() => reject(new Error("LLM Extraction Timeout")), 30000); // 30s timeout
     });
 
     const generatePromise = ai.generate({
-      model: 'ollama/tinyllama:latest',
+      model: 'openai/gpt-3.5-turbo',
       system: "Tu es un Extracteur de Savoir Elite. Identifie une règle technique universelle issue de cet échange.",
       prompt: `Question : ${query}\nRéponse : ${answer}\n\nJSON: [{"content": "...", "importance": 0.X}]`,
     });

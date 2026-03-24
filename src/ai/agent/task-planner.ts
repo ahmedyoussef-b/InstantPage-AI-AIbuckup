@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview TaskPlanner - Phase 2 de l'Architecture Agentic.
  * Gère la décomposition des intentions complexes en étapes atomiques.

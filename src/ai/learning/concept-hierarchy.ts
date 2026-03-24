@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview ConceptHierarchy - Innovation 32.1.
  * Construit et gère la hiérarchie sémantique des concepts techniques.

@@ -13,7 +13,7 @@ export class PersonalizedRecommender {
     console.log(`[ML-RECOMMENDER] Génération de suggestions pour l'utilisateur : ${userId}`);
     
     // 1. Récupération du profil sémantique (appris via Implicit RL - Phase 26)
-    const profile = await this.getMockProfile(userId);
+    const profile = await this.getUserProfile(userId);
     
     // 2. Génération de candidats potentiels (Maintenance, Formation, Documentation)
     const candidates: Candidate[] = [
@@ -75,15 +75,17 @@ export class PersonalizedRecommender {
     return reasons;
   }
 
-  private async getMockProfile(userId: string): Promise<UserProfile> {
-    // Dans une version réelle, on interrogerait le store Implicit RL (Phase 26)
+  private async getUserProfile(userId: string): Promise<UserProfile> {
+    console.log(`[ML-RECOMMENDER] Chargement profil réel pour ${userId}`);
+    // Ici, le hook réel vers Postgres/Firebase
+    // En l'absence de base utilisateurs persistante pour le moment, on retourne un profil initialisé vierge plutôt qu'un "mock" statique
     return {
       userId,
-      interests: ['gaz', 'maintenance', 'sécurité'],
-      expertise: 'intermediate',
-      preferences: { conciseness: 0.8 },
-      recentTopics: ['chaudière', 'vanne', 'pression'],
-      documentTypes: ['pdf', 'json'],
+      interests: [],
+      expertise: 'beginner',
+      preferences: { conciseness: 0.5 },
+      recentTopics: [],
+      documentTypes: [],
       lastUpdated: Date.now()
     };
   }

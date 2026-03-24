@@ -1,19 +1,22 @@
-// src/app/page.tsx
+﻿// src/app/page.tsx
 'use client';
 
 import { useState } from 'react';
 import Chat from '@/components/chat/Chat';
-import Upload from '@/components/upload/Upload';
-import { 
-  Bot, 
-  MessageSquare, 
-  ShieldCheck, 
-  HardDrive, 
-  Menu, 
-  ChevronLeft, 
+import Upload from '@/components/upload/DocumentUploader';
+import {
+  Bot,
+  MessageSquare,
+  ShieldCheck,
+  HardDrive,
+  Menu,
+  ChevronLeft,
   ChevronRight,
   Cpu,
-  Camera // ← AJOUTÉ
+  Camera,
+  UploadCloud,
+  Database,
+  BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -48,8 +51,10 @@ export default function HomePage() {
               Navigation
             </div>
           )}
-          <Link 
-            href="/" 
+
+          {/* Chat Intelligent */}
+          <Link
+            href="/"
             className={cn(
               "flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-blue-600/10 border border-blue-500/20 rounded-xl transition-all",
               collapsed && "justify-center px-0 border-none bg-transparent hover:bg-blue-600/10"
@@ -58,10 +63,10 @@ export default function HomePage() {
             <MessageSquare className="w-4 h-4 text-blue-400 shrink-0" />
             {!collapsed && <span className="truncate">Chat Intelligent</span>}
           </Link>
-          
-          {/* 🔥 NOUVEAU : Lien vers Vision */}
-          <Link 
-            href="/vision" 
+
+          {/* Recherche par Image */}
+          <Link
+            href="/vision"
             className={cn(
               "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
               collapsed && "justify-center px-0"
@@ -75,9 +80,10 @@ export default function HomePage() {
               </Badge>
             )}
           </Link>
-          
-          <Link 
-            href="/admin" 
+
+          {/* Base de Connaissances */}
+          <Link
+            href="/admin"
             className={cn(
               "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
               collapsed && "justify-center px-0"
@@ -86,17 +92,63 @@ export default function HomePage() {
             <HardDrive className="w-4 h-4 group-hover:text-purple-400 transition-colors shrink-0" />
             {!collapsed && <span className="truncate">Base de Connaissances</span>}
           </Link>
+
+          {/* Upload de Documents */}
+          <Link
+            href="/documents/upload"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <UploadCloud className="w-4 h-4 group-hover:text-green-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Upload Documents</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-green-500/10 text-green-400 border-none text-[8px] font-black uppercase">
+                IMPORT
+              </Badge>
+            )}
+          </Link>
+
+          {/* Gestion des Documents */}
+          <Link
+            href="/documents/manage"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <Database className="w-4 h-4 group-hover:text-blue-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">GÃ©rer Documents</span>}
+          </Link>
+
+          {/* Documentation */}
+          <Link
+            href="/docs"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all group",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <BookOpen className="w-4 h-4 group-hover:text-orange-400 transition-colors shrink-0" />
+            {!collapsed && <span className="truncate">Documentation</span>}
+            {!collapsed && (
+              <Badge className="ml-auto bg-orange-500/10 text-orange-400 border-none text-[8px] font-black uppercase">
+                GUIDE
+              </Badge>
+            )}
+          </Link>
         </div>
 
         {!collapsed && (
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
-             <div className="flex items-center gap-2">
-               <Cpu className="w-4 h-4 text-yellow-400" />
-               <span className="text-[10px] font-black text-white uppercase tracking-widest">Innovation AI</span>
-             </div>
-             <p className="text-[9px] text-gray-500 leading-relaxed">
-               Le RAG Hybride combine sémantique et graphe de relations pour une précision maximale.
-             </p>
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-yellow-400" />
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">Innovation AI</span>
+            </div>
+            <p className="text-[9px] text-gray-500 leading-relaxed">
+              Le RAG Hybride combine sÃ©mantique et graphe de relations pour une prÃ©cision maximale.
+            </p>
           </div>
         )}
       </div>
@@ -106,13 +158,13 @@ export default function HomePage() {
           <>
             <div className="px-3 py-2 flex items-center justify-between animate-in fade-in">
               <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold uppercase tracking-widest">
-                <ShieldCheck className="w-3.5 h-3.5" /> Sécurité
+                <ShieldCheck className="w-3.5 h-3.5" /> SÃ©curitÃ©
               </div>
               <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] font-black uppercase">Local VFS</Badge>
             </div>
           </>
         ) : (
-          <div className="flex justify-center py-2" title="Mode Sécurisé Local">
+          <div className="flex justify-center py-2" title="Mode SÃ©curisÃ© Local">
             <ShieldCheck className="w-5 h-5 text-green-500" />
           </div>
         )}
@@ -127,9 +179,9 @@ export default function HomePage() {
         "flex-col hidden lg:flex border-r border-white/5 bg-[#171717] transition-all duration-300 relative z-30",
         isCollapsed ? "w-20" : "w-72"
       )}>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-4 top-12 z-50 bg-[#171717] border border-white/5 rounded-full h-8 w-8 hover:bg-blue-600 hover:text-white shadow-xl transition-all"
         >
@@ -159,12 +211,12 @@ export default function HomePage() {
             <h1 className="font-bold text-white text-sm uppercase tracking-widest text-center flex-1">Assistant Professionnel</h1>
           </div>
         </header>
-        
+
         {/* Chat Interface */}
         <div className="flex-1 overflow-hidden relative">
           <Chat />
         </div>
-        
+
         {/* Document Ingestion Bar */}
         <Upload />
       </div>

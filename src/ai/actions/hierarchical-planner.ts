@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview HierarchicalPlanner - Innovation 18.
  * Décomposition des tâches complexes en sous-actions exécutables avec validation multi-niveaux.

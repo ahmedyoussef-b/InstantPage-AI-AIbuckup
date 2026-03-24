@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview CollaborativeLearningNetwork - Innovation 32.
  * Permet le partage de connaissances anonymisées entre instances pour une intelligence collective.

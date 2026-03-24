@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview AgentLearner - Phase 4 de l'Architecture Agentic.
  */

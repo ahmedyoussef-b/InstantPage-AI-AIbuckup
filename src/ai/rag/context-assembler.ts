@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileOverview Phase 2: RAISONNER.
  */

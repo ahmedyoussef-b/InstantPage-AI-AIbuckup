@@ -7,6 +7,8 @@ import crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
+const EDGE_TTS_BIN = 'C:\\Users\\pc\\AppData\\Roaming\\Python\\Python313\\Scripts\\edge-tts.exe';
+
 class EdgeProvider {
   name = 'edge';
   private tempPath: string;
@@ -27,7 +29,7 @@ class EdgeProvider {
    */
   async checkHealth(): Promise<boolean> {
     try {
-      await execAsync('edge-tts --list-voices');
+      await execAsync(`"${EDGE_TTS_BIN}" --list-voices`);
       return true;
     } catch {
       return false;
@@ -38,7 +40,7 @@ class EdgeProvider {
    * Obtenir les voix disponibles
    */
   async getVoices(): Promise<any[]> {
-    const { stdout } = await execAsync('edge-tts --list-voices');
+    const { stdout } = await execAsync(`"${EDGE_TTS_BIN}" --list-voices`);
     return stdout.split('\n')
       .filter(line => line.includes('fr-FR') || line.includes('en-US'))
       .map(line => {
@@ -63,8 +65,11 @@ class EdgeProvider {
     const outputPath = path.join(this.tempPath, `${crypto.randomUUID()}.mp3`);
     
     try {
+      // Nettoyer le texte pour Windows (éviter les problèmes de guillemets)
+      const safeText = text.replace(/"/g, ' ');
+      
       // Exécuter edge-tts
-      const command = `edge-tts --text "${text}" --voice "${voice}" --write-media "${outputPath}"`;
+      const command = `"${EDGE_TTS_BIN}" --text "${safeText}" --voice "${voice}" --write-media "${outputPath}"`;
       
       if (speed !== 1.0) {
         await execAsync(`${command} --rate ${this.speedToRate(speed)}`);
