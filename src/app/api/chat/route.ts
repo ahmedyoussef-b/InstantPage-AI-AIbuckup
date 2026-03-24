@@ -21,6 +21,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Le message est requis." }, { status: 400 });
     }
 
+    // 🔥 BYPASS URGENT POUR LES SALUTATIONS ET MOTS COURTS (Évite 40s+ de latence)
+    const greetings = [
+      'bonjour', 'bonsoir', 'salut', 'coucou', 'hello', 'hi', 'hey', 'bjr',
+      'bonjour?', 'bonsoir?', 'salut?', 'coucou?', 'hello?', 'hi?', 'hey?', 'bjr?',
+      'bonjour !', 'bonsoir !', 'salut !', 'coucou !', 'hello !', 'hi !', 'hey !',
+      'slaut', 'slt', 'cc', 'yo', 'salutations'
+    ];
+    
+    const promptLower = prompt.toLowerCase().trim();
+    const isGreeting = greetings.some(g => promptLower.includes(g) && promptLower.length < 30) || promptLower.length < 7;
+    
+    if (isGreeting) {
+      console.log(`[API][CHAT][${requestId}] ✅ Salutation/Mot très court détecté - BYPASS TOTAL`);
+      const hour = new Date().getHours();
+      const greeting = (hour >= 18 || hour < 6) ? "Bonsoir" : "Bonjour";
+      
+      return NextResponse.json({
+        answer: `${greeting} ! Comment puis-je vous aider aujourd'hui ?`,
+        sources: [],
+        suggestions: ["Que puis-je faire pour vous ?", "Posez-moi une question technique"],
+        confidence: 0.98,
+        isAgentMission: false,
+        learning: { recorded: false, timestamp: Date.now() }
+      });
+    }
+
     // PHASE 1: COMPRENDRE - Analyse sémantique de l'intention
     console.log(`[API][CHAT][${requestId}] Analyse de l'intention...`);
     const analysis = await analyzeQuery(prompt);

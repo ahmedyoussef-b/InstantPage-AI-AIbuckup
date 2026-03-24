@@ -38,16 +38,24 @@ export async function apprendreVector(
 
 async function extractLessons(query: string, answer: string): Promise<Lesson[]> {
   try {
-    const response = await ai.generate({
-      model: 'ollama/phi3:mini',
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("LLM Extraction Timeout")), 15000);
+    });
+
+    const generatePromise = ai.generate({
+      model: 'ollama/tinyllama:latest',
       system: "Tu es un Extracteur de Savoir Elite. Identifie une règle technique universelle issue de cet échange.",
       prompt: `Question : ${query}\nRéponse : ${answer}\n\nJSON: [{"content": "...", "importance": 0.X}]`,
     });
+
+    const response = await Promise.race([generatePromise, timeoutPromise]) as any;
 
     const match = response.text.match(/\[.*\]/s);
     if (match) {
       return JSON.parse(match[0]).map((l: any) => ({ ...l, timestamp: Date.now() }));
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[AI][PHASE-4] Extraction de leçon ignorée suite à un timeout ou une erreur.");
+  }
   return [];
 }

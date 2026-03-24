@@ -26,14 +26,17 @@ export async function generateLLMResponse(
   options: { model?: string } = {}
 ): Promise<LLMResponse> {
   const startTime = Date.now();
-  const model = options.model || 'phi3:mini';
-  const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+  const model = options.model || 'tinyllama:latest';
+  const ollamaUrl = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
   console.log(`[RAG][GENERATOR] Génération de la réponse avec citations. Modèle: ${model}`);
 
   const fullPrompt = buildFinalPrompt(userPrompt, context);
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 secondes max
+
     const response = await fetch(`${ollamaUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -43,10 +46,13 @@ export async function generateLLMResponse(
         stream: false,
         options: {
           temperature: 0.3,
-          num_predict: 1000
+          num_predict: 150
         }
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error(`Ollama Error: ${response.status}`);
 

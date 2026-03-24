@@ -46,8 +46,13 @@ export async function analyzeQuery(query: string): Promise<QueryAnalysis> {
 }
 
 async function performLLMAnalysis(query: string) {
-  const response = await ai.generate({
-    model: 'ollama/phi3:mini',
+  // Wrap in a 15-second timeout to allow model swapping into RAM
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("LLM Analysis Timeout")), 15000);
+  });
+  
+  const generatePromise = ai.generate({
+    model: 'ollama/tinyllama:latest',
     system: `Tu es un Analyste Sémantique expert en maintenance industrielle. 
     Analyse la requête et extrait les informations au format JSON STRICT.
     TYPES: factual, procedural, comparative, explanatory, action.
@@ -61,6 +66,8 @@ async function performLLMAnalysis(query: string) {
       "entities": ["équipement", "code_erreur"]
     }`,
   });
+
+  const response = await Promise.race([generatePromise, timeoutPromise]) as any;
 
   const match = response.text.match(/\{.*\}/s);
   if (match) {

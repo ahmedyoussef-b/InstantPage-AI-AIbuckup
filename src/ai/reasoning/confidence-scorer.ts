@@ -29,7 +29,7 @@ export class ConfidenceScorer {
   /**
    * Détermine si une réponse est fiable après auto-évaluation.
    */
-  static isReliable(score: number): boolean {
+  static isReliable(score: number, threshold: number): boolean {
     return score >= 0.3;
   }
 }

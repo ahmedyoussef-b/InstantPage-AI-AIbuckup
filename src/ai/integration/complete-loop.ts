@@ -20,6 +20,9 @@ export interface LoopInteraction {
   distilledRules: any[];
   userProfile?: any;
   hierarchyNodes?: any[];
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface LoopResult {
@@ -28,6 +31,7 @@ export interface LoopResult {
   disclaimer?: string;
   sources: any[];
   newMemoryEpisode: any;
+  tokenUsage?: any;
 }
 
 /**

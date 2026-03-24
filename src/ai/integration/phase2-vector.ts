@@ -9,7 +9,7 @@
  */
 export async function getEmbedding(text: string): Promise<number[]> {
   try {
-    const response = await fetch('http://localhost:11434/api/embeddings', {
+    const response = await fetch('http://127.0.0.1:11434/api/embeddings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -93,7 +93,7 @@ function simpleHash(text: string): number {
  */
 export async function isEmbeddingAvailable(): Promise<boolean> {
   try {
-    const response = await fetch('http://localhost:11434/api/tags');
+    const response = await fetch('http://127.0.0.1:11434/api/tags');
     const data = await response.json();
     return data.models?.some((m: any) => m.name.includes('nomic-embed-text')) || false;
   } catch {

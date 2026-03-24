@@ -53,7 +53,7 @@ export class AnalogicalReasoner {
   
   private async getEmbedding(text: string): Promise<number[]> {
     try {
-      const response = await fetch('http://localhost:11434/api/embeddings', {
+      const response = await fetch('http://127.0.0.1:11434/api/embeddings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
